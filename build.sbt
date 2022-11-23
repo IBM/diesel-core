@@ -76,7 +76,6 @@ lazy val sharedSettings_lint = Seq(
 )
 
 lazy val sharedJsSettings = Seq(
-  coverageEnabled     := false,
   scalacOptions += {
     val branch        =
       if (version.value.endsWith("SNAPSHOT")) {
