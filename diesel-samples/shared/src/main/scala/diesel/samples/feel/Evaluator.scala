@@ -23,8 +23,8 @@ object Evaluator {
   type ValueSupplier = () => EValue
 
   sealed trait EValue {
-    def +(o: EValue): EValue = ENull
-    def isTruthy: Boolean    = false
+    def +(o: EValue): EValue         = ENull
+    def isTruthy: Boolean            = false
     def or(s: ValueSupplier): EValue = {
       s() match {
         case ETrue =>
@@ -88,7 +88,7 @@ object Evaluator {
   }
 
   case object EFalse extends EBool {
-    override def or(o: ValueSupplier): EValue = {
+    override def or(o: ValueSupplier): EValue  = {
       o() match {
         case bool: EBool =>
           bool

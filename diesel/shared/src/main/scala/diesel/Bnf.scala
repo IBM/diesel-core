@@ -522,21 +522,21 @@ object Bnf {
         if (first) this else GrammarContext(concept, cardinality, None, None, None)
 
       override def toString: String = s"${concept match {
-        case Some(value) => value.name
-        case None        => "_"
-      }},${cardinality match {
-        case Some(value) => value.name
-        case None        => "_"
-      }},${article match {
-        case Some(value) => value.name
-        case None        => "_"
-      }},${plural match {
-        case Some(value) => if (value) "PLURAL" else "SINGULAR"
-        case None        => "_"
-      }},${partitive match {
-        case Some(value) => if (value) "PARTITIVE" else "NON-PARTITIVE"
-        case None        => "_"
-      }}"
+          case Some(value) => value.name
+          case None        => "_"
+        }},${cardinality match {
+          case Some(value) => value.name
+          case None        => "_"
+        }},${article match {
+          case Some(value) => value.name
+          case None        => "_"
+        }},${plural match {
+          case Some(value) => if (value) "PLURAL" else "SINGULAR"
+          case None        => "_"
+        }},${partitive match {
+          case Some(value) => if (value) "PARTITIVE" else "NON-PARTITIVE"
+          case None        => "_"
+        }}"
     }
 
     def ruleNameOf(prefix: String, ctx: GrammarContext, suffix: String): String = {
@@ -1084,7 +1084,7 @@ object Bnf {
           }
             .foldLeft(Partial(Seq())) { (acc, p) => acc ++ p }
 
-        case PPExprRef(concept, vc)           =>
+        case PPExprRef(concept, vc) =>
           val newCtx = vc
             .map { vc => ctx.derive(concept, Single, vc) }
             .getOrElse(ctx.derive(concept, Single))

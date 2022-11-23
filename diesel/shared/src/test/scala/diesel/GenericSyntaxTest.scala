@@ -91,7 +91,8 @@ class GenericSyntaxTest extends DslTestFunSuite {
           offset = 6,
           length = 5,
           message = InsertedTokenMsg(token =
-            "'foo'")
+            "'foo'"
+          )
         ),
         Marker(
           descriptor = Descriptor(
@@ -101,7 +102,8 @@ class GenericSyntaxTest extends DslTestFunSuite {
           offset = 12,
           length = 5,
           message = InsertedTokenMsg(token =
-            "'bar'")
+            "'bar'"
+          )
         )
       )
     }
@@ -118,7 +120,8 @@ class GenericSyntaxTest extends DslTestFunSuite {
           offset = 9,
           length = 1,
           message = InsertedTokenMsg(token =
-            "1")
+            "1"
+          )
         ),
         Marker(
           descriptor = Descriptor(
@@ -128,7 +131,8 @@ class GenericSyntaxTest extends DslTestFunSuite {
           offset = 11,
           length = 1,
           message = InsertedTokenMsg(token =
-            "2")
+            "2"
+          )
         )
       )
     }
@@ -144,7 +148,8 @@ class GenericSyntaxTest extends DslTestFunSuite {
         offset = 9,
         length = 1,
         message = InsertedTokenMsg(token =
-          "1")
+          "1"
+        )
       ))
     }
     assertMarkers("sum [ 1 'bar' ]") {
@@ -156,7 +161,8 @@ class GenericSyntaxTest extends DslTestFunSuite {
         offset = 8,
         length = 5,
         message = InsertedTokenMsg(token =
-          "'bar'")
+          "'bar'"
+        )
       ))
     }
   }

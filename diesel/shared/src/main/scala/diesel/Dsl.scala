@@ -190,7 +190,8 @@ object Dsl {
     def multiple[T2]: PPMultiple[T, T2] = PPMultiple(this)
 
     def verbalization(vc: SPVerbalizationContext): PPExprRef[T] = this.copy(verbalizationContext =
-      Some(vc))
+      Some(vc)
+    )
   }
 
   case class PPMultiple[T, T2](
@@ -201,7 +202,8 @@ object Dsl {
 
     def verbalization(vc: SPVerbalizationContext): PPMultiple[T, T2] =
       this.copy(verbalizationContext =
-        Some(vc))
+        Some(vc)
+      )
   }
 
   case class PPAssoc[T](e: PhraseProduction[T], associativity: Associativity.Value, order: Int = 0)
@@ -623,7 +625,8 @@ object Dsl {
 
     def verbalization(vc: SPVerbalizationContext): SPMultiple[T, T2] =
       this.copy(verbalizationContext =
-        Some(vc))
+        Some(vc)
+      )
   }
 
   case class SPRefWithContext[T](ref: SPExprRef[T], verbalizationContext: SPVerbalizationContext)
@@ -915,9 +918,9 @@ object Dsl {
   trait DynamicLexer {}
 }
 
-/** Dsl trait : to be mixed in by language definitions. Holds all declared concepts,
-  * phrases, instances etc., and provides user-friendly APIs for declaring grammars and
-  * mapping to custom ASTs.
+/** Dsl trait : to be mixed in by language definitions. Holds all declared concepts, phrases,
+  * instances etc., and provides user-friendly APIs for declaring grammars and mapping to custom
+  * ASTs.
   */
 trait Dsl {
 

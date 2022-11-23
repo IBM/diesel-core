@@ -8,14 +8,14 @@ val scalaVersion_ = "2.13.8"
 
 inThisBuild(
   List(
-    organization := "com.ibm.diesel",
-    scalaVersion := scalaVersion_,
+    organization  := "com.ibm.diesel",
+    scalaVersion  := scalaVersion_,
     versionScheme := Some("semver-spec")
   )
 )
 
 lazy val copyrightSettings = Seq(
-  startYear := Some(2018),
+  startYear        := Some(2018),
   organizationName := "The Diesel Authors",
   licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt"))
 )
@@ -39,8 +39,8 @@ lazy val root = project
   .in(file("."))
   .aggregate(dieselJVM, dieselJS, samplesJVM, samplesJS)
   .settings(
-    name := "diesel-root",
-    scalaVersion := scalaVersion_,
+    name               := "diesel-root",
+    scalaVersion       := scalaVersion_,
     crossScalaVersions := crossVersion2Only
   )
   .settings(copyrightSettings)
@@ -59,11 +59,11 @@ lazy val sharedSettings_scalac = Seq(
 )
 
 lazy val sharedSettings_test = Seq(
-  Test / fork := false,
+  Test / fork        := false,
   Test / logBuffered := false,
   // see https://github.com/scalameta/munit/blob/main/junit-interface/src/main/java/munit/internal/junitinterface/JUnitRunner.java
   // with logger:
-  //Test / testOptions += Tests.Argument("+l", "--summary=1")
+  // Test / testOptions += Tests.Argument("+l", "--summary=1")
   // without logger:
   Test / testOptions += Tests.Argument("--summary=1")
 )
@@ -71,12 +71,12 @@ lazy val sharedSettings_test = Seq(
 lazy val sharedSettings_lint = Seq(
   addCompilerPlugin(scalafixSemanticdb),
   ThisBuild / scalafixScalaBinaryVersion := CrossVersion.binaryScalaVersion(scalaVersion.value),
-  ThisBuild / semanticdbEnabled := true,
-  ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
+  ThisBuild / semanticdbEnabled          := true,
+  ThisBuild / semanticdbVersion          := scalafixSemanticdb.revision
 )
 
 lazy val sharedJsSettings = Seq(
-  coverageEnabled := false,
+  coverageEnabled     := false,
   scalacOptions += {
     val branch        =
       if (version.value.endsWith("SNAPSHOT")) {
@@ -98,19 +98,19 @@ lazy val diesel = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .enablePlugins(I18nPlugin)
   .settings(
-    name := "diesel",
-    scalaVersion := scalaVersion_,
-    i18nDir := file("./diesel/i18n"),
+    name          := "diesel",
+    scalaVersion  := scalaVersion_,
+    i18nDir       := file("./diesel/i18n"),
     i18nClassName := "diesel.I18nFiles"
   )
   .settings(copyrightSettings)
   .settings(sharedSettings_scalac)
   .settings(
     libraryDependencies ++= Seq(
-      "com.lihaoyi"         %%% "sourcecode"    % "0.3.0",
-      "com.ibm.cloud.diesel"      %%% "diesel-i18n"   % Dependencies.dieselI18nVersion,
-      scalaOrganization.value % "scala-reflect" % scalaVersion.value,
-      "org.scalameta"       %%% "munit"         % "1.0.0-M7" % Test
+      "com.lihaoyi"          %%% "sourcecode"    % "0.3.0",
+      "com.ibm.cloud.diesel" %%% "diesel-i18n"   % Dependencies.dieselI18nVersion,
+      scalaOrganization.value  % "scala-reflect" % scalaVersion.value,
+      "org.scalameta"        %%% "munit"         % "1.0.0-M7" % Test
     )
   )
   .settings(sharedSettings_test)
@@ -125,7 +125,7 @@ lazy val samples = crossProject(JSPlatform, JVMPlatform)
   .in(file("./diesel-samples"))
   .dependsOn(diesel % "compile->compile;test->test")
   .settings(
-    name := "diesel-samples",
+    name         := "diesel-samples",
     scalaVersion := scalaVersion_
   )
   .settings(copyrightSettings)

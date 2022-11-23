@@ -22,7 +22,7 @@ import diesel.Lexer.Scanner
 import diesel._
 import diesel.samples.jsmodeldsl.BmdAst.{findSelfConceptNameDeclaration, findSymbolRefNode}
 
-case object BmdDsl extends Dsl with Identifiers with Comments { //with DynamicLexer {
+case object BmdDsl extends Dsl with Identifiers with Comments { // with DynamicLexer {
 
   // TODO avoid identSpec
   private val identSpec     = "[a-zA-Z][a-zA-Z0-9]*"
