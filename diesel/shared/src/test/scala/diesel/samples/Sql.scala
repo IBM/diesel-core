@@ -89,7 +89,7 @@ object Sql {
     val nullNotNullCrit: Syntax[FieldCrit] = syntax(fieldCrit)(
       "is" ~ "not".? ~ "null" map {
         case (_, (_, not, _)) =>
-          not.map { _: Token => IsNotNull }.getOrElse(IsNull)
+          not.map { (_: Token) => IsNotNull }.getOrElse(IsNull)
       }
     )
 

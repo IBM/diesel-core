@@ -137,7 +137,7 @@ trait DefaultVerbalizer extends Verbalizer {
     verbalizable: Verbalizable
   ): Verbalization = {
     val label   =
-      if (context.plural) {
+      if context.plural then {
         labelBuilder.getDisplayPluralLabel(context, verbalizable)
       } else {
         labelBuilder.getDisplayLabel(context, verbalizable)
@@ -145,7 +145,7 @@ trait DefaultVerbalizer extends Verbalizer {
     val prepend = isRTLVerbalizer && shouldInsert(context.article)
 
     val builder = new StringBuilder()
-    if (prepend) {
+    if prepend then {
       builder.append(label)
       builder.append(' ')
     }
@@ -156,22 +156,22 @@ trait DefaultVerbalizer extends Verbalizer {
       articleOffset = builder.length()
       articleLength = article.length
       builder.append(article)
-      if (!isRTLVerbalizer || shouldAddSpace(context.article)) {
+      if !isRTLVerbalizer || shouldAddSpace(context.article) then {
         builder.append(" ")
       }
     }
 
-    if (!prepend) {
+    if !prepend then {
       builder.append(label)
     }
 
     val text        = builder.toString()
     val trimmedText = text.trim
     val index       = text.indexOf(trimmedText)
-    if (index >= 0) {
+    if index >= 0 then {
       articleOffset -= Math.max(0, index)
     }
-    if (articleOffset + articleLength > trimmedText.length) {
+    if articleOffset + articleLength > trimmedText.length then {
       articleLength = trimmedText.length - articleOffset
     }
     Verbalization(trimmedText, articleOffset, articleLength)
@@ -192,7 +192,7 @@ trait DefaultArticleBuilder extends ArticleBuilder {
     context: VerbalizationContext,
     verbalizable: Verbalizable
   ): Option[String] = {
-    if (context.plural) {
+    if context.plural then {
       getPluralArticle(context, verbalizable)
     } else {
       getSingularArticle(context, verbalizable)
@@ -207,10 +207,10 @@ trait DefaultArticleBuilder extends ArticleBuilder {
     context: VerbalizationContext,
     verbalizable: Verbalizable
   ): Option[String] = {
-    if (context.article == NoArticle) {
+    if context.article == NoArticle then {
       None
     } else {
-      if (context.useTermProperties) {
+      if context.useTermProperties then {
         glossary.getTerm(verbalizable.label).flatMap { term =>
           term.getTermPropertyValue(Glossary.getArticlePropertyName(context))
             .filter(_ != "NO_ARTICLE")

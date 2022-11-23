@@ -89,13 +89,13 @@ object SentenceProcessor {
         val template     = s.template
         var subjectFirst = false
         val open         = 1 + template.indexOf('{')
-        if (open > 0) {
+        if open > 0 then {
           val close = template.indexOf('}', open)
-          if (close >= 0) {
+          if close >= 0 then {
             val comma = template.indexOf(',', open)
             val index = template.substring(
               open,
-              if (comma < 0) {
+              if comma < 0 then {
                 close
               } else {
                 Math.min(comma, close)
@@ -104,26 +104,26 @@ object SentenceProcessor {
             Try(index.toInt)
               .toOption
               .foreach { idx =>
-                if (idx > 0) {
+                if idx > 0 then {
                   subjectFirst = true
                 }
               }
           }
         }
         var ctx          = context
-        if (subjectFirst) {
+        if subjectFirst then {
           ctx = ctx.copy(article = DefiniteArticle)
         } else {
           ctx = ctx.copy(article = NoArticle)
         }
-        if (role.cardinality == Multiple) {
+        if role.cardinality == Multiple then {
           ctx = ctx.copy(plural = true)
         }
-        if (useBracket) {
+        if useBracket then {
           writeOpenBracket(true)
         }
         writer.write(verbalizer.verbalizeTerm(ctx, RoleVerbalizable(getRole(role.roleIndex))).text)
-        if (useBracket) {
+        if useBracket then {
           writeCloseBracket(true)
         }
       }
@@ -139,9 +139,9 @@ object SentenceProcessor {
 
     override def processObject(role: SyntacticRole, context: VerbalizationContext): Unit = {
       val label = getRole(role.roleIndex).label
-      if (useBracket) writeOpenBracket(false)
+      if useBracket then writeOpenBracket(false)
       writeObjectText(label.getOrElse("?"))
-      if (useBracket) writeCloseBracket(false)
+      if useBracket then writeCloseBracket(false)
     }
 
     protected def writeObjectText(s: String): Unit = {
@@ -208,7 +208,7 @@ object SentenceProcessor {
     var ctx                = context
     val textBuffer         = new StringBuilder()
     val template           = sentence.template
-    if (template.isEmpty) {
+    if template.isEmpty then {
       return
     }
     val synRoleBuffer      = new StringBuilder()
@@ -219,14 +219,14 @@ object SentenceProcessor {
     ctx = ctx.copy(sentence = Some(sentence))
     handler.processSentence(sentence, ctx)
     var propagatePartitif  = true
-    for (c <- template) {
+    for c <- template do {
       c match {
         case PLACE_HOLDER_OPEN                 =>
           isInSynRole = true
           synRoleBuffer.clear()
           synRolePropsBuffer.clear()
-          if (textBuffer.nonEmpty) {
-            if (mustGeneratePartitiveArticle(ctx, propagatePartitif)) {
+          if textBuffer.nonEmpty then {
+            if mustGeneratePartitiveArticle(ctx, propagatePartitif) then {
               generatePartitiveArticle(verbalizer, ctx, handler)
             }
             handler.processText(textBuffer.substring(0, textBuffer.length))
@@ -240,10 +240,10 @@ object SentenceProcessor {
           ).toOption.flatMap(synRoleIndex => sentence.getSyntacticRole(synRoleIndex))
           synRoleOpt match {
             case Some(synRole) =>
-              if (synRolePropsBuffer.nonEmpty) {
+              if synRolePropsBuffer.nonEmpty then {
                 val props     = synRolePropsBuffer.toString.trim
                 val propsList = getSyntacticRoleProperties(props)
-                if (propsList.nonEmpty) {
+                if propsList.nonEmpty then {
                   ctx = ctx.copy(props = propsList)
                 }
               }
@@ -255,18 +255,18 @@ object SentenceProcessor {
 
             case None =>
               // Unparseable place holder. Let's handle it as a text:
-              if (mustGeneratePartitiveArticle(ctx, propagatePartitif)) {
+              if mustGeneratePartitiveArticle(ctx, propagatePartitif) then {
                 generatePartitiveArticle(verbalizer, ctx, handler)
               }
               handler.processText(s"$PLACE_HOLDER_OPEN$synRoleAsString$PLACE_HOLDER_CLOSE")
               propagatePartitif = false
           }
         case _                                 =>
-          if (isInSynRole) {
-            if (isInSynRoleProps) {
+          if isInSynRole then {
+            if isInSynRoleProps then {
               synRolePropsBuffer.append(c)
             } else {
-              if (c == PLACE_HOLDER_PROPS_SEPARATOR) {
+              if c == PLACE_HOLDER_PROPS_SEPARATOR then {
                 isInSynRoleProps = true
               } else {
                 synRoleBuffer.append(c)
@@ -277,8 +277,8 @@ object SentenceProcessor {
           }
       }
     }
-    if (textBuffer.nonEmpty) {
-      if (mustGeneratePartitiveArticle(ctx, propagatePartitif)) {
+    if textBuffer.nonEmpty then {
+      if mustGeneratePartitiveArticle(ctx, propagatePartitif) then {
         generatePartitiveArticle(verbalizer, ctx, handler)
       }
       handler.processText(textBuffer.toString())
@@ -288,12 +288,12 @@ object SentenceProcessor {
   private def getSyntacticRoleProperties(props: String): Map[String, String] = {
     val tokenizer = new StringTokenizer(props, ", ")
     val propsMap  = mutable.Map[String, String]()
-    while ({
+    while {
       tokenizer.hasMoreTokens
-    }) {
+    } do {
       val prop  = tokenizer.nextToken
       val index = prop.indexOf('=')
-      if (index == -1) propsMap.put(prop, "true")
+      if index == -1 then propsMap.put(prop, "true")
       else {
         val key   = prop.substring(0, index)
         val `val` = prop.substring(index + 1)
@@ -314,12 +314,12 @@ object SentenceProcessor {
       case None        =>
         context.copy(partitive = context.partitive && propagatePartitif)
     }
-    if (context.getProperty(Vocabulary.Constants.NO_ARTICLE).exists(_.equalsIgnoreCase("TRUE"))) {
+    if context.getProperty(Vocabulary.Constants.NO_ARTICLE).exists(_.equalsIgnoreCase("TRUE")) then {
       ctx = ctx.copy(article = NoArticle)
     }
-    if (
+    if
       context.getProperty(Vocabulary.Constants.PLURAL_UNDEFINED).exists(_.equalsIgnoreCase("TRUE"))
-    ) {
+    then {
       ctx = ctx.copy(plural = synRole.cardinality == Multiple)
     }
     ctx

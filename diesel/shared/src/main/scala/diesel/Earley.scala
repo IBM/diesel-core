@@ -32,18 +32,18 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
   }
 
   private def scan(input: Lexer.Input, tokens: Seq[Lexer.TokenId], context: Result): Lexer.Token = {
-    var token = if (tokens.isEmpty) lexer.next(input) else lexer.next(input, tokens)
-    if (token.id == Lexer.Error) {
+    var token = if tokens.isEmpty then lexer.next(input) else lexer.next(input, tokens)
+    if token.id == Lexer.Error then {
       var errorToken = Lexer.Token(token.offset, "", Lexer.Error)
-      do {
-        if (errorToken.offset + errorToken.length == token.offset) {
+      while token.id == Lexer.Error do {
+        if errorToken.offset + errorToken.length == token.offset then {
           errorToken = Lexer.Token(errorToken.offset, errorToken.text ++ token.text, Lexer.Error)
         } else {
           context.addLexicalError(errorToken)
           errorToken = token
         }
-        token = if (tokens.isEmpty) lexer.next(input) else lexer.next(input, tokens)
-      } while (token.id == Lexer.Error)
+        token = if tokens.isEmpty then lexer.next(input) else lexer.next(input, tokens)
+      }
       context.addLexicalError(token = errorToken)
     }
     token
@@ -55,28 +55,28 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
 
   private def buildCharts(input: Lexer.Input, axiom: Bnf.Axiom): Result = {
     val context      = new Result(axiom)
-    var lexicalValue = if (dynamicLexer) skip(input) else scan(input, context)
-    var length       = if (lexicalValue.id == Lexer.Eos) 0 else 1
+    var lexicalValue = if dynamicLexer then skip(input) else scan(input, context)
+    var length       = if lexicalValue.id == Lexer.Eos then 0 else 1
     var index        = 0
-    while (index <= length) {
+    while index <= length do {
       var scanned = false
       val chart   = context.beginChart(index, lexicalValue)
-      if (dynamicLexer) {
+      if dynamicLexer then {
         val scanQueue = closure(context)
         val tokens    = scanQueue.map(_.nextSymbol.asInstanceOf[Bnf.Token].tokenId)
         lexicalValue = scan(input, tokens, context)
         chart.setToken(lexicalValue)
         scanQueue.foreach(context.processingQueue.enqueue(_))
       }
-      while (context.processingQueue.nonEmpty) {
+      while context.processingQueue.nonEmpty do {
         val state: State = context.processingQueue.dequeue()
-        if (state.isCompleted)
+        if state.isCompleted then
           completer(state, context)
         else {
           val next: Bnf.Symbol = state.nextSymbol
           next match {
             case token: Bnf.Token =>
-              if (scanner(state, token, lexicalValue, context))
+              if scanner(state, token, lexicalValue, context) then
                 scanned = true
 
             case rule: Bnf.Rule =>
@@ -86,18 +86,18 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
           }
         }
       }
-      if (!scanned && !succeed(lexicalValue, context)) {
+      if !scanned && !succeed(lexicalValue, context) then {
         errorRecovery(index, lexicalValue, context)
-        if (lexicalValue.id == Lexer.Eos) {
-          while (!context.success) {
+        if lexicalValue.id == Lexer.Eos then {
+          while !context.success do {
             errorRecovery(index, lexicalValue, context)
           }
         }
       }
       context.endChart()
 
-      lexicalValue = if (dynamicLexer) skip(input) else scan(input, context)
-      if (lexicalValue.id != Lexer.Eos)
+      lexicalValue = if dynamicLexer then skip(input) else scan(input, context)
+      if lexicalValue.id != Lexer.Eos then
         length += 1
       index += 1
     }
@@ -106,9 +106,9 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
 
   private def closure(context: Result): Seq[State] = {
     var scanQueue: Seq[State] = Seq()
-    while (context.processingQueue.nonEmpty) {
+    while context.processingQueue.nonEmpty do {
       val state: State = context.processingQueue.dequeue()
-      if (state.isCompleted)
+      if state.isCompleted then
         completer(state, context)
       else {
         val next: Bnf.Symbol = state.nextSymbol
@@ -127,15 +127,15 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
   }
 
   private def succeed(lexicalValue: Lexer.Token, context: Result) = {
-    if (lexicalValue.id == Lexer.Eos) context.success else false
+    if lexicalValue.id == Lexer.Eos then context.success else false
   }
 
   private def errorRecovery(index: Int, lexicalValue: Lexer.Token, context: Result): Unit = {
     context.beginErrorRecovery()
-    while (context.processingQueue.nonEmpty) {
+    while context.processingQueue.nonEmpty do {
       val state: State = context.processingQueue.dequeue()
-      if (state.isCompleted) {
-        if (state == context.successState && lexicalValue.id != Eos) {
+      if state.isCompleted then {
+        if state == context.successState && lexicalValue.id != Eos then {
           // Insertion error hypothesis : ignore all the tokens at the end of right text
           context.addState(
             State(state.production, state.begin, state.end + 1, state.dot),
@@ -148,8 +148,8 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
         val next: Bnf.Symbol = state.nextSymbol
         next match {
           case token: Bnf.Token =>
-            if (!scanner(state, token, lexicalValue, context)) {
-              if (lexicalValue.id != Lexer.Eos) {
+            if !scanner(state, token, lexicalValue, context) then {
+              if lexicalValue.id != Lexer.Eos then {
                 context.addState(
                   State(state.production, state.begin, state.end + 1, state.dot),
                   StateKind.ErrorRecovery,
@@ -199,7 +199,7 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
     tokenValue: Lexer.Token,
     context: Result
   ): Boolean = {
-    if (token.accept(tokenValue.id, lexer.identifiers)) {
+    if token.accept(tokenValue.id, lexer.identifiers) then {
       context.addState(
         State(state.production, state.begin, state.end + 1, state.dot + 1),
         StateKind.Kernel,
@@ -225,14 +225,14 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
       context.chartAt(state.begin).activeStates(candidate => candidate.nextSymbol eq state.rule)
     candidates.foreach(candidate => {
       val feature = candidate.feature.merge(candidate.dot, state.feature)
-      if (feature != Constraints.Incompatible) {
+      if feature != Constraints.Incompatible then {
         context.addState(
           State(
             candidate.production,
             candidate.begin,
             state.end,
             candidate.dot + 1,
-            if (candidate.feature.canPropagate) feature else candidate.feature
+            if candidate.feature.canPropagate then feature else candidate.feature
           ),
           StateKind.next(state.kind(context)),
           Some(BackPtr(candidate, state))

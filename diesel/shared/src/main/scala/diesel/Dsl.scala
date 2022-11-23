@@ -190,7 +190,8 @@ object Dsl {
     def multiple[T2]: PPMultiple[T, T2] = PPMultiple(this)
 
     def verbalization(vc: SPVerbalizationContext): PPExprRef[T] = this.copy(verbalizationContext =
-      Some(vc))
+      Some(vc)
+    )
   }
 
   case class PPMultiple[T, T2](
@@ -201,7 +202,8 @@ object Dsl {
 
     def verbalization(vc: SPVerbalizationContext): PPMultiple[T, T2] =
       this.copy(verbalizationContext =
-        Some(vc))
+        Some(vc)
+      )
   }
 
   case class PPAssoc[T](e: PhraseProduction[T], associativity: Associativity.Value, order: Int = 0)
@@ -371,9 +373,9 @@ object Dsl {
       dsl: Dsl,
       consumer: SyntaxTyped[T] => Unit
     ): Unit = {
-      if (concept.typeOf == tag) {
+      if concept.typeOf == tag then {
         val c = concept.asInstanceOf[Concept[T]]
-        if (accept(c, exprTypes, dsl))
+        if accept(c, exprTypes, dsl) then
           consumer(syntaxOf(c))
       }
     }
@@ -391,9 +393,9 @@ object Dsl {
       dsl: Dsl,
       consumer: (SyntaxMulti[T, T2]) => Unit
     ): Unit =
-      if (concept.typeOf == tag) {
+      if concept.typeOf == tag then {
         val c = concept.asInstanceOf[Concept[T]]
-        if (accept(c, exprTypes, dsl))
+        if accept(c, exprTypes, dsl) then
           consumer(syntaxOf(c))
       }
   }
@@ -623,7 +625,8 @@ object Dsl {
 
     def verbalization(vc: SPVerbalizationContext): SPMultiple[T, T2] =
       this.copy(verbalizationContext =
-        Some(vc))
+        Some(vc)
+      )
   }
 
   case class SPRefWithContext[T](ref: SPExprRef[T], verbalizationContext: SPVerbalizationContext)
@@ -915,9 +918,9 @@ object Dsl {
   trait DynamicLexer {}
 }
 
-/** Dsl trait : to be mixed in by language definitions. Holds all declared concepts,
-  * phrases, instances etc., and provides user-friendly APIs for declaring grammars and
-  * mapping to custom ASTs.
+/** Dsl trait : to be mixed in by language definitions. Holds all declared concepts, phrases,
+  * instances etc., and provides user-friendly APIs for declaring grammars and mapping to custom
+  * ASTs.
   */
 trait Dsl {
 
@@ -1079,14 +1082,14 @@ trait Dsl {
     syntax
   }
 
-  def syntax[T](production: SyntaxProduction[T])(implicit name: sourcecode.Name): SyntaxUntyped[T] =
-    addSyntax(SyntaxUntyped(name.value, production)).asInstanceOf[SyntaxUntyped[T]]
-
   def syntax[T](
     concept: Concept[T],
     expression: Boolean = true
   )(production: SyntaxProduction[T])(implicit name: sourcecode.Name): SyntaxTyped[T] =
     addSyntax(SyntaxTyped(name.value, concept, expression, production)).asInstanceOf[SyntaxTyped[T]]
+
+  // def syntax[T](production: SyntaxProduction[T])(implicit name: sourcecode.Name): SyntaxUntyped[T] =
+  // addSyntax(SyntaxUntyped(name.value, production)).asInstanceOf[SyntaxUntyped[T]]
 
   def syntaxMultiple[T, T2](concept: Concept[T])(production: SyntaxProduction[T2])(implicit
     name: sourcecode.Name

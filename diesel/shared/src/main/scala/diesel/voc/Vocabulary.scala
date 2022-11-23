@@ -193,7 +193,7 @@ object Glossary {
     getArticlePropertyName(context.article, context.plural)
 
   def getArticlePropertyName(article: Article, isPlural: Boolean): String =
-    s"${article.name}${if (isPlural) PLURAL_ARTICLE_SUFFIX else SINGULAR_ARTICLE_SUFFIX}"
+    s"${article.name}${if isPlural then PLURAL_ARTICLE_SUFFIX else SINGULAR_ARTICLE_SUFFIX}"
 
   def empty: Glossary = Glossary(Seq.empty)
 }

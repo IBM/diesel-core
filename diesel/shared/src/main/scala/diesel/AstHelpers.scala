@@ -86,7 +86,7 @@ object AstHelpers {
     verbalizer: Option[Verbalizer] = None,
     axiom: Option[Axiom[_]] = None
   )(s: String)(f: GenericTree => Unit): Unit = {
-    assertAsts(dsl, verbalizer, axiom)(s) { n: Navigator =>
+    assertAsts(dsl, verbalizer, axiom)(s) { (n: Navigator) =>
       assert(n.hasNext)
       val a = n.next()
       // println(a.root)
@@ -121,7 +121,7 @@ object AstHelpers {
 
   def assertNoMarkers(p: GenericTree, assertNoAmbiguity: Boolean = true): Unit = {
     assert(p.markers.isEmpty, s"markers found ${p.markers.mkString("\n")}")
-    if (assertNoAmbiguity)
+    if assertNoAmbiguity then
       assert(!p.toSeq.exists(n => n.hasAmbiguity))
   }
 

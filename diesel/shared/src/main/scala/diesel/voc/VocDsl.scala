@@ -66,14 +66,14 @@ trait VocDsl extends Dsl {
       case Some(value) => sourcecode.Name(s"${value}-${key}")
       case None        => sourcecode.Name(s"${key}")
     }
-    if (c.parentIds.isEmpty) {
+    if c.parentIds.isEmpty then {
       Seq(key -> concept[Ast.Expr](classTag[Ast.Expr], sourceName))
     } else {
       // TODO multiple inheritance?
       val parent = c.parentIds.headOption
-        .map(DslConceptKey)
+        .map(DslConceptKey.apply)
         .flatMap(concepts.get)
-      if (parent.isDefined) {
+      if parent.isDefined then {
         Seq(key -> concept[Ast.Expr, Ast.Expr](parent.get)(classTag[Ast.Expr], sourceName))
       } else {
         val created = c.parentIds.headOption.flatMap(lookup.get)
@@ -103,7 +103,7 @@ trait VocDsl extends Dsl {
         VerbalizationContext(article = DefiniteArticle),
         dslConcepts
       )(mapPhrase(ft, s))
-      if (s.syntacticRoles.last.cardinality == Multiple) {
+      if s.syntacticRoles.last.cardinality == Multiple then {
         phraseMultiple(dslResultConcept)(production)
       } else {
         phrase(dslResultConcept)(production)
@@ -143,7 +143,7 @@ trait VocDsl extends Dsl {
     val vc                        = VerbalizationContext(article = DemonstrativeArticle)
     val text                      = verbalizer.verbalize(vc, ConceptVerbalizable(concept))
     val words                     = text.trim().split(" ").map(t => SPStr(t))
-    val production                = if (words.length > 1) SPAndN(words.toSeq) else words(0)
+    val production                = if words.length > 1 then SPAndN(words.toSeq) else words(0)
     syntax(dslResultConcept)(production map { case _ =>
       Ast.SyntaxExpr("this", concept.identifier, multiple = false, Seq())
     })
@@ -187,7 +187,7 @@ private object VocDslUtils {
     }
 
     override def processText(text: String): Unit = {
-      val words = text.trim().split(" ").map(TextPart)
+      val words = text.trim().split(" ").map(TextPart.apply)
       parts.appendAll(words)
     }
   }
@@ -257,9 +257,9 @@ private object VocDslUtils {
         case (TextPart(t), index)               =>
           precedences.get(t) match {
             case Some(value) =>
-              if (index == 0) {
-                if (parts.isDefinedAt(index + 1)) {
-                  if (parts.apply(index + 1).isRole && parts.length == 2) {
+              if index == 0 then {
+                if parts.isDefinedAt(index + 1) then {
+                  if parts.apply(index + 1).isRole && parts.length == 2 then {
                     PPAssoc(PPStr(t), value._1, value._2)
                   } else {
                     PPStr(t)
@@ -268,15 +268,15 @@ private object VocDslUtils {
                   PPStr(t)
                 }
               } else {
-                if (parts.apply(index - 1).isRole) {
-                  if (parts.isDefinedAt(index + 1)) {
-                    if (parts.apply(index + 1).isRole && parts.length == 3) {
+                if parts.apply(index - 1).isRole then {
+                  if parts.isDefinedAt(index + 1) then {
+                    if parts.apply(index + 1).isRole && parts.length == 3 then {
                       PPAssoc(PPStr(t), value._1, value._2)
                     } else {
                       PPStr(t)
                     }
                   } else {
-                    if (parts.length == 2) {
+                    if parts.length == 2 then {
                       PPAssoc(PPStr(t), value._1, value._2)
                     } else {
                       PPStr(t)
@@ -293,7 +293,7 @@ private object VocDslUtils {
           PPStr(role.label.getOrElse("?")).subject
         case (ObjectRolePart(syntacticRole), _) =>
           val ref = PPExprRef[T](useConcept(Some(syntacticRole), roles, dslConcepts))
-          if (syntacticRole.cardinality == Multiple) {
+          if syntacticRole.cardinality == Multiple then {
             ref
               .multiple[T]
             // TODO ?
