@@ -22,6 +22,8 @@ lazy val copyrightSettings = Seq(
 
 // CI convenience
 addCommandAlias("lint", "fmtCheck;fixCheck;headerCheckAll")
+addCommandAlias("build", "compile")
+
 // dev convenience
 addCommandAlias("fmtCheck", "all scalafmtSbtCheck scalafmtCheckAll")
 addCommandAlias("fixCheck", "scalafixAll --check")
