@@ -1,0 +1,30 @@
+/*
+ * Copyright 2018 The Diesel Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package diesel.samples.glsl
+
+import diesel.BuiltinStyles
+import diesel.Style
+
+object GStyles {
+
+  sealed trait GStyle       extends Style
+  case object Keyword       extends BuiltinStyles.WrappedStyle(BuiltinStyles.KeywordStyle) with GStyle
+  case object Constant      extends BuiltinStyles.WrappedStyle(BuiltinStyles.ConstantStyle) with GStyle
+  case object Type          extends GStyle { val name = "type" }
+  case object VariableStyle extends BuiltinStyles.WrappedStyle(BuiltinStyles.VariableStyle)
+
+}
