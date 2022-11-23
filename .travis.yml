@@ -10,14 +10,14 @@ before_install:
 
 stages:
   - name: test
-  - name: release
-    if: (tag IS present) AND NOT fork
+  #- name: release
+  #  if: (tag IS present) AND NOT fork
 
 jobs:
   include:
     - script: sbt build lint test
-    - stage: release
-      script: sbt ci-release
+    #- stage: release
+    #  script: sbt ci-release
 
 cache:
   directories:
