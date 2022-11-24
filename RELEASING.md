@@ -19,14 +19,14 @@ Verify version to be
 
 Print current version(s)
 
-    git fetch origin master develop
+    git fetch origin main develop
     git describe
 
 New release version
 
     VERSION=x.y.z
-    git checkout master
-    git pull --ff-only origin master 
+    git checkout main
+    git pull --ff-only origin main 
     git checkout develop
     git pull --ff-only origin develop
     git flow release start \
@@ -45,7 +45,7 @@ Take a look ...
         --nopush --nokeep --nofetch --showcommands \
         -m "v" \
         $VERSION
-    git push origin master
+    git push origin main
     git push origin $VERSION
 
 Release in github (requires your github token `export GREN_GITHUB_TOKEN=...`)
