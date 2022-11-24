@@ -37,7 +37,7 @@ val crossVersion2Only = Seq(scalaVersion_)
 
 lazy val root = project
   .in(file("."))
-  .aggregate(dieselJVM, dieselJS, samplesJVM, samplesJS)
+  .aggregate(diesel.jvm, diesel.js, samples.jvm, samples.js)
   .settings(
     name               := "diesel-root",
     scalaVersion       := scalaVersion_,
@@ -116,9 +116,6 @@ lazy val diesel = crossProject(JSPlatform, JVMPlatform)
   .settings(sharedSettings_lint)
   .jsSettings(sharedJsSettings)
 
-lazy val dieselJS  = diesel.js
-lazy val dieselJVM = diesel.jvm
-
 lazy val samples = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .in(file("./diesel-samples"))
@@ -132,6 +129,3 @@ lazy val samples = crossProject(JSPlatform, JVMPlatform)
   .settings(sharedSettings_test)
   .settings(sharedSettings_lint)
   .jsSettings(sharedJsSettings)
-
-lazy val samplesJS  = samples.js
-lazy val samplesJVM = samples.jvm
