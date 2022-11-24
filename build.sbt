@@ -84,18 +84,6 @@ lazy val sharedSettings_lint = Seq(
 )
 
 lazy val sharedJsSettings = Seq(
-  scalacOptions += {
-    val branch        =
-      if (version.value.endsWith("SNAPSHOT")) {
-        "develop"
-      } else {
-        version.value
-      }
-    val local: String = baseDirectory.value.getParentFile.getParentFile.toURI.toString
-    val remote        = s"https://raw.github.ibm.com/diesel/diesel/$branch/"
-    println(s"sourceURIs : \nLOCAL:$local\nREMOTE:$remote")
-    s"-P:scalajs:mapSourceURI:$local->$remote"
-  },
   // for dependency: pine
   libraryDependencies := libraryDependencies.value.filterNot(_.name == "scalajs-compiler"),
   addCompilerPlugin("org.scala-js" % "scalajs-compiler" % scalaJSVersion cross CrossVersion.patch)
