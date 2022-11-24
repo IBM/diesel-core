@@ -314,7 +314,8 @@ object SentenceProcessor {
       case None        =>
         context.copy(partitive = context.partitive && propagatePartitif)
     }
-    if context.getProperty(Vocabulary.Constants.NO_ARTICLE).exists(_.equalsIgnoreCase("TRUE")) then {
+    if context.getProperty(Vocabulary.Constants.NO_ARTICLE).exists(_.equalsIgnoreCase("TRUE"))
+    then {
       ctx = ctx.copy(article = NoArticle)
     }
     if
