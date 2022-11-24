@@ -2,7 +2,7 @@ dist: jammy
 
 language: scala
 scala:
-  - 3.2.1
+  - 2.13.10
 
 before_install:
   # for sbt-dynver

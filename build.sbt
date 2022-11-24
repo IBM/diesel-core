@@ -3,7 +3,7 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 import scala.sys.process._
 
-val scalaVersion_ = "2.13.8"
+val scalaVersion_ = "2.13.10"
 // val scalaVersion_ = "3.2.1"
 
 inThisBuild(
