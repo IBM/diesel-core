@@ -1083,13 +1083,12 @@ trait Dsl {
   }
 
   def syntax[T](
-    concept: Concept[T],
-    expression: Boolean = true
+    concept: Concept[T]
   )(production: SyntaxProduction[T])(implicit name: sourcecode.Name): SyntaxTyped[T] =
-    addSyntax(SyntaxTyped(name.value, concept, expression, production)).asInstanceOf[SyntaxTyped[T]]
+    addSyntax(SyntaxTyped(name.value, concept, true, production)).asInstanceOf[SyntaxTyped[T]]
 
-  // def syntax[T](production: SyntaxProduction[T])(implicit name: sourcecode.Name): SyntaxUntyped[T] =
-  // addSyntax(SyntaxUntyped(name.value, production)).asInstanceOf[SyntaxUntyped[T]]
+  def syntax[T](production: SyntaxProduction[T])(implicit name: sourcecode.Name): SyntaxUntyped[T] =
+    addSyntax(SyntaxUntyped(name.value, production)).asInstanceOf[SyntaxUntyped[T]]
 
   def syntaxMultiple[T, T2](concept: Concept[T])(production: SyntaxProduction[T2])(implicit
     name: sourcecode.Name
