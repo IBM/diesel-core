@@ -43,7 +43,7 @@ Take a look ...
 
     git flow release finish \
         --nopush --nokeep --nofetch --showcommands \
-        -T "v${VERSION}"
+        -m "release" -T "v${VERSION}"
     git push origin main
     git push origin $VERSION
 
