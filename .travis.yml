@@ -11,7 +11,7 @@ before_install:
 stages:
   - name: test
   - name: release
-    if: (tag IS present) AND NOT fork
+    if: (tag =~ /^v.+/) AND NOT fork
 
 jobs:
   include:
