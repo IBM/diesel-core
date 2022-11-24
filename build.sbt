@@ -92,7 +92,7 @@ lazy val sharedJsSettings = Seq(
         version.value
       }
     val local: String = baseDirectory.value.getParentFile.getParentFile.toURI.toString
-    val remote        = s"https://raw.github.ibm.com/diesel/diesel/$branch/"
+    val remote        = s"https://raw.github.ibm.com/IBM/diesel-core/$branch/"
     println(s"sourceURIs : \nLOCAL:$local\nREMOTE:$remote")
     s"-P:scalajs:mapSourceURI:$local->$remote"
   },
@@ -131,8 +131,7 @@ lazy val samples = crossProject(JSPlatform, JVMPlatform)
   .settings(commonSettings)
   .settings(copyrightSettings)
   .settings(
-    name           := "diesel-core-samples",
-    publish / skip := true
+    name := "diesel-core-samples"
   )
   .dependsOn(diesel % "compile->compile;test->test")
   .settings(sharedSettings_scalac)
