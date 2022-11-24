@@ -131,7 +131,7 @@ lazy val samples = crossProject(JSPlatform, JVMPlatform)
   .settings(commonSettings)
   .settings(copyrightSettings)
   .settings(
-    name           := "diesel-core-samples"
+    name := "diesel-core-samples"
   )
   .dependsOn(diesel % "compile->compile;test->test")
   .settings(sharedSettings_scalac)
