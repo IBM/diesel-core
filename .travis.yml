@@ -2,7 +2,7 @@ dist: jammy
 
 language: scala
 scala:
-  - 2.13.10
+  - 3.2.1
 
 before_install:
   # for sbt-dynver
@@ -11,7 +11,7 @@ before_install:
 stages:
   - name: test
   - name: release
-     if: (tag IS present) AND NOT fork
+    if: (tag IS present) AND NOT fork
 
 jobs:
   include:
