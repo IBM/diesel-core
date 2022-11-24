@@ -66,7 +66,7 @@ object Evaluator {
 
   object EBool {
     def apply(b: Boolean): EBool =
-      if (b)
+      if b then
         ETrue
       else
         EFalse
@@ -129,7 +129,7 @@ object Evaluator {
       val variablesToDeclare = args match {
         case Left(positional) =>
           // arg count must match
-          if (positional.size != definition.params.size) {
+          if positional.size != definition.params.size then {
             throw new UnsupportedOperationException("invalid arg list")
           } else {
             definition.params.map(_.n.s).zip(positional)
@@ -207,7 +207,7 @@ object Evaluator {
         ???
       case TEIf(IfExpression(cond, thenExpr, elseExpr)) =>
         val c = eval(cond)
-        if (c.isTruthy)
+        if c.isTruthy then
           eval(thenExpr)
         else
           eval(elseExpr)
@@ -361,7 +361,7 @@ object Evaluator {
       case SLString(l)   =>
         EStr(l.v)
       case SLBool(l)     =>
-        if (l.v) ETrue else EFalse
+        if l.v then ETrue else EFalse
       case SLDateTime(l) =>
         ???
     }

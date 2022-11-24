@@ -33,9 +33,9 @@ class Feel extends Dsl with Identifiers with DynamicLexer {
         // regex matches : check in scope/keywords
         var i                 = 1
         var m: Option[String] = None
-        while (i <= str.length()) {
+        while i <= str.length() do {
           val s = str.substring(0, i)
-          if (scope.contains(s) || keywords.contains(s)) {
+          if scope.contains(s) || keywords.contains(s) then {
             m = Some(s)
           }
           i = i + 1
@@ -46,7 +46,7 @@ class Feel extends Dsl with Identifiers with DynamicLexer {
           case None    =>
             val i = str.indexOf(" in")
             val r =
-              if (i != -1) {
+              if i != -1 then {
                 str.substring(0, i)
               } else {
                 str
@@ -86,7 +86,7 @@ class Feel extends Dsl with Identifiers with DynamicLexer {
         case Some(x) =>
           val i = x.indexOf(" in")
           val r =
-            if (i != -1) {
+            if i != -1 then {
               x.substring(0, i)
             } else {
               x

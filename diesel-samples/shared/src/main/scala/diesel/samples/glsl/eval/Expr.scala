@@ -96,7 +96,7 @@ case class ENum(v: Double) extends EValue {
   }
 
   override def dash(): EValue = {
-    ENum(if (v == 0) 0 else -v)
+    ENum(if v == 0 then 0 else -v)
   }
 }
 
@@ -109,10 +109,10 @@ object Vec {
 
   def mkValues(nbComponents: Int, values: Array[Double]): Array[Double] = {
     val buf: mutable.ArrayBuffer[Double] = mutable.ArrayBuffer()
-    for (i <- 0 until nbComponents) {
+    for i <- 0 until nbComponents do {
       buf.append(
         values(
-          if (values.length < nbComponents) {
+          if values.length < nbComponents then {
             0
           } else {
             i
@@ -222,8 +222,8 @@ trait Vec extends EValue {
         val thisValues  = values
         val otherValues = vec.values
         val newVals     = mutable.ArrayBuffer[Double]()
-        for (i <- thisValues.indices) {
-          if (i < otherValues.length) {
+        for i <- thisValues.indices do {
+          if i < otherValues.length then {
             newVals.append(f(values(i), otherValues(i)))
           } else {
             newVals.append(values(i))

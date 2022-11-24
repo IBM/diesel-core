@@ -58,7 +58,7 @@ object Validator {
     override def validate(model: JsModelDecl): Seq[Marker] = {
 
       def checkDeclared(offsets: Offsets, name: String): Option[Marker] =
-        if (model.findClass(name).isDefined || model.findDomain(name).isDefined)
+        if model.findClass(name).isDefined || model.findDomain(name).isDefined then
           None
         else {
           Some(Marker(
@@ -115,7 +115,7 @@ object Validator {
     ): Option[Marker] = {
       classDeclaration.superClass
         .flatMap { superClass =>
-          if (superClass.name == classDeclaration.name) {
+          if superClass.name == classDeclaration.name then {
             Some(Marker(
               semanticError,
               superClass.offsets.offset,
@@ -123,7 +123,7 @@ object Validator {
               "A class cannot extend itself"
             ))
           } else {
-            if (checked.contains(superClass.name)) {
+            if checked.contains(superClass.name) then {
               Some(Marker(
                 semanticError,
                 superClass.offsets.offset,
@@ -168,7 +168,7 @@ object Validator {
                 )
               }
             val dMarker     =
-              if (attrMarkers.isEmpty)
+              if attrMarkers.isEmpty then
                 Seq.empty
               else {
                 Seq(
@@ -193,7 +193,7 @@ object Validator {
       model.classes.flatMap { classDeclaration =>
         classDeclaration.discriminator match {
           case Some(DFieldValue(offsets, _)) =>
-            if (classDeclaration.superClass.isEmpty) {
+            if classDeclaration.superClass.isEmpty then {
               Seq(
                 Marker(
                   Descriptor(Kind.Semantic, Severity.Warning),

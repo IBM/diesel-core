@@ -122,7 +122,7 @@ case object BmdDsl extends Dsl with Identifiers with Comments { // with DynamicL
   val sExtendsDeclaration: Syntax[CustomType] = syntax(
     sSymbolRef map {
       case (ctx, isA) =>
-        if (isA.text == "concept") {
+        if isA.text == "concept" then {
           ctx.abort()
         }
         CustomType(Offsets(isA.offset, isA.length), isA.text)

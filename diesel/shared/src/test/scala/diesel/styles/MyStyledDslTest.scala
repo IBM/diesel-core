@@ -49,8 +49,8 @@ class MyStyledDslTest extends DslTestFunSuite {
     val input                        = new Input("1 + pi")
     var res: (Lexer.Token, Seq[Any]) = lexer.nextWithStyles(input)
     val actualStyles                 = mutable.ArrayBuffer[StyledRange]()
-    while (res._1.id != Lexer.Eos) {
-      if (res._2.nonEmpty)
+    while res._1.id != Lexer.Eos do {
+      if res._2.nonEmpty then
         actualStyles.append(StyledRange(
           res._1.offset,
           res._1.text.length,

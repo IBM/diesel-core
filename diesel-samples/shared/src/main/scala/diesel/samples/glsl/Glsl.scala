@@ -136,13 +136,13 @@ object Glsl extends Dsl with Identifiers with Comments {
       }
 
   val s_primary_expression_3: Instance[PrimaryExpression] =
-    instance(primary_expression)("true") map { c: Context =>
+    instance(primary_expression)("true") map { (c: Context) =>
       c.setStyle(Keyword)
       PrimBoolConstant(true)
     }
 
   val s_primary_expression_4: Instance[PrimaryExpression] =
-    instance(primary_expression)("false") map { c: Context =>
+    instance(primary_expression)("false") map { (c: Context) =>
       c.setStyle(Keyword)
       PrimBoolConstant(false)
     }

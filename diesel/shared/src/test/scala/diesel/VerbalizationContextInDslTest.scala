@@ -20,6 +20,7 @@ import diesel.Dsl._
 import diesel.voc.i18n.EnglishVerbalizer
 import diesel.voc.{Concept => _, _}
 import munit.FunSuite
+import scala.util.NotGiven
 
 class VerbalizationContextInDslTest extends FunSuite {
 

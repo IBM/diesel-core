@@ -91,7 +91,7 @@ abstract class DslTestFunSuite extends FunSuite {
       lines.filterNot(_.isEmpty)(0)
     }
     val oneLineTestName =
-      if (lines.length > 1) { firstLine + s"...(${trimmed.length} on ${lines.length} lines)" }
+      if lines.length > 1 then { firstLine + s"...(${trimmed.length} on ${lines.length} lines)" }
       else { trimmed }
     oneLineTestName
   }

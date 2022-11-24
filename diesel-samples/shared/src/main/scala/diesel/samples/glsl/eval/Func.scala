@@ -32,7 +32,7 @@ case class GlslFunc(args: Seq[GlslArg], body: Option[StatementList]) extends Fun
       .map(statements => {
         // create a new scope and add all arguments into it
         val s = scope.push()
-        for ((arg, argIndex) <- args.zipWithIndex) {
+        for (arg, argIndex) <- args.zipWithIndex do {
           val argVal = arguments(argIndex) match {
             case ERef(name)    =>
               scope.find(name).get
@@ -47,8 +47,8 @@ case class GlslFunc(args: Seq[GlslArg], body: Option[StatementList]) extends Fun
 
         // post-process out args by setting their
         // values in the parent scope
-        for ((arg, argIndex) <- args.zipWithIndex) {
-          if (arg.isOut) {
+        for (arg, argIndex) <- args.zipWithIndex do {
+          if arg.isOut then {
             arguments(argIndex) match {
               case ERef(parentScopeVarName) =>
                 // it's a ref : update in the parent scope...
@@ -97,7 +97,7 @@ object BuiltInFunction {
   }
 
   def myCos: BuiltInFunction = BuiltInFunction((scope, exprs) => {
-    if (exprs.length == 1) {
+    if exprs.length == 1 then {
       exprs(0) match {
         case ERef(name)    =>
           val v = scope.find(name).get
@@ -112,11 +112,11 @@ object BuiltInFunction {
   })
 
   def myDot(values: Array[Double], values2: Array[Double]): EValue = {
-    if (values.length != values2.length) {
+    if values.length != values2.length then {
       throw new IllegalArgumentException("dot product must have arrays of same length")
     }
     var p: Double = 0
-    for (i <- values.indices) {
+    for i <- values.indices do {
       p = p + values(i) * values2(i)
     }
     num(p)
@@ -128,7 +128,7 @@ object BuiltInFunction {
     "vec4" -> vecN(4),
     "cos"  -> myCos,
     "dot"  -> BuiltInFunction((scope, exprs) => {
-      if (exprs.length != 2) {
+      if exprs.length != 2 then {
         throw new IllegalArgumentException("dot() needs 2 args")
       }
       myDot(

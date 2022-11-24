@@ -467,7 +467,7 @@ class GlslEval(var scope: Scope) {
 
   def eval(e: ConditionalExpression): Expr = {
     val r = eval(e.e)
-    if (e.rest.isDefined) {
+    if e.rest.isDefined then {
       throw new RuntimeException("TODO")
     }
     r
