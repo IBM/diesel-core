@@ -21,7 +21,7 @@ import diesel.Bnf.{DslInstance, DslSyntax, DslValue}
 import diesel.samples.calc.Ast._
 import diesel.samples.calc.MyDsl
 
-class CalcTest extends DslTestFunSuite {
+class CalcTest extends DslTestFunSuite[Dsl] {
 
   type Ast = Expr
   override def dsl: MyDsl.type = MyDsl

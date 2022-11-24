@@ -19,7 +19,7 @@ package diesel.samples.jsmodeldsl
 import diesel.Marker.{Descriptor, Kind, Severity}
 import diesel.{DslTestFunSuite, Marker}
 
-class JsModelDslValidationTest extends DslTestFunSuite {
+class JsModelDslValidationTest extends DslTestFunSuite[JsModelDsl.type] {
 
   override def dsl = JsModelDsl
 

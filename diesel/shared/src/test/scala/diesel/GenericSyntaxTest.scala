@@ -19,7 +19,7 @@ package diesel
 import diesel.Dsl.{Axiom, Concept, Syntax, SyntaxGenericMulti}
 import diesel.Marker.{Descriptor, Kind, Severity}
 
-class GenericSyntaxTest extends DslTestFunSuite {
+class GenericSyntaxTest extends DslTestFunSuite[Dsl] {
   case class MyList[T](items: Seq[T])
 
   type Result = Either[Int, String]

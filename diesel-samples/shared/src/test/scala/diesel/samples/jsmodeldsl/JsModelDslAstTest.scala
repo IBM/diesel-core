@@ -18,9 +18,9 @@ package diesel.samples.jsmodeldsl
 
 import diesel.DslTestFunSuite
 
-class JsModelDslAstTest extends DslTestFunSuite {
+class JsModelDslAstTest extends DslTestFunSuite[JsModelDsl.type] {
 
-  override def dsl: JsModelDsl.type = JsModelDsl
+  override def dsl = JsModelDsl
   type Ast = JsModelDecl
 
   test("root") {

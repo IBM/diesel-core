@@ -20,7 +20,7 @@ import diesel.DslTestFunSuite
 import diesel.samples.sfeel.Ast._
 import diesel.Dsl
 
-class SFeelTest extends DslTestFunSuite {
+class SFeelTest extends DslTestFunSuite[SFeel.type] {
 
   override def dsl: SFeel.type                    = SFeel
   override def axiom: Some[Dsl.Axiom[Expression]] = Some(dsl.a_expression)
@@ -109,7 +109,7 @@ class SFeelTest extends DslTestFunSuite {
 
 }
 
-class SFeelSimpleUnaryTestsTest extends DslTestFunSuite {
+class SFeelSimpleUnaryTestsTest extends DslTestFunSuite[SFeel.type] {
 
   override def dsl: SFeel.type = SFeel
   type Ast = SimpleUnaryTests

@@ -18,7 +18,7 @@ package diesel.samples.feel
 
 import diesel.{DslTestFunSuite}
 
-class FeelFunSuite extends DslTestFunSuite {
+class FeelFunSuite extends DslTestFunSuite[Feel] {
 
   override def dsl = new Feel
 

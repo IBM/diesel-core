@@ -41,7 +41,7 @@ object MappedAxiomDsl extends Dsl {
 
 }
 
-class MappedAxiomTest extends DslTestFunSuite {
+class MappedAxiomTest extends DslTestFunSuite[Dsl] {
 
   override def dsl = MappedAxiomDsl
 

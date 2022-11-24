@@ -20,7 +20,7 @@ import diesel.AstHelpers._
 import diesel.samples.Abort
 import diesel.samples.Abort.{Add, Constant, Mul}
 
-class AbortTest extends DslTestFunSuite {
+class AbortTest extends DslTestFunSuite[Dsl] {
 
   type Ast = Abort.Expr
   override def dsl = Abort.MyDsl

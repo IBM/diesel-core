@@ -19,7 +19,7 @@ package diesel
 import diesel.samples.UnrelatedTypes
 import diesel.samples.UnrelatedTypes.{Foo, RFoo, Root}
 
-class UnrelatedTypesTest extends DslTestFunSuite {
+class UnrelatedTypesTest extends DslTestFunSuite[Dsl] {
 
   type Ast = Root
   override def dsl = UnrelatedTypes.UnrelatedTypesDsl

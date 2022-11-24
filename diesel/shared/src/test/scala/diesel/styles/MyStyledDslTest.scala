@@ -22,7 +22,7 @@ import diesel.styles.MyStyledDsl.{Add, Constant, Keyword, Literal, Pi, Value}
 
 import scala.collection.mutable
 
-class MyStyledDslTest extends DslTestFunSuite {
+class MyStyledDslTest extends DslTestFunSuite[Dsl] {
 
   type Ast = MyStyledDsl.Expr
   override def dsl = MyStyledDsl

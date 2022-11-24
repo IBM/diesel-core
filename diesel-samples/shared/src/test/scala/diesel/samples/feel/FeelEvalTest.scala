@@ -21,7 +21,7 @@ import diesel.samples.feel.Ast.{Expression, _}
 import diesel.samples.feel.Evaluator._
 import diesel.Dsl
 
-class FeelEvalTest extends DslTestFunSuite {
+class FeelEvalTest extends DslTestFunSuite[Feel] {
 
   override def dsl                                = new Feel
   override def axiom: Some[Dsl.Axiom[Expression]] = Some(dsl.a_expression)

@@ -20,7 +20,7 @@ import diesel.AstHelpers._
 import diesel.samples.Ambiguity
 import diesel.samples.Ambiguity._
 
-class AmbiguityTest extends DslTestFunSuite {
+class AmbiguityTest extends DslTestFunSuite[Dsl] {
 
   type Ast = Expr
   override def dsl = Ambiguity.MyDsl

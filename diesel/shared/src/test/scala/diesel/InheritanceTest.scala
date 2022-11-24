@@ -19,7 +19,7 @@ package diesel
 import diesel.samples.InheritanceSample.Ast._
 import diesel.samples.InheritanceSample._
 
-class InheritanceTest extends DslTestFunSuite {
+class InheritanceTest extends DslTestFunSuite[Dsl] {
 
   type Ast = Ast.Value
   override def dsl = MyDsl

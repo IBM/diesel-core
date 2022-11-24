@@ -19,8 +19,9 @@ package diesel.samplestests
 import diesel.DslTestFunSuite
 import diesel.samples.Expr
 import diesel.samples.Expr._
+import diesel.Dsl
 
-class ExprTest extends DslTestFunSuite {
+class ExprTest extends DslTestFunSuite[Dsl] {
 
   type Ast = Expression
   override def dsl = Expr
