@@ -20,9 +20,9 @@ import diesel.Dsl.Axiom
 import diesel.voc.{Verbalizer, VocDsl}
 import munit.FunSuite
 
-abstract class DslTestFunSuite extends FunSuite {
+abstract class DslTestFunSuite[D <: Dsl] extends FunSuite {
 
-  protected def dsl: Dsl
+  protected def dsl: D
   protected def axiom: Option[Axiom[_]]        = None
   protected def verbalizer: Option[Verbalizer] = dsl match {
     case dslWithVoc: VocDsl => Some(dslWithVoc.verbalizer)
