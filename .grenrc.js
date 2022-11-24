@@ -1,5 +1,5 @@
 module.exports = {
-    "apiUrl": "https://github.ibm.com/api/v3",
+//    "apiUrl": "https://github.com/api/v3",
     "dataSource": "prs",
     "prefix": "v",
     "includeMessages": "all",
