@@ -130,6 +130,7 @@ lazy val samples = crossProject(JSPlatform, JVMPlatform)
   .in(file("./diesel-samples"))
   .settings(commonSettings)
   .settings(copyrightSettings)
+  .settings(sonatypeSettings)
   .settings(
     name := "diesel-core-samples"
   )
