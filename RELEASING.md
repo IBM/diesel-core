@@ -45,7 +45,7 @@ Take a look ...
         --nopush --nokeep --nofetch --showcommands \
         -m "release" -T "v${VERSION}"
     git push origin main
-    git push origin $VERSION
+    git push origin v$VERSION
 
 Release in github (requires your github token `export GREN_GITHUB_TOKEN=...`)
 
