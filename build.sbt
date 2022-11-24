@@ -3,21 +3,30 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 import scala.sys.process._
 
-val scalaVersion_ = "2.13.10"
-// val scalaVersion_ = "3.2.1"
+val scalaVersion2 = "2.13.10"
+// val scalaVersion3 = "3.2.1"
 
-inThisBuild(
-  List(
-    organization  := "com.ibm.diesel",
-    scalaVersion  := scalaVersion_,
-    versionScheme := Some("semver-spec")
-  )
+lazy val commonSettings = Seq(
+  organization  := "com.ibm.cloud.diesel",
+  scalaVersion  := scalaVersion2,
+  versionScheme := Some("semver-spec"),
+  description   := "Diesel is a library for creating and using languages easily."
 )
 
 lazy val copyrightSettings = Seq(
   startYear        := Some(2018),
   organizationName := "The Diesel Authors",
   licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt"))
+)
+
+import xerial.sbt.Sonatype._
+lazy val sonatypeSettings = Seq(
+  sonatypeProfileName    := "com.ibm.cloud",
+  sonatypeProjectHosting := Some(
+    GitHubHosting("IBM", "diesel-core", "agilecoderfrank@gmail.com")
+  ),
+  sonatypeCredentialHost := "oss.sonatype.org",
+  sonatypeRepository     := "https://oss.sonatype.org/service/local"
 )
 
 // CI convenience
@@ -33,17 +42,16 @@ addCommandAlias("cleanJVM", "all diesel/clean samples/clean")
 addCommandAlias("testJVM", "all diesel/test samples/test")
 addCommandAlias("testJS", "all dieselJS/test samplesJS/test")
 
-val crossVersion2Only = Seq(scalaVersion_)
-
 lazy val root = project
   .in(file("."))
   .aggregate(diesel.jvm, diesel.js, samples.jvm, samples.js)
-  .settings(
-    name               := "diesel-root",
-    scalaVersion       := scalaVersion_,
-    crossScalaVersions := crossVersion2Only
-  )
+  .settings(commonSettings)
+  .settings(sonatypeSettings)
   .settings(copyrightSettings)
+  .settings(
+    name           := "diesel-core-root",
+    publish / skip := true
+  )
 
 lazy val sharedSettings_scalac = Seq(
   scalacOptions ++= Seq(
@@ -96,13 +104,14 @@ lazy val sharedJsSettings = Seq(
 lazy val diesel = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .enablePlugins(I18nPlugin)
+  .settings(commonSettings)
+  .settings(sonatypeSettings)
+  .settings(copyrightSettings)
   .settings(
-    name          := "diesel",
-    scalaVersion  := scalaVersion_,
+    name          := "diesel-core",
     i18nDir       := file("./diesel/i18n"),
     i18nClassName := "diesel.I18nFiles"
   )
-  .settings(copyrightSettings)
   .settings(sharedSettings_scalac)
   .settings(
     libraryDependencies ++= Seq(
@@ -119,12 +128,13 @@ lazy val diesel = crossProject(JSPlatform, JVMPlatform)
 lazy val samples = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .in(file("./diesel-samples"))
-  .dependsOn(diesel % "compile->compile;test->test")
-  .settings(
-    name         := "diesel-samples",
-    scalaVersion := scalaVersion_
-  )
+  .settings(commonSettings)
   .settings(copyrightSettings)
+  .settings(
+    name           := "diesel-core-samples",
+    publish / skip := true
+  )
+  .dependsOn(diesel % "compile->compile;test->test")
   .settings(sharedSettings_scalac)
   .settings(sharedSettings_test)
   .settings(sharedSettings_lint)
