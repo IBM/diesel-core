@@ -45,20 +45,20 @@ Take a look ...
         --nopush --nokeep --nofetch --showcommands \
         -m "release" -T "v${VERSION}"
     git push origin main
-    git push origin $VERSION
+    git push origin v$VERSION
 
 Release in github (requires your github token `export GREN_GITHUB_TOKEN=...`)
 
     nvm install --lts
     nvm use --lts
     npm install github-release-notes@0.17.2 -g # latest @0.17.3 is broken
-    gren release
-    gren changelog --generate
+# BROKEN    gren release
+    gren changelog --tags all --generate --override
 
 or 
 
-    npx -p github-release-notes@0.17.2 gren release
-    npx -p github-release-notes@0.17.2 gren changelog --generate
+# BROKEN    npx -p github-release-notes@0.17.2 gren release
+    npx -p github-release-notes@0.17.2 gren changelog --tags all --generate --override
 
 Unbump `develop` and update changelog
 
