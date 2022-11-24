@@ -196,7 +196,7 @@ object Ast {
     id: String,
     c: Option[ConstantExpression],
     i: Option[Initializer]
-  )                                     extends InitDeclaratorList
+  ) extends InitDeclaratorList
 
   case class SingleDeclaration(
     t: FullySpecifiedType,

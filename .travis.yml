@@ -1,0 +1,26 @@
+dist: jammy
+
+language: scala
+scala:
+  - 3.2.1
+
+before_install:
+  # for sbt-dynver
+  - git fetch --tags
+
+stages:
+  - name: test
+  - name: release
+    if: (tag =~ /^v.+/) AND NOT fork
+
+jobs:
+  include:
+    - script: sbt build lint test
+    - stage: release
+      script: sbt ci-release
+
+cache:
+  directories:
+    - $HOME/.cache/coursier
+    - $HOME/.ivy2/cache
+    - $HOME/.sbt

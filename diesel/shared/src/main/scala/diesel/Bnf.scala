@@ -531,10 +531,10 @@ object Bnf {
           case Some(value) => value.name
           case None        => "_"
         }},${plural match {
-          case Some(value) => if value then "PLURAL" else "SINGULAR"
+          case Some(value) => if (value) "PLURAL" else "SINGULAR"
           case None        => "_"
         }},${partitive match {
-          case Some(value) => if value then "PARTITIVE" else "NON-PARTITIVE"
+          case Some(value) => if (value) "PARTITIVE" else "NON-PARTITIVE"
           case None        => "_"
         }}"
     }

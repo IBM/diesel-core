@@ -421,7 +421,7 @@ class GlslEval(var scope: Scope) {
           case ISDoWhile(s, e) =>
             ???
           case ISFor(i, r, s)  =>
-            //eval(i)
+            // eval(i)
             println(s"$i${r.toString}$s")
             ???
         }
