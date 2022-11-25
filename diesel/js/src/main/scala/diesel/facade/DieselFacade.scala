@@ -1,3 +1,19 @@
+/*
+ * Copyright 2018 The Diesel Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package diesel.facade
 
 import diesel._
@@ -13,13 +29,14 @@ object DieselParsers {
   def createParseRequest(text: String) = ParseRequest(text)
 
   @JSExport
-  def createPredictRequest(text: String, offset: Int) = PredictionRequest(ParseRequest(text), offset)
+  def createPredictRequest(text: String, offset: Int) =
+    PredictionRequest(ParseRequest(text), offset)
 
 }
 
 class DieselParserFacade(val dsl: Dsl) {
 
-  val bnf: Bnf = Bnf(dsl, None)
+  val bnf: Bnf       = Bnf(dsl, None)
   val parser: Earley = Earley(bnf, dsl.dynamicLexer)
 
   private def doParse(request: ParseRequest): Result = {
@@ -44,7 +61,7 @@ class DieselParserFacade(val dsl: Dsl) {
         bnf.axioms
           .find(ba => ba.name == s"${x}[_,_,_,_,_].axiom")
           .getOrElse(throw new IllegalArgumentException(s"missing axiom '${x}'"))
-      case None =>
+      case None    =>
         bnf.axioms
           .headOption
           .getOrElse(throw new IllegalArgumentException("no axiom"))
@@ -79,9 +96,9 @@ class DieselMarker(private val marker: Marker) {
 
   @JSExport
   val severity: String = marker.descriptor.severity match {
-    case diesel.Marker.Severity.Info => "info"
+    case diesel.Marker.Severity.Info    => "info"
     case diesel.Marker.Severity.Warning => "warning"
-    case diesel.Marker.Severity.Error => "error"
+    case diesel.Marker.Severity.Error   => "error"
   }
 
 }
@@ -104,7 +121,7 @@ class DieselParseResult(private val res: Either[String, GenericTree]) {
   val success: Boolean = res.isRight
 
   @JSExport
-  val error: js.UndefOr[String] =  res.left.toOption.orUndefined
+  val error: js.UndefOr[String] = res.left.toOption.orUndefined
 
   @JSExport
   val markers: js.Array[DieselMarker] = res.toOption
@@ -137,7 +154,7 @@ object DieselParseResult {
           new DieselParseResult(Right(ast))
         }
       } else {
-       errorResult("No AST found ??")
+        errorResult("No AST found ??")
       }
     } else {
       errorResult("parsing failure :/")
@@ -145,7 +162,7 @@ object DieselParseResult {
   }
 }
 
-class Replace(private val r: (Int,Int)) {
+class Replace(private val r: (Int, Int)) {
 
   @JSExport
   val offset: Int = r._1
@@ -167,14 +184,13 @@ class DieselCompletionProposal(private val proposal: CompletionProposal) {
 
 }
 
-
 case class DieselPredictResult(private val res: Either[String, Seq[CompletionProposal]]) {
 
   @JSExport
   val success: Boolean = res.isRight
 
   @JSExport
-  val error: js.UndefOr[String] =  res.left.toOption.orUndefined
+  val error: js.UndefOr[String] = res.left.toOption.orUndefined
 
   @JSExport
   val proposals: js.Array[DieselCompletionProposal] = res
@@ -184,7 +200,6 @@ case class DieselPredictResult(private val res: Either[String, Seq[CompletionPro
     .toJSArray
 
 }
-
 
 object DieselPredictResult {
 
@@ -198,7 +213,9 @@ object DieselPredictResult {
           result,
           None,
           None
-        ).computeCompletionProposal(offset).distinctBy(_.text) // not sure why but we have to dedup this
+        ).computeCompletionProposal(offset).distinctBy(
+          _.text
+        ) // not sure why but we have to dedup this
         new DieselPredictResult(Right(proposals))
       } else {
         errorResult("No AST found ??")
