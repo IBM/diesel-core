@@ -18,10 +18,9 @@ package diesel
 
 import diesel.i18n.Messages.{Lang, Resolver}
 import diesel.i18n.{Lang, Loader, MessageFormat, Messages}
-import diesel.i18n.MessageKey
+import diesel.i18n.DeclaringSourceName.given
 
 object DieselI18n extends Messages {
-  given m(using name: sourcecode.Name): MessageKey = MessageKey(name.value)
 
   val missingToken: Msg1[String]          = msg1
   val insertedToken: Msg1[String]         = msg1
