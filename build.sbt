@@ -119,9 +119,7 @@ lazy val diesel = crossProject(JSPlatform, JVMPlatform)
   .settings(sharedSettings_scalac)
   .settings(
     libraryDependencies ++= Seq(
-      "com.lihaoyi"          %%% "sourcecode"  % "0.3.0",
       "com.ibm.cloud.diesel" %%% "diesel-i18n" % Dependencies.dieselI18nVersion cross (CrossVersion.for3Use2_13),
-      // scalaOrganization.value  % "scala-reflect" % scalaVersion.value,
       "org.scalameta"        %%% "munit"       % "1.0.0-M7" % Test
     )
   )

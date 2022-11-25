@@ -19,6 +19,8 @@ package diesel
 import diesel.Lexer.{RegexScanner, Scanner, Token}
 import diesel.voc.Article
 
+import diesel.i18n.DeclaringSourceName
+
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
 import scala.util.matching.Regex
@@ -962,33 +964,33 @@ trait Dsl {
   def hasAncestor(c: ConceptBase, p: ConceptBase): Boolean =
     getParent(c).contains(p) || subConceptsOf(p).exists(d => hasAncestor(c, d))
 
-  def concept[T: ClassTag](implicit name: sourcecode.Name): Concept[T] = {
-    val result = Concept[T](name = name.value, None)
+  def concept[T: ClassTag](implicit name: DeclaringSourceName): Concept[T] = {
+    val result = Concept[T](name = name.name, None)
     concepts :+= result
     result
   }
 
   def concept[T: ClassTag, P >: T](parent: Concept[P])(implicit
-    name: sourcecode.Name
+    name: DeclaringSourceName
   ): Concept[T] = {
-    val result = Concept[T](name = name.value, None)
+    val result = Concept[T](name = name.name, None)
     concepts :+= result
     inheritances :+= Inheritance(parent, result)
     result
   }
 
   def concept[T: ClassTag](scanner: Scanner, defaultValue: T)(implicit
-    name: sourcecode.Name
+    name: DeclaringSourceName
   ): ConceptBuilder[T, T] =
-    new ConceptBuilder(name.value, scanner, defaultValue, (value: T) => value.toString, None)
+    new ConceptBuilder(name.name, scanner, defaultValue, (value: T) => value.toString, None)
 
   def concept[T: ClassTag, P >: T](
     scanner: Scanner,
     defaultValue: T,
     parent: Option[Concept[P]]
-  )(implicit name: sourcecode.Name): ConceptBuilder[T, P] =
+  )(implicit name: DeclaringSourceName): ConceptBuilder[T, P] =
     new ConceptBuilder[T, P](
-      name.value,
+      name.name,
       scanner,
       defaultValue,
       (value: T) => value.toString,
@@ -1037,9 +1039,9 @@ trait Dsl {
   }
 
   def instance[T](concept: Concept[T])(s: String)(implicit
-    name: sourcecode.Name
+    name: DeclaringSourceName
   ): InstanceBuilder[T] =
-    new InstanceBuilder(name.value, concept, IPStr(s))
+    new InstanceBuilder(name.name, concept, IPStr(s))
 
   class InstanceBuilder[T](
     val name: String,
@@ -1066,15 +1068,15 @@ trait Dsl {
   }
 
   def phrase[T](concept: Concept[T])(production: PhraseProduction[T])(implicit
-    name: sourcecode.Name
+    name: DeclaringSourceName
   ): Phrase[T] = {
-    addPhrase(PhraseSingle(name.value, concept, production))
+    addPhrase(PhraseSingle(name.name, concept, production))
   }
 
   def phraseMultiple[T, T2](concept: Concept[T])(production: PhraseProduction[T2])(implicit
-    name: sourcecode.Name
+    name: DeclaringSourceName
   ): Phrase[T2] = {
-    addPhrase(PhraseMulti(name.value, concept, production))
+    addPhrase(PhraseMulti(name.name, concept, production))
   }
 
   private def addSyntax[T](syntax: Syntax[T]): Syntax[T] = {
@@ -1082,18 +1084,23 @@ trait Dsl {
     syntax
   }
 
+  def syntax[T](production: SyntaxProduction[T])(implicit
+    name: DeclaringSourceName
+  ): SyntaxUntyped[T] =
+    addSyntax(SyntaxUntyped(name.name, production)).asInstanceOf[SyntaxUntyped[T]]
+
   def syntax[T](
     concept: Concept[T]
-  )(production: SyntaxProduction[T])(implicit name: sourcecode.Name): SyntaxTyped[T] =
-    addSyntax(SyntaxTyped(name.value, concept, true, production)).asInstanceOf[SyntaxTyped[T]]
+  )(production: SyntaxProduction[T])(implicit name: DeclaringSourceName): SyntaxTyped[T] =
+    addSyntax(SyntaxTyped(name.name, concept, true, production)).asInstanceOf[SyntaxTyped[T]]
 
   def syntax[T](production: SyntaxProduction[T])(implicit name: sourcecode.Name): SyntaxUntyped[T] =
     addSyntax(SyntaxUntyped(name.value, production)).asInstanceOf[SyntaxUntyped[T]]
 
   def syntaxMultiple[T, T2](concept: Concept[T])(production: SyntaxProduction[T2])(implicit
-    name: sourcecode.Name
+    name: DeclaringSourceName
   ): SyntaxMulti[T, T2] = {
-    addSyntax(SyntaxMulti(name.value, concept, production)).asInstanceOf[SyntaxMulti[T, T2]]
+    addSyntax(SyntaxMulti(name.name, concept, production)).asInstanceOf[SyntaxMulti[T, T2]]
   }
 
   private def addGenericSyntax[T](syntax: SyntaxGenericBase[T]): SyntaxGenericBase[T] = {
@@ -1102,7 +1109,7 @@ trait Dsl {
   }
 
   def genericSyntax[T: ClassTag](base: Concept[T], toProduction: Concept[T] => SyntaxProduction[T])(
-    implicit name: sourcecode.Name
+    implicit name: DeclaringSourceName
   ): SyntaxGeneric[T] = {
     genericSyntax[T](
       toProduction,
@@ -1115,16 +1122,16 @@ trait Dsl {
     accept: (Concept[T], Expressions.Types, Dsl) => Boolean =
       (_: Concept[T], _: Expressions.Types, _: Dsl) => true
   )(
-    implicit name: sourcecode.Name
+    implicit name: DeclaringSourceName
   ): SyntaxGeneric[T] = {
     var cache: Map[Concept[T], SyntaxTyped[T]] = Map()
     addGenericSyntax(SyntaxGeneric[T](
-      name.value,
+      name.name,
       accept,
       concept => {
         cache.getOrElse(
           concept, {
-            val rule = SyntaxTyped(name.value, concept, expression = true, toProduction(concept))
+            val rule = SyntaxTyped(name.name, concept, expression = true, toProduction(concept))
             cache += concept -> rule
             rule
           }
@@ -1137,7 +1144,7 @@ trait Dsl {
     base: Concept[T],
     toProduction: Concept[T] => SyntaxProduction[T2]
   )(
-    implicit name: sourcecode.Name
+    implicit name: DeclaringSourceName
   ): SyntaxGenericMulti[T, T2] = {
     genericSyntaxMultiple[T, T2](
       toProduction,
@@ -1150,16 +1157,16 @@ trait Dsl {
     accept: (Concept[T], Expressions.Types, Dsl) => Boolean =
       (_: Concept[T], _: Expressions.Types, _: Dsl) => true
   )(
-    implicit name: sourcecode.Name
+    implicit name: DeclaringSourceName
   ): SyntaxGenericMulti[T, T2] = {
     var cache: Map[Concept[T], SyntaxMulti[T, T2]] = Map()
     addGenericSyntax(SyntaxGenericMulti[T, T2](
-      name.value,
+      name.name,
       accept,
       concept => {
         cache.getOrElse(
           concept, {
-            val rule = SyntaxMulti(name.value, concept, toProduction(concept))
+            val rule = SyntaxMulti(name.name, concept, toProduction(concept))
             cache += concept -> rule
             rule
           }
@@ -1179,11 +1186,11 @@ trait Dsl {
       new AxiomBuilder(name, SPMapped(production, f))
   }
 
-  def axiom[T](concept: Concept[T])(implicit name: sourcecode.Name): AxiomBuilder[T] =
-    new AxiomBuilder(name.value, SPExprRef(concept, internalDefaultExprs))
+  def axiom[T](concept: Concept[T])(implicit name: DeclaringSourceName): AxiomBuilder[T] =
+    new AxiomBuilder(name.name, SPExprRef(concept, internalDefaultExprs))
 
-  def axiom[T](syntax: Syntax[T])(implicit name: sourcecode.Name): AxiomBuilder[T] =
-    new AxiomBuilder(name.value, SPRuleRef(syntax))
+  def axiom[T](syntax: Syntax[T])(implicit name: DeclaringSourceName): AxiomBuilder[T] =
+    new AxiomBuilder(name.name, SPRuleRef(syntax))
 
   implicit def builderToAxiom[T](builder: AxiomBuilder[T]): Axiom[T] = builder.build
 
