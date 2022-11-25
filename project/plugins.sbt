@@ -6,5 +6,5 @@ addSbtPlugin("de.heikoseeberger"  % "sbt-header"               % "5.9.0")
 addSbtPlugin("com.github.sbt"     % "sbt-ci-release"           % "1.5.11")
 
 addSbtPlugin(
-  "com.ibm.cloud.diesel" % "diesel-i18n-plugin" % "0.5.0"
+  "com.ibm.cloud.diesel" % "diesel-i18n-plugin" % "0.6.0"
 ) // Dependencies.dieselI18nVersion
