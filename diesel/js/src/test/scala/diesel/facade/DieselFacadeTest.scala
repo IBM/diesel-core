@@ -85,11 +85,11 @@ class DieselFacadeTest extends FunSuite {
 
   test("facade should support marker post processing") {
     val facade = new DieselParserFacade(MyDsl, markerPostProcessor = Some(MyMarkerPostProcessor))
-    val res = facade.parse(DieselParsers.createParseRequest("1+2"))
+    val res    = facade.parse(DieselParsers.createParseRequest("1+2"))
     assert(res.success)
     assert(res.error.isEmpty)
     assertEquals(res.markers.length, 1)
-    val m0 = res.markers(0)
+    val m0     = res.markers(0)
     assertEquals(m0.offset, 0)
     assertEquals(m0.length, 3)
     assertEquals(m0.getMessage("en"), "yalla")

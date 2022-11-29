@@ -54,7 +54,8 @@ class DieselParserFacade(
   }
 
   @JSExport
-  def parse(request: ParseRequest): DieselParseResult = DieselParseResult(doParse(request), markerPostProcessor)
+  def parse(request: ParseRequest): DieselParseResult =
+    DieselParseResult(doParse(request), markerPostProcessor)
 
   @JSExport
   def predict(request: PredictionRequest): DieselPredictResult = {
@@ -122,7 +123,10 @@ case class DieselStyle(private val styledRange: StyledRange) {
   val name: String = styledRange.style.name
 }
 
-class DieselParseResult(private val res: Either[String, GenericTree], private val markerPostProcessor: Option[MarkerPostProcessor]) {
+class DieselParseResult(
+  private val res: Either[String, GenericTree],
+  private val markerPostProcessor: Option[MarkerPostProcessor]
+) {
 
   @JSExport
   val success: Boolean = res.isRight
@@ -147,7 +151,8 @@ class DieselParseResult(private val res: Either[String, GenericTree], private va
 
 object DieselParseResult {
 
-  private def errorResult(reason: String): DieselParseResult = new DieselParseResult(Left(reason), None)
+  private def errorResult(reason: String): DieselParseResult =
+    new DieselParseResult(Left(reason), None)
 
   def apply(result: Result, markerPostProcessor: Option[MarkerPostProcessor]): DieselParseResult = {
     if (result.success) {
