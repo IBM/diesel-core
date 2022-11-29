@@ -16,6 +16,7 @@
 
 package diesel.facade
 
+import diesel.{Errors, GenericTree, Marker, MarkerMessage}
 import diesel.samples.calc.MyDsl
 import munit.FunSuite
 
@@ -63,7 +64,6 @@ class DieselFacadeTest extends FunSuite {
     val res    = facade.predict(DieselParsers.createPredictRequest("1 + ", 3))
     assert(res.success)
     assert(res.error.isEmpty)
-    println("****", res)
     assertEquals(res.proposals.length, 5)
     val p0     = res.proposals(0)
     assertEquals(p0.text, "0")
@@ -71,6 +71,29 @@ class DieselFacadeTest extends FunSuite {
     val p1     = res.proposals(1)
     assertEquals(p1.text, "pi")
     assert(p1.replace.isEmpty)
+  }
+
+  object MyMarkerMessage extends MarkerMessage {
+    override def format(locale: String): String = "yalla"
+  }
+
+  object MyMarkerPostProcessor extends MarkerPostProcessor {
+    override def postProcessMarkers(tree: GenericTree): Seq[Marker] = {
+      tree.markers ++ Seq(Marker(Errors.SyntacticError, 0, tree.length, MyMarkerMessage))
+    }
+  }
+
+  test("facade should support marker post processing") {
+    val facade = new DieselParserFacade(MyDsl, markerPostProcessor = Some(MyMarkerPostProcessor))
+    val res = facade.parse(DieselParsers.createParseRequest("1+2"))
+    assert(res.success)
+    assert(res.error.isEmpty)
+    assertEquals(res.markers.length, 1)
+    val m0 = res.markers(0)
+    assertEquals(m0.offset, 0)
+    assertEquals(m0.length, 3)
+    assertEquals(m0.getMessage("en"), "yalla")
+    assertEquals(m0.severity, "error")
   }
 
 }

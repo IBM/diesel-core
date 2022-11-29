@@ -34,10 +34,15 @@ object DieselParsers {
 
 }
 
+trait MarkerPostProcessor {
+  def postProcessMarkers(tree: GenericTree): Seq[Marker]
+}
+
 class DieselParserFacade(
   val dsl: Dsl,
   val config: Option[CompletionConfiguration] = None,
-  val userDataProvider: Option[UserDataProvider] = None
+  val userDataProvider: Option[UserDataProvider] = None,
+  val markerPostProcessor: Option[MarkerPostProcessor] = None
 ) {
 
   val bnf: Bnf       = Bnf(dsl, None)
@@ -49,7 +54,7 @@ class DieselParserFacade(
   }
 
   @JSExport
-  def parse(request: ParseRequest): DieselParseResult = DieselParseResult(doParse(request))
+  def parse(request: ParseRequest): DieselParseResult = DieselParseResult(doParse(request), markerPostProcessor)
 
   @JSExport
   def predict(request: PredictionRequest): DieselPredictResult = {
@@ -117,7 +122,7 @@ case class DieselStyle(private val styledRange: StyledRange) {
   val name: String = styledRange.style.name
 }
 
-class DieselParseResult(private val res: Either[String, GenericTree]) {
+class DieselParseResult(private val res: Either[String, GenericTree], private val markerPostProcessor: Option[MarkerPostProcessor]) {
 
   @JSExport
   val success: Boolean = res.isRight
@@ -127,7 +132,7 @@ class DieselParseResult(private val res: Either[String, GenericTree]) {
 
   @JSExport
   val markers: js.Array[DieselMarker] = res.toOption
-    .map(_.markers)
+    .map(tree => markerPostProcessor.map(mp => mp.postProcessMarkers(tree)).getOrElse(tree.markers))
     .getOrElse(Seq.empty)
     .map(m => new DieselMarker(m))
     .toJSArray
@@ -142,9 +147,9 @@ class DieselParseResult(private val res: Either[String, GenericTree]) {
 
 object DieselParseResult {
 
-  private def errorResult(reason: String): DieselParseResult = new DieselParseResult(Left(reason))
+  private def errorResult(reason: String): DieselParseResult = new DieselParseResult(Left(reason), None)
 
-  def apply(result: Result): DieselParseResult = {
+  def apply(result: Result, markerPostProcessor: Option[MarkerPostProcessor]): DieselParseResult = {
     if (result.success) {
       val navigator = Navigator(result)
       if (navigator.hasNext) {
@@ -153,7 +158,7 @@ object DieselParseResult {
           // TODO how to debug ?
           errorResult("too many ASTs")
         } else {
-          new DieselParseResult(Right(ast))
+          new DieselParseResult(Right(ast), markerPostProcessor)
         }
       } else {
         errorResult("No AST found ??")
