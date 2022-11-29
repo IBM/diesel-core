@@ -34,7 +34,11 @@ object DieselParsers {
 
 }
 
-class DieselParserFacade(val dsl: Dsl) {
+class DieselParserFacade(
+  val dsl: Dsl,
+  val config: Option[CompletionConfiguration] = None,
+  val userDataProvider: Option[UserDataProvider] = None
+) {
 
   val bnf: Bnf       = Bnf(dsl, None)
   val parser: Earley = Earley(bnf, dsl.dynamicLexer)
@@ -49,9 +53,7 @@ class DieselParserFacade(val dsl: Dsl) {
 
   @JSExport
   def predict(request: PredictionRequest): DieselPredictResult = {
-    val a = getBnfAxiomOrThrow(request.parseRequest.axiom.toOption)
-    val r = parser.parse(new Lexer.Input(request.parseRequest.text), a)
-    DieselPredictResult(doParse(request.parseRequest), request.offset)
+    DieselPredictResult(doParse(request.parseRequest), request.offset, config, userDataProvider)
   }
 
   // TODO borrowed from AstHelper
@@ -205,14 +207,19 @@ object DieselPredictResult {
 
   private def errorResult(reason: String): DieselPredictResult = DieselPredictResult(Left(reason))
 
-  def apply(result: Result, offset: Int): DieselPredictResult = {
+  def apply(
+    result: Result,
+    offset: Int,
+    config: Option[CompletionConfiguration],
+    userDataProvider: Option[UserDataProvider]
+  ): DieselPredictResult = {
     if (result.success) {
       val navigator = Navigator(result)
       if (navigator.hasNext) {
         val proposals = new CompletionProcessor(
           result,
-          None,
-          None
+          config,
+          userDataProvider
         ).computeCompletionProposal(offset).distinctBy(
           _.text
         ) // not sure why but we have to dedup this
