@@ -39,16 +39,16 @@ class PredictWithPrefixTest extends FunSuite {
     expectedPredictions: Seq[String]
   ): Unit = {
     val proposals = AstHelpers.predict(MyDsl, text, offset)
-    assert(
-      proposals.map(_.text) == expectedPredictions
-    )
+    assertEquals(proposals.map(_.text), expectedPredictions)
   }
+
+  private val expectedAll = Seq("foo", "bar")
 
   test("empty") {
     assertPredictions(
       "",
       0,
-      Seq("foo", "bar")
+      expectedAll
     )
   }
 
@@ -56,7 +56,7 @@ class PredictWithPrefixTest extends FunSuite {
     assertPredictions(
       "f ba",
       4,
-      Seq("bar")
+      expectedAll
     )
   }
 
@@ -64,7 +64,7 @@ class PredictWithPrefixTest extends FunSuite {
     assertPredictions(
       "f",
       1,
-      Seq("foo")
+      expectedAll
     )
   }
 
@@ -72,7 +72,7 @@ class PredictWithPrefixTest extends FunSuite {
     assertPredictions(
       "fo",
       2,
-      Seq("foo")
+      expectedAll
     )
   }
 
@@ -80,7 +80,7 @@ class PredictWithPrefixTest extends FunSuite {
     assertPredictions(
       "b",
       1,
-      Seq("bar")
+      expectedAll
     )
   }
 
@@ -88,7 +88,7 @@ class PredictWithPrefixTest extends FunSuite {
     assertPredictions(
       "x",
       0,
-      Seq("foo", "bar")
+      expectedAll
     )
   }
 
@@ -96,19 +96,81 @@ class PredictWithPrefixTest extends FunSuite {
     assertPredictions(
       "x",
       1,
-      Seq.empty
+      expectedAll
     )
   }
 
-  test("replace") {
+  test("replace 1") {
     val proposals = AstHelpers.predict(MyDsl, "fo", 2)
-    assert(proposals.size == 1)
-    val p         = proposals.head
-    assert(p.text == "foo")
-    assert(p.userData.isEmpty)
-    assert(p.replace.isDefined)
-    assert(p.replace.get._1 == 0)
-    assert(p.replace.get._2 == 2)
+    assert(proposals.size == 2)
+    val p0        = proposals.toArray.apply(0)
+    assert(p0.text == "foo")
+    assert(p0.userData.isEmpty)
+    assert(p0.replace.isDefined)
+    assert(p0.replace.get._1 == 0)
+    assert(p0.replace.get._2 == 2)
+    val p1        = proposals.toArray.apply(1)
+    assert(p1.text == "bar")
+    assert(p1.userData.isEmpty)
+    assert(p1.replace.isDefined)
+    assert(p1.replace.get._1 == 0)
+    assert(p1.replace.get._2 == 2)
   }
+
+  test("replace 2") {
+    val proposals = AstHelpers.predict(MyDsl, "foo", 2)
+    assert(proposals.size == 2)
+    val p0        = proposals.toArray.apply(0)
+    assert(p0.text == "foo")
+    assert(p0.userData.isEmpty)
+    assert(p0.replace.isDefined)
+    assert(p0.replace.get._1 == 0)
+    assert(p0.replace.get._2 == 3)
+    val p1        = proposals.toArray.apply(1)
+    assert(p1.text == "bar")
+    assert(p1.userData.isEmpty)
+    assert(p1.replace.isDefined)
+    assert(p1.replace.get._1 == 0)
+    assert(p1.replace.get._2 == 3)
+  }
+
+  test("replace 3") {
+    val proposals = AstHelpers.predict(MyDsl, "foo", 0)
+    assert(proposals.size == 2)
+    val p0        = proposals.toArray.apply(0)
+    assert(p0.text == "foo")
+    assert(p0.userData.isEmpty)
+    assert(p0.replace.isDefined)
+    assert(p0.replace.get._1 == 0)
+    assert(p0.replace.get._2 == 3)
+    val p1        = proposals.toArray.apply(1)
+    assert(p1.text == "bar")
+    assert(p1.userData.isEmpty)
+    assert(p1.replace.isDefined)
+    assert(p1.replace.get._1 == 0)
+    assert(p1.replace.get._2 == 3)
+  }
+
+  test("replace 4") {
+    val proposals = AstHelpers.predict(MyDsl, "foo", 3)
+    assert(proposals.size == 2)
+    val p0        = proposals.toArray.apply(0)
+    assert(p0.text == "foo")
+    assert(p0.userData.isEmpty)
+    assert(p0.replace.isDefined)
+    assert(p0.replace.get._1 == 0)
+    assert(p0.replace.get._2 == 3)
+    val p1        = proposals.toArray.apply(1)
+    assert(p1.text == "bar")
+    assert(p1.userData.isEmpty)
+    assert(p1.replace.isDefined)
+    assert(p1.replace.get._1 == 0)
+    assert(p1.replace.get._2 == 3)
+  }
+
+//  test("tmp") {
+//    val proposals = AstHelpers.predict(MyDsl, "fo", 2)
+//    assert(proposals.size == 2)
+//  }
 
 }

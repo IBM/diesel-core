@@ -86,10 +86,9 @@ class CompletionProcessor(
                   offset: Int,
                   node: Option[GenericNode]
                 ) => {
-                  println(node)
                   val token = findTokenTextAfterDot(state)
                   token
-                    .filter(text => prefix.forall(text.startsWith))
+//                    .filter(text => prefix.forall(text.startsWith))
                     .map(text =>
                       CompletionProposal(
                         element,
