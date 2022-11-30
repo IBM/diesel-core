@@ -45,7 +45,7 @@ class PredictionAndSpacesTest extends FunSuite {
 
   private def assertPredictions(text: String, offset: Int, expected: Seq[String]) = {
     val proposals = predict(MyDsl, text, offset, None)
-    assert(proposals.map(_.text) == expected)
+    assertEquals(proposals.map(_.text), expected)
   }
 
   test("empty text, no spaces, eol") {
