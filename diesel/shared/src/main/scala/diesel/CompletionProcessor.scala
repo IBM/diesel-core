@@ -80,18 +80,24 @@ class CompletionProcessor(
             chart.notCompletedStates
               .filterNot(_.kind(result) == StateKind.ErrorRecovery)
               .flatMap(state => {
-                val defaultProvider: CompletionProvider = new CompletionProvider {
-                  override def getProposals(
-                    element: Option[DslElement],
-                    tree: GenericTree,
-                    offset: Int,
-                    node: Option[GenericNode]
-                  ): Seq[CompletionProposal] = {
-                    findTokenTextAfterDot(state)
-                      .filter(text => prefix.forall(text.startsWith))
-                      .map(CompletionProposal(element, _))
-                      .toSeq
-                  }
+                val defaultProvider: CompletionProvider = (
+                  element: Option[DslElement],
+                  tree: GenericTree,
+                  offset: Int,
+                  node: Option[GenericNode]
+                ) => {
+                  println(node)
+                  val token = findTokenTextAfterDot(state)
+                  token
+                    .filter(text => prefix.forall(text.startsWith))
+                    .map(text =>
+                      CompletionProposal(
+                        element,
+                        text,
+                        prefix.map(p => (offset - p.length, p.length))
+                      )
+                    )
+                    .toSeq
                 }
                 val element: Option[DslElement]         = state.production.element
                 element

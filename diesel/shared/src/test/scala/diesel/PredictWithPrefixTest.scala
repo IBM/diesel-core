@@ -100,4 +100,15 @@ class PredictWithPrefixTest extends FunSuite {
     )
   }
 
+  test("replace") {
+    val proposals = AstHelpers.predict(MyDsl, "fo", 2)
+    assert(proposals.size == 1)
+    val p         = proposals.head
+    assert(p.text == "foo")
+    assert(p.userData.isEmpty)
+    assert(p.replace.isDefined)
+    assert(p.replace.get._1 == 0)
+    assert(p.replace.get._2 == 2)
+  }
+
 }
