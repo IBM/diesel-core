@@ -24,12 +24,17 @@ class JsModelDslPredictionTest extends FunSuite {
   private def assertPredictions(
     text: String,
     offset: Int,
-    expectedPredictions: Seq[String]
+    expectedPredictions: Seq[String],
+    expectedReplace: Option[Seq[Option[(Int, Int)]]] = None
   ): Unit = {
     val proposals = predict(JsModelDsl, text, offset, Some(JsModelDsl.completionConfiguration))
+    println("FW", proposals.map(_.replace))
     assert(
       proposals.map(_.text) == expectedPredictions
     )
+    expectedReplace.foreach { expectedReplace =>
+      assertEquals(proposals.map(_.replace), expectedReplace)
+    }
   }
 
   test("empty") {
@@ -129,6 +134,17 @@ class JsModelDslPredictionTest extends FunSuite {
         |class B extends """.stripMargin,
       35,
       Seq("A")
+    )
+  }
+
+  test("super class, with replace") {
+    assertPredictions(
+      """root: A
+        |class A {}
+        |class B extends xxx""".stripMargin,
+      36,
+      Seq("A"),
+      Some(Seq(Some(35, 1)))
     )
   }
 

@@ -73,9 +73,11 @@ class CompletionProcessor(
     navigator.toIterator
       .toSeq
       .foldLeft(Seq.empty[CompletionProposal]) { case (acc, tree) =>
-        var node: Option[GenericNode] = None
-        val treeProposals             = result.chartAndPrefixAtOffset(offset)
+        var node: Option[GenericNode]          = None
+        var defaultReplace: Option[(Int, Int)] = None
+        val treeProposals                      = result.chartAndPrefixAtOffset(offset)
           .map({ case (chart, prefix) =>
+            defaultReplace = prefix.map(p => (offset - p.length, p.length))
             node = tree.root.findNodeAtIndex(chart.index)
             chart.notCompletedStates
               .filterNot(_.kind(result) == StateKind.ErrorRecovery)
@@ -111,6 +113,7 @@ class CompletionProcessor(
           .flatMap(c => c.filter)
           .map(f => f.filterProposals(tree, offset, node, treeProposals))
           .getOrElse(treeProposals)
+          .map(proposal => proposal.copy(replace = proposal.replace.orElse(defaultReplace)))
       }
       .distinct
   }
