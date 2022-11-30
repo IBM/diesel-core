@@ -16,7 +16,7 @@
 
 package diesel
 
-import diesel.Dsl.{Axiom, Concept, Instance}
+import diesel.Dsl.{Axiom, Concept, Instance, Syntax}
 import munit.FunSuite
 
 class PredictWithPrefixTest extends FunSuite {
@@ -28,6 +28,33 @@ class PredictWithPrefixTest extends FunSuite {
     val foo: Instance[String] = instance(x)("foo") map { _ => "foo" }
 
     val bar: Instance[String] = instance(x)("bar") map { _ => "bar" }
+
+    val sHelloWorld: Syntax[String] = syntax(x)(
+      "hello" ~ "world" map {
+        case _ =>
+          "helloworld"
+      }
+    )
+
+    val sHelloFriend: Syntax[String] = syntax(x)(
+      "hello" ~ "friend" map {
+        case _ =>
+          "hellofriend"
+      }
+    )
+
+    val y: Concept[String] = concept
+
+    val iJob: Instance[String] = instance(y)("job") map { _ => "job" }
+
+    val iDay: Instance[String] = instance(y)("day") map { _ => "day" }
+
+    val sGoodJobOrDay: Syntax[String] = syntax(x)(
+      "good" ~ y map {
+        case (_, (_, s)) =>
+          "good" + s
+      }
+    )
 
     val a: Axiom[String] = axiom(x)
 
@@ -42,7 +69,7 @@ class PredictWithPrefixTest extends FunSuite {
     assertEquals(proposals.map(_.text), expectedPredictions)
   }
 
-  private val expectedAll = Seq("foo", "bar")
+  private val expectedAll = Seq("foo", "bar", "hello world", "hello friend", "good")
 
   test("empty") {
     assertPredictions(
@@ -84,93 +111,89 @@ class PredictWithPrefixTest extends FunSuite {
     )
   }
 
-  test("x, offset 0") {
+  test("good") {
     assertPredictions(
-      "x",
-      0,
+      "good ",
+      5,
+      Seq("job", "day")
+    )
+  }
+
+  test("good 2") {
+    assertPredictions(
+      "good",
+      2,
       expectedAll
     )
   }
 
-  test("x, offset 1") {
+  test("good 3") {
     assertPredictions(
-      "x",
-      1,
-      expectedAll
+      "good xxx",
+      7,
+      Seq("job", "day")
     )
+  }
+
+  def assertProposal(p: CompletionProposal, text: String, replace: (Int, Int)): Unit = {
+    assertEquals(p.text, text)
+    assertEquals(p.replace.get._1, replace._1)
+    assertEquals(p.replace.get._2, replace._2)
   }
 
   test("replace 1") {
     val proposals = AstHelpers.predict(MyDsl, "fo", 2)
-    assert(proposals.size == 2)
-    val p0        = proposals.toArray.apply(0)
-    assert(p0.text == "foo")
-    assert(p0.userData.isEmpty)
-    assert(p0.replace.isDefined)
-    assert(p0.replace.get._1 == 0)
-    assert(p0.replace.get._2 == 2)
-    val p1        = proposals.toArray.apply(1)
-    assert(p1.text == "bar")
-    assert(p1.userData.isEmpty)
-    assert(p1.replace.isDefined)
-    assert(p1.replace.get._1 == 0)
-    assert(p1.replace.get._2 == 2)
+    assertEquals(proposals.size, 5)
+    proposals.foreach(p => {
+      assertEquals(p.replace.get, (0, 2))
+    })
   }
 
   test("replace 2") {
     val proposals = AstHelpers.predict(MyDsl, "foo", 2)
-    assert(proposals.size == 2)
-    val p0        = proposals.toArray.apply(0)
-    assert(p0.text == "foo")
-    assert(p0.userData.isEmpty)
-    assert(p0.replace.isDefined)
-    assert(p0.replace.get._1 == 0)
-    assert(p0.replace.get._2 == 3)
-    val p1        = proposals.toArray.apply(1)
-    assert(p1.text == "bar")
-    assert(p1.userData.isEmpty)
-    assert(p1.replace.isDefined)
-    assert(p1.replace.get._1 == 0)
-    assert(p1.replace.get._2 == 3)
+    assertEquals(proposals.size, 5)
+    proposals.foreach(p => {
+      assertEquals(p.replace.get, (0, 2))
+    })
   }
 
   test("replace 3") {
     val proposals = AstHelpers.predict(MyDsl, "foo", 0)
-    assert(proposals.size == 2)
-    val p0        = proposals.toArray.apply(0)
-    assert(p0.text == "foo")
-    assert(p0.userData.isEmpty)
-    assert(p0.replace.isDefined)
-    assert(p0.replace.get._1 == 0)
-    assert(p0.replace.get._2 == 3)
-    val p1        = proposals.toArray.apply(1)
-    assert(p1.text == "bar")
-    assert(p1.userData.isEmpty)
-    assert(p1.replace.isDefined)
-    assert(p1.replace.get._1 == 0)
-    assert(p1.replace.get._2 == 3)
+    assertEquals(proposals.size, 5)
+    proposals.foreach(p => {
+      assert(p.replace.isEmpty)
+    })
   }
 
   test("replace 4") {
     val proposals = AstHelpers.predict(MyDsl, "foo", 3)
-    assert(proposals.size == 2)
-    val p0        = proposals.toArray.apply(0)
-    assert(p0.text == "foo")
-    assert(p0.userData.isEmpty)
-    assert(p0.replace.isDefined)
-    assert(p0.replace.get._1 == 0)
-    assert(p0.replace.get._2 == 3)
-    val p1        = proposals.toArray.apply(1)
-    assert(p1.text == "bar")
-    assert(p1.userData.isEmpty)
-    assert(p1.replace.isDefined)
-    assert(p1.replace.get._1 == 0)
-    assert(p1.replace.get._2 == 3)
+    assertEquals(proposals.size, 5)
+    proposals.foreach(p => {
+      assertEquals(p.replace.get, (0, 3))
+    })
   }
 
-//  test("tmp") {
-//    val proposals = AstHelpers.predict(MyDsl, "fo", 2)
-//    assert(proposals.size == 2)
-//  }
+  test("replace 5") {
+    val proposals = AstHelpers.predict(MyDsl, "good ", 5)
+    assertEquals(proposals.size, 2)
+    proposals.foreach(p => {
+      assert(p.replace.isEmpty)
+    })
+  }
 
+  test("replace 6") {
+    val proposals = AstHelpers.predict(MyDsl, "good xx", 7)
+    assertEquals(proposals.size, 2)
+    proposals.foreach(p => {
+      assertEquals(p.replace.get, (5, 2))
+    })
+  }
+
+  test("replace 7") {
+    val proposals = AstHelpers.predict(MyDsl, "good job", 8)
+    assertEquals(proposals.size, 2)
+    proposals.foreach(p => {
+      assertEquals(p.replace.get, (5, 3))
+    })
+  }
 }
