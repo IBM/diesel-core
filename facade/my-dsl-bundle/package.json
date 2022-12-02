@@ -1,0 +1,6 @@
+{
+  "name": "@diesel-parser/facade",
+  "version": "0.1.0",
+  "description": "My dsl facade",
+  "main": "dist/my-dsl-bundle.js"
+}
