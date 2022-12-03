@@ -1,4 +1,5 @@
 #!/bin/bash
 
 sbt ci-release && \
-npm publish --prefix facade/ts-facade
+cd facade/ts-facade && \
+npm publish
