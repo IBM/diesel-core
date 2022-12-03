@@ -10,7 +10,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "my-dsl-bundle": "file:../my-dsl-bundle"
+    "@diesel-parser/my-dsl-bundle": "1.0.0"
   },
   "devDependencies": {
     "@types/chai": "^4.3.4",
