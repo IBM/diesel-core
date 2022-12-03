@@ -16,7 +16,7 @@
 
 package diesel
 
-import diesel.Dsl.{Axiom, Concept, Instance}
+import diesel.Dsl.{Axiom, Concept, Instance, Syntax}
 import munit.FunSuite
 
 class PredictWithPrefixTest extends FunSuite {
@@ -29,6 +29,33 @@ class PredictWithPrefixTest extends FunSuite {
 
     val bar: Instance[String] = instance(x)("bar") map { _ => "bar" }
 
+    val sHelloWorld: Syntax[String] = syntax(x)(
+      "hello" ~ "world" map {
+        case _ =>
+          "helloworld"
+      }
+    )
+
+    val sHelloFriend: Syntax[String] = syntax(x)(
+      "hello" ~ "friend" map {
+        case _ =>
+          "hellofriend"
+      }
+    )
+
+    val y: Concept[String] = concept
+
+    val iJob: Instance[String] = instance(y)("job") map { _ => "job" }
+
+    val iDay: Instance[String] = instance(y)("day") map { _ => "day" }
+
+    val sGoodJobOrDay: Syntax[String] = syntax(x)(
+      "good" ~ y map {
+        case (_, (_, s)) =>
+          "good" + s
+      }
+    )
+
     val a: Axiom[String] = axiom(x)
 
   }
@@ -39,16 +66,16 @@ class PredictWithPrefixTest extends FunSuite {
     expectedPredictions: Seq[String]
   ): Unit = {
     val proposals = AstHelpers.predict(MyDsl, text, offset)
-    assert(
-      proposals.map(_.text) == expectedPredictions
-    )
+    assertEquals(proposals.map(_.text), expectedPredictions)
   }
+
+  private val expectedAll = Seq("foo", "bar", "hello world", "hello friend", "good")
 
   test("empty") {
     assertPredictions(
       "",
       0,
-      Seq("foo", "bar")
+      expectedAll
     )
   }
 
@@ -56,7 +83,7 @@ class PredictWithPrefixTest extends FunSuite {
     assertPredictions(
       "f ba",
       4,
-      Seq("bar")
+      expectedAll
     )
   }
 
@@ -64,7 +91,7 @@ class PredictWithPrefixTest extends FunSuite {
     assertPredictions(
       "f",
       1,
-      Seq("foo")
+      expectedAll
     )
   }
 
@@ -72,7 +99,7 @@ class PredictWithPrefixTest extends FunSuite {
     assertPredictions(
       "fo",
       2,
-      Seq("foo")
+      expectedAll
     )
   }
 
@@ -80,24 +107,87 @@ class PredictWithPrefixTest extends FunSuite {
     assertPredictions(
       "b",
       1,
-      Seq("bar")
+      expectedAll
     )
   }
 
-  test("x, offset 0") {
+  test("good") {
     assertPredictions(
-      "x",
-      0,
-      Seq("foo", "bar")
+      "good ",
+      5,
+      Seq("job", "day")
     )
   }
 
-  test("x, offset 1") {
+  test("good 2") {
     assertPredictions(
-      "x",
-      1,
-      Seq.empty
+      "good",
+      2,
+      expectedAll
     )
   }
 
+  test("good 3") {
+    assertPredictions(
+      "good xxx",
+      7,
+      Seq("job", "day")
+    )
+  }
+
+  def assertProposal(p: CompletionProposal, text: String, replace: (Int, Int)): Unit = {
+    assertEquals(p.text, text)
+    assertEquals(p.replace.get._1, replace._1)
+    assertEquals(p.replace.get._2, replace._2)
+  }
+
+  test("replace 1") {
+    val proposals = AstHelpers.predict(MyDsl, "fo", 2)
+    assertEquals(proposals.size, 5)
+    proposals.foreach(p => {
+      assertEquals(p.replace.get, (0, 2))
+    })
+  }
+
+  test("replace 2") {
+    val proposals = AstHelpers.predict(MyDsl, "foo", 2)
+    assertEquals(proposals.size, 5)
+    proposals.foreach(p => {
+      assertEquals(p.replace.get, (0, 2))
+    })
+  }
+
+  test("replace 3") {
+    val proposals = AstHelpers.predict(MyDsl, "foo", 0)
+    assertEquals(proposals.size, 5)
+    proposals.foreach(p => {
+      assert(p.replace.isEmpty)
+    })
+  }
+
+  test("replace 4") {
+    val proposals = AstHelpers.predict(MyDsl, "foo", 3)
+    assertEquals(proposals.size, 0)
+  }
+
+  test("replace 5") {
+    val proposals = AstHelpers.predict(MyDsl, "good ", 5)
+    assertEquals(proposals.size, 2)
+    proposals.foreach(p => {
+      assert(p.replace.isEmpty)
+    })
+  }
+
+  test("replace 6") {
+    val proposals = AstHelpers.predict(MyDsl, "good xx", 7)
+    assertEquals(proposals.size, 2)
+    proposals.foreach(p => {
+      assertEquals(p.replace.get, (5, 2))
+    })
+  }
+
+  test("replace 7") {
+    val proposals = AstHelpers.predict(MyDsl, "good job", 8)
+    assertEquals(proposals.size, 0)
+  }
 }
