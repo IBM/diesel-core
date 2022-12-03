@@ -10,7 +10,8 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@diesel-parser/my-dsl-bundle": "1.0.0"
+    "@diesel-parser/ts-facade": "^0.11.0",
+    "@diesel-parser/samples": "^0.11.0"
   },
   "devDependencies": {
     "@types/chai": "^4.3.4",
