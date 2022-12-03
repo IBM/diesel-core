@@ -142,4 +142,5 @@ lazy val samples = crossProject(JSPlatform, JVMPlatform)
 lazy val myDslBundle = project
   .in(file("./facade/my-dsl-bundle"))
   .settings(commonSettings)
+  .settings(copyrightSettings)
   .dependsOn(samples.js)
