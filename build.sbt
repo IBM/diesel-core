@@ -31,7 +31,7 @@ lazy val sonatypeSettings = Seq(
 
 // CI convenience
 addCommandAlias("lint", "fmtCheck;fixCheck;headerCheckAll")
-addCommandAlias("build", "compile;myDslBundle/fastOptJS")
+addCommandAlias("build", "compile;samplesBundle/fastOptJS")
 
 // dev convenience
 addCommandAlias("fmtCheck", "all scalafmtSbtCheck scalafmtCheckAll")
@@ -44,7 +44,7 @@ addCommandAlias("testJS", "all dieselJS/test samplesJS/test")
 
 lazy val root = project
   .in(file("."))
-  .aggregate(diesel.jvm, diesel.js, samples.jvm, samples.js, myDslBundle)
+  .aggregate(diesel.jvm, diesel.js, samples.jvm, samples.js, samplesBundle)
   .settings(commonSettings)
   .settings(sonatypeSettings)
   .settings(copyrightSettings)
@@ -139,8 +139,8 @@ lazy val samples = crossProject(JSPlatform, JVMPlatform)
   .settings(sharedSettings_lint)
   .jsSettings(sharedJsSettings)
 
-lazy val myDslBundle = project
-  .in(file("./facade/my-dsl-bundle"))
+lazy val samplesBundle = project
+  .in(file("./facade/samples-bundle"))
   .settings(commonSettings)
   .settings(copyrightSettings)
   .dependsOn(samples.js)

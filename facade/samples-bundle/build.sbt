@@ -3,7 +3,7 @@ enablePlugins(ScalaJSPlugin)
 scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
 Test / scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
 
-name := "my-dsl-bundle"
+name := "samples-bundle"
 
 publish / skip := true
 
@@ -19,7 +19,7 @@ scalacOptions ++= Seq(
 
 Compile / fastOptJS := {
   val file = (Compile / fastOptJS).value
-  IO.copyFile(file.data, baseDirectory.value / "dist" / "my-dsl-bundle.js")
+  IO.copyFile(file.data, baseDirectory.value / "dist" / "index.js")
   file
 }
 

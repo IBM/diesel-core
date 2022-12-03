@@ -14,17 +14,25 @@
  * limitations under the License.
  */
 
-package diesel.samples.mybundle
+package diesel.samples
 
 import diesel.facade.DieselParserFacade
+import diesel.samples.glsl.Glsl
 import diesel.samples.jsmodeldsl.BmdDsl
+import diesel.samples.sfeel.SFeel
 
 import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
 
-@JSExportTopLevel("MyFacade")
-object MyFacade {
+@JSExportTopLevel("DieselSamples")
+object DieselSamples {
 
   @JSExport
-  def createMyParser(): DieselParserFacade = new DieselParserFacade(BmdDsl)
+  def createBmdParser(): DieselParserFacade = new DieselParserFacade(BmdDsl)
+
+  @JSExport
+  def createGlslParser(): DieselParserFacade = new DieselParserFacade(Glsl)
+
+  @JSExport
+  def createSFeelParser(): DieselParserFacade = new DieselParserFacade(SFeel)
 
 }

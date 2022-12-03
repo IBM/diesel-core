@@ -17,12 +17,12 @@
 import {DieselParserFacade, ParseRequest, PredictRequest} from "@diesel-parser/ts-facade";
 
 // @ts-ignore
-import * as MyBundle from "@diesel-parser/my-dsl-bundle";
+import { DieselSamples } from "@diesel-parser/samples";
 import {expect} from "chai";
 
 function getMyParser(): DieselParserFacade {
   // @ts-ignore
-  return MyBundle.MyFacade.createMyParser();
+  return DieselSamples.createBmdParser();
 }
 
 describe('parse', () => {
