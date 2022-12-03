@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# sbt ci-release && \
+sbt ci-release && \
 cd facade && \
 echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc && \
 yarn && \
