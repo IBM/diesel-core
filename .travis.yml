@@ -15,7 +15,7 @@ stages:
 
 jobs:
   include:
-    - script: sbt build lint test
+    - script: ./build.sh
     - stage: release
       script: sbt ci-release
 
