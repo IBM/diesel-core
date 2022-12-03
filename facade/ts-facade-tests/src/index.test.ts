@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {DieselParserFacade, ParseRequest, PredictRequest} from "./index";
+import {DieselParserFacade, ParseRequest, PredictRequest} from "@diesel-parser/ts-facade";
 
 // @ts-ignore
 import * as MyBundle from "my-dsl-bundle";

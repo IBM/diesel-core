@@ -1,0 +1,10 @@
+{
+  "name": "@diesel-parser/diesel-facade-parent",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "ts-facade",
+    "my-dsl-bundle",
+    "ts-facade-tests"
+  ]
+}

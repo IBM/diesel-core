@@ -1,15 +1,7 @@
 {
-  "name": "@diesel-parser/ts-facade",
+  "name": "@diesel-parser/ts-facade-facade-tests",
   "version": "0.5.0",
-  "description": "Facade types for using diesel parsers in typescript",
-  "author": "Rémi Van Keisbelck <remi@rvkb.com>",
-  "license": "Apache-2.0",
-  "repository": {
-    "type": "git",
-    "url": "git@github.com:IBM/diesel-core"
-  },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "private": true,
   "scripts": {
     "clean": "rimraf dist",
     "tsc-v": "tsc -v",
@@ -18,12 +10,18 @@
     "build": "tsc"
   },
   "dependencies": {
+    "my-dsl-bundle": "file:../my-dsl-bundle"
   },
   "devDependencies": {
+    "@types/chai": "^4.3.4",
+    "@types/mocha": "^10.0.1",
+    "chai": "^4.3.7",
     "eslint-config-prettier": "^6.11.0",
     "eslint-plugin-prettier": "^3.1.4",
+    "mocha": "^9.2.1",
     "prettier": "2.0.5",
     "rimraf": "^3.0.2",
+    "ts-node": "^10.9.1",
     "typescript": "^4.8.4"
   }
 }
