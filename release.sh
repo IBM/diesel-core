@@ -5,4 +5,4 @@ cd facade && \
 yarn && \
 cd  ts-facade && \
 yarn build && \
-yarn publish --access public
+yarn publish --access public --verbose
