@@ -73,25 +73,32 @@ class CompletionProcessor(
     navigator.toIterator
       .toSeq
       .foldLeft(Seq.empty[CompletionProposal]) { case (acc, tree) =>
-        var node: Option[GenericNode] = None
-        val treeProposals             = result.chartAndPrefixAtOffset(offset)
+        var node: Option[GenericNode]          = None
+        var defaultReplace: Option[(Int, Int)] = None
+        val treeProposals                      = result.chartAndPrefixAtOffset(offset)
           .map({ case (chart, prefix) =>
+            defaultReplace = prefix.map(p => (offset - p.length, p.length))
             node = tree.root.findNodeAtIndex(chart.index)
             chart.notCompletedStates
               .filterNot(_.kind(result) == StateKind.ErrorRecovery)
               .flatMap(state => {
-                val defaultProvider: CompletionProvider = new CompletionProvider {
-                  override def getProposals(
-                    element: Option[DslElement],
-                    tree: GenericTree,
-                    offset: Int,
-                    node: Option[GenericNode]
-                  ): Seq[CompletionProposal] = {
-                    findTokenTextAfterDot(state)
-                      .filter(text => prefix.forall(text.startsWith))
-                      .map(CompletionProposal(element, _))
-                      .toSeq
-                  }
+                val defaultProvider: CompletionProvider = (
+                  element: Option[DslElement],
+                  tree: GenericTree,
+                  offset: Int,
+                  node: Option[GenericNode]
+                ) => {
+                  val token = findTokenTextAfterDot(state)
+                  token
+//                    .filter(text => prefix.forall(text.startsWith))
+                    .map(text =>
+                      CompletionProposal(
+                        element,
+                        text,
+                        prefix.map(p => (offset - p.length, p.length))
+                      )
+                    )
+                    .toSeq
                 }
                 val element: Option[DslElement]         = state.production.element
                 element
@@ -106,6 +113,7 @@ class CompletionProcessor(
           .flatMap(c => c.filter)
           .map(f => f.filterProposals(tree, offset, node, treeProposals))
           .getOrElse(treeProposals)
+          .map(proposal => proposal.copy(replace = proposal.replace.orElse(defaultReplace)))
       }
       .distinct
   }
