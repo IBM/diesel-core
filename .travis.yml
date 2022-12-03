@@ -18,7 +18,7 @@ jobs:
   include:
     - script: ./build.sh
     - stage: release
-      script: sbt ci-release
+      script: ./release.sh
 
 cache:
   directories:
