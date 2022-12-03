@@ -8,6 +8,7 @@ before_install:
   # for sbt-dynver
   - git fetch --tags
   - nvm install lts/gallium
+  - echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
 
 stages:
   - name: test
