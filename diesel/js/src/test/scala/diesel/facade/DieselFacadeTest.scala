@@ -18,29 +18,39 @@ package diesel.facade
 
 import diesel.{Errors, GenericTree, Marker, MarkerMessage}
 import diesel.samples.calc.MyDsl
+import scala.scalajs.js
 import munit.FunSuite
 
 class DieselFacadeTest extends FunSuite {
 
+  def createParseRequest(text: String): ParseRequest = js.Dynamic.literal(
+    "text" -> text
+  ).asInstanceOf[ParseRequest]
+
+  def createPredictRequest(text: String, offset: Int): PredictRequest = js.Dynamic.literal(
+    "text"   -> text,
+    "offset" -> offset
+  ).asInstanceOf[PredictRequest]
+
   test("facade should create parse request") {
-    val parseRequest  = DieselParsers.createParseRequest("hello")
+    val parseRequest = createParseRequest("hello")
     assertEquals(parseRequest.text, "hello")
-    assert(parseRequest.axiom.isEmpty);
-    val parseRequest2 = parseRequest.setAxiom("yalla")
-    assertEquals(parseRequest2.text, "hello")
-    assertEquals(parseRequest2.axiom.toOption, Some("yalla"))
+    assert(parseRequest.axiom.isEmpty)
+    parseRequest.axiom = "yalla"
+    assertEquals(parseRequest.text, "hello")
+    assertEquals(parseRequest.axiom.toOption, Some("yalla"))
   }
 
   test("facade should create predict request") {
-    val predictRequest = DieselParsers.createPredictRequest("hello", 2)
-    assertEquals(predictRequest.parseRequest.text, "hello")
-    assert(predictRequest.parseRequest.axiom.isEmpty);
+    val predictRequest = createPredictRequest("hello", 2)
+    assertEquals(predictRequest.text, "hello")
+    assert(predictRequest.axiom.isEmpty)
     assertEquals(predictRequest.offset, 2)
   }
 
   test("facade should parse calc dsl") {
     val facade = new DieselParserFacade(MyDsl)
-    val res    = facade.parse(DieselParsers.createParseRequest("1 + pi"))
+    val res    = facade.parse(createParseRequest("1 + pi"))
     assert(res.success)
     assert(res.error.isEmpty)
     assert(res.markers.isEmpty)
@@ -61,7 +71,7 @@ class DieselFacadeTest extends FunSuite {
 
   test("facade should predict calc dsl") {
     val facade = new DieselParserFacade(MyDsl)
-    val res    = facade.predict(DieselParsers.createPredictRequest("1 + ", 3))
+    val res    = facade.predict(createPredictRequest("1 + ", 3))
     assert(res.success)
     assert(res.error.isEmpty)
     assertEquals(res.proposals.length, 5)
@@ -85,7 +95,7 @@ class DieselFacadeTest extends FunSuite {
 
   test("facade should support marker post processing") {
     val facade = new DieselParserFacade(MyDsl, markerPostProcessor = Some(MyMarkerPostProcessor))
-    val res    = facade.parse(DieselParsers.createParseRequest("1+2"))
+    val res    = facade.parse(createParseRequest("1+2"))
     assert(res.success)
     assert(res.error.isEmpty)
     assertEquals(res.markers.length, 1)

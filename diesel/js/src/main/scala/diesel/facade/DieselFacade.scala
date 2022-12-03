@@ -22,18 +22,6 @@ import scala.scalajs.js
 import scala.scalajs.js.JSConverters._
 import scala.scalajs.js.annotation._
 
-@JSExportTopLevel("diesel")
-object DieselParsers {
-
-  @JSExport
-  def createParseRequest(text: String) = ParseRequest(text)
-
-  @JSExport
-  def createPredictRequest(text: String, offset: Int) =
-    PredictionRequest(ParseRequest(text), offset)
-
-}
-
 trait MarkerPostProcessor {
   def postProcessMarkers(tree: GenericTree): Seq[Marker]
 }
@@ -58,8 +46,8 @@ class DieselParserFacade(
     DieselParseResult(doParse(request), markerPostProcessor)
 
   @JSExport
-  def predict(request: PredictionRequest): DieselPredictResult = {
-    DieselPredictResult(doParse(request.parseRequest), request.offset, config, userDataProvider)
+  def predict(request: PredictRequest): DieselPredictResult = {
+    DieselPredictResult(doParse(request), request.offset, config, userDataProvider)
   }
 
   // TODO borrowed from AstHelper
@@ -68,27 +56,25 @@ class DieselParserFacade(
       case Some(x) =>
         bnf.axioms
           .find(ba => ba.name == s"${x}[_,_,_,_,_].axiom")
-          .getOrElse(throw new IllegalArgumentException(s"missing axiom '${x}'"))
+          .getOrElse(throw new IllegalArgumentException(s"missing axiom '$x'"))
       case None    =>
         bnf.axioms
           .headOption
           .getOrElse(throw new IllegalArgumentException("no axiom"))
     }
   }
-
 }
 
-@JSExportAll
-case class ParseRequest(text: String, axiom: js.UndefOr[String] = js.undefined) {
-
-  def setAxiom(axiom: js.UndefOr[String]): ParseRequest = {
-    this.copy(axiom = axiom)
-  }
-
+@js.native
+trait ParseRequest extends js.Object {
+  var text: String              = js.native
+  var axiom: js.UndefOr[String] = js.native
 }
 
-@JSExportAll
-case class PredictionRequest(parseRequest: ParseRequest, offset: Int)
+@js.native
+trait PredictRequest extends ParseRequest {
+  val offset: Int = js.native
+}
 
 class DieselMarker(private val marker: Marker) {
 
