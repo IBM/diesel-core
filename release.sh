@@ -1,7 +1,7 @@
 #!/bin/bash
 
-sbt samplesBundle/fastOptJS && \
 #sbt ci-release && \
+sbt samplesBundle/fastOptJS && \
 cd facade && \
 echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc && \
 yarn && \
