@@ -1,6 +1,6 @@
 {
   "name": "@diesel-parser/ts-facade",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Facade types for using diesel parsers in typescript",
   "author": "Rémi Van Keisbelck <remi@rvkb.com>",
   "license": "Apache-2.0",
@@ -12,7 +12,7 @@
     "access": "public"
   },
   "main": "dist/index.js",
-  "types": "dist/index.d.ts", 
+  "types": "dist/index.d.ts",
   "scripts": {
     "clean": "rimraf dist",
     "tsc-v": "tsc -v",
@@ -20,8 +20,7 @@
     "prettify": "prettier --write ..",
     "build": "tsc"
   },
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
     "eslint-config-prettier": "^6.11.0",
     "eslint-plugin-prettier": "^3.1.4",
