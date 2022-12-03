@@ -8,6 +8,9 @@
     "type": "git",
     "url": "git@github.com:IBM/diesel-core"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts", 
   "scripts": {
