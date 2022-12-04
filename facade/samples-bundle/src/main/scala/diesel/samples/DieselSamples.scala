@@ -27,7 +27,8 @@ import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
 object DieselSamples {
 
   @JSExport
-  def createBmdParser(): DieselParserFacade = new DieselParserFacade(BmdDsl, Some(BmdDsl.completionConfiguration))
+  def createBmdParser(): DieselParserFacade =
+    new DieselParserFacade(BmdDsl, Some(BmdDsl.completionConfiguration))
 
   @JSExport
   def createGlslParser(): DieselParserFacade = new DieselParserFacade(Glsl)
