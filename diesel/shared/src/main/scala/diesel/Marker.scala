@@ -66,27 +66,32 @@ sealed trait InternalMsg extends MarkerMessage {
 
 case class MissingTokenMsg(token: String)                               extends InternalMsg {
   override def format(locale: String): String = {
-    DieselI18n.missingToken(token)(resolver(locale))
+    given KeyResolver = resolver(locale)
+    DieselI18n.missingToken(token)
   }
 }
 case class InsertedTokenMsg(token: String)                              extends InternalMsg {
   override def format(locale: String): String = {
-    DieselI18n.insertedToken(token)(resolver(locale))
+    given KeyResolver = resolver(locale)
+    DieselI18n.insertedToken(token)
   }
 }
 case class TokenMutationMsg(actualToken: String, expectedToken: String) extends InternalMsg {
   override def format(locale: String): String = {
-    DieselI18n.tokenMutation(actualToken, expectedToken)(resolver(locale))
+    given KeyResolver = resolver(locale)
+    DieselI18n.tokenMutation(actualToken, expectedToken)
   }
 }
 case class UnknownTokenMsg(token: String)                               extends InternalMsg {
   override def format(locale: String): String = {
-    DieselI18n.unknownToken(token)(resolver(locale))
+    given KeyResolver = resolver(locale)
+    DieselI18n.unknownToken(token)
   }
 }
 case object AmbiguousMsg                                                extends InternalMsg {
   override def format(locale: String): String = {
-    DieselI18n.ambiguous()(resolver(locale))
+    given KeyResolver = resolver(locale)
+    DieselI18n.ambiguous()
   }
 }
 

@@ -164,14 +164,14 @@ object Lexer {
       var isKeyword = false
       identifiers.foreach { i =>
         i.keywordScanner.findPrefixOf(text).foreach { prefix =>
-          if (prefix == text) {
-            if (!keywords.contains(prefix)) {
+          if prefix == text then {
+            if !keywords.contains(prefix) then {
               keywords.put(prefix, IdentifiedToken(prefix))
               styleOpt.foreach(style => keywordToStyles.put(prefix, Seq(style)))
             } else {
               styleOpt.foreach(style => {
                 val styles = keywordToStyles.get(prefix)
-                if (styles.isEmpty)
+                if styles.isEmpty then
                   keywordToStyles.put(prefix, Seq(style))
                 else
                   keywordToStyles.put(prefix, styles.get ++ Seq(style))
@@ -181,14 +181,14 @@ object Lexer {
           }
         }
       }
-      if (!isKeyword) {
+      if !isKeyword then {
         computeScanner(RegexScanner(Regex.quote(text).r), IdentifiedToken(text), styleOpt)
       } else
         Seq()
     }
 
     def computeScanner(re: Scanner, tokenId: Lexer.TokenId, styleOpt: Option[Style]): Seq[Rule] = {
-      if (!scanners.contains(re)) {
+      if !scanners.contains(re) then {
         val rule = SimpleRule(re, tokenId)
         styleOpt.foreach { style =>
           rule.styles = rule.styles ++ Seq(style)
@@ -284,7 +284,7 @@ case class Lexer(lexerRules: Seq[Rule], tokenRules: Map[TokenId, Rule]) {
   def next(input: Input, tokens: Seq[TokenId]): Token = {
     val lexerRules = tokens.map(tokenId => tokenRules(tokenId)) ++ skipRules
     var res        = next(input, lexerRules, eatOnError = false)._1
-    if (res.id == Error) {
+    if res.id == Error then {
       res = next(input)
     }
     res
@@ -300,7 +300,7 @@ case class Lexer(lexerRules: Seq[Rule], tokenRules: Map[TokenId, Rule]) {
     lexerRules: Seq[Rule],
     eatOnError: Boolean = true
   ): (Token, Seq[Style]) = {
-    if (input.eos) {
+    if input.eos then {
       (Token(input.offset, "", Eos), Seq())
     } else {
       val initialAcc: Option[((Token, Seq[Style]), Int)] = None // (Token, Priority)
@@ -313,9 +313,9 @@ case class Lexer(lexerRules: Seq[Rule], tokenRules: Map[TokenId, Rule]) {
                 Some(((Token(input.offset, s, rule.tokenId(s)), rule.stylesOf(s)), rule.priority))
 
               case Some(r @ ((t, _), p)) =>
-                if (
+                if
                   (s.length > t.text.length) || ((s.length == t.text.length) && (rule.priority > p))
-                ) {
+                then {
                   Some(((Token(input.offset, s, rule.tokenId(s)), rule.stylesOf(s)), rule.priority))
                 } else {
                   Some(r)
@@ -328,7 +328,7 @@ case class Lexer(lexerRules: Seq[Rule], tokenRules: Map[TokenId, Rule]) {
       }
       a match {
         case None =>
-          (Token(input.offset, if (eatOnError) input.eat(1) else "", Error), Seq())
+          (Token(input.offset, if eatOnError then input.eat(1) else "", Error), Seq())
 
         case Some(((Token(_, text, Skip), _), _)) =>
           input.eat(text.length)

@@ -19,7 +19,7 @@ package diesel
 import diesel.samples.Sql.Ast._
 import diesel.samples.Sql.Sql
 
-class SqlTest extends DslTestFunSuite {
+class SqlTest extends DslTestFunSuite[Dsl] {
 
   type Ast = Clause
   override def dsl = Sql

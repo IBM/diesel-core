@@ -20,7 +20,7 @@ import diesel.Marker.{Descriptor, Kind, Severity}
 import diesel.{DslTestFunSuite, Marker}
 import diesel.Dsl
 
-class BmdDslValidationTest extends DslTestFunSuite {
+class BmdDslValidationTest extends DslTestFunSuite[BmdDsl.type] {
 
   override def dsl                                 = BmdDsl
   override def axiom: Some[Dsl.Axiom[JsModelDecl]] = Some(BmdDsl.aCompileUnit)

@@ -375,9 +375,9 @@ object Dsl {
       dsl: Dsl,
       consumer: SyntaxTyped[T] => Unit
     ): Unit = {
-      if (concept.typeOf == tag) {
+      if concept.typeOf == tag then {
         val c = concept.asInstanceOf[Concept[T]]
-        if (accept(c, exprTypes, dsl))
+        if accept(c, exprTypes, dsl) then
           consumer(syntaxOf(c))
       }
     }
@@ -395,9 +395,9 @@ object Dsl {
       dsl: Dsl,
       consumer: (SyntaxMulti[T, T2]) => Unit
     ): Unit =
-      if (concept.typeOf == tag) {
+      if concept.typeOf == tag then {
         val c = concept.asInstanceOf[Concept[T]]
-        if (accept(c, exprTypes, dsl))
+        if accept(c, exprTypes, dsl) then
           consumer(syntaxOf(c))
       }
   }
@@ -1090,10 +1090,12 @@ trait Dsl {
     addSyntax(SyntaxUntyped(name.name, production)).asInstanceOf[SyntaxUntyped[T]]
 
   def syntax[T](
-    concept: Concept[T],
-    expression: Boolean = true
+    concept: Concept[T]
   )(production: SyntaxProduction[T])(implicit name: DeclaringSourceName): SyntaxTyped[T] =
-    addSyntax(SyntaxTyped(name.name, concept, expression, production)).asInstanceOf[SyntaxTyped[T]]
+    addSyntax(SyntaxTyped(name.name, concept, true, production)).asInstanceOf[SyntaxTyped[T]]
+
+  def syntax[T](production: SyntaxProduction[T])(implicit name: sourcecode.Name): SyntaxUntyped[T] =
+    addSyntax(SyntaxUntyped(name.value, production)).asInstanceOf[SyntaxUntyped[T]]
 
   def syntaxMultiple[T, T2](concept: Concept[T])(production: SyntaxProduction[T2])(implicit
     name: DeclaringSourceName

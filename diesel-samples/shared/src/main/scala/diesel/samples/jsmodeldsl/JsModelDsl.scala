@@ -167,10 +167,10 @@ case object JsModelDsl extends Dsl with Identifiers with Comments with DynamicLe
       proposals.flatMap { p =>
         p.element match {
           case Some(DslSyntax(syntax)) =>
-            if (syntax.name == sCustomRef.name) {
+            if syntax.name == sCustomRef.name then {
               // pediction for a custom ref : list what we have !
               model.types.map(td => CompletionProposal(p.element, td.name))
-            } else if (syntax.name == sSuperClassName.name) {
+            } else if syntax.name == sSuperClassName.name then {
               val classDeclNode =
                 node.flatMap(_.findFirstParent(_.value.isInstanceOf[ClassDeclaration]))
               classDeclNode
@@ -183,9 +183,9 @@ case object JsModelDsl extends Dsl with Identifiers with Comments with DynamicLe
                     .map(CompletionProposal(p.element, _))
                 }
                 .getOrElse(Seq.empty)
-            } else if (
+            } else if
               syntax.name == sAttrName.name || syntax.name == sClassName.name || syntax.name == sDomainName.name
-            ) {
+            then {
               Seq()
             } else {
               Seq(p)

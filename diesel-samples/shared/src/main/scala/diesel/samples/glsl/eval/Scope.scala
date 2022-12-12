@@ -48,10 +48,10 @@ class Scope(
   def getFunctions: Map[String, Func] = functions.toMap
 
   def setValue(name: String, value: EValue): Unit = {
-    if (variables.contains(name)) {
+    if variables.contains(name) then {
       variables(name) = value
     } else {
-      if (parent.isDefined) {
+      if parent.isDefined then {
         parent.get.setValue(name, value)
       } else {
         throw new IllegalStateException(s"trying to set value of undeclared ${name}")
@@ -74,7 +74,7 @@ object Scope {
 
   def initial(): Scope = {
     val s = new Scope()
-    for (f <- BuiltInFunction.builtInFunctions) {
+    for f <- BuiltInFunction.builtInFunctions do {
       s.declare(f._1, f._2)
     }
     s

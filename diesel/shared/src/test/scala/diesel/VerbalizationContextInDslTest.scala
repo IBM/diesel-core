@@ -20,6 +20,7 @@ import diesel.Dsl._
 import diesel.voc.i18n.EnglishVerbalizer
 import diesel.voc.{Concept => _, _}
 import munit.FunSuite
+import scala.util.NotGiven
 
 class VerbalizationContextInDslTest extends FunSuite {
 
@@ -49,7 +50,7 @@ class VerbalizationContextInDslTest extends FunSuite {
     val void: Concept[AVoid] = concept
 
     val print: Phrase[AVoid] = phrase(void)(
-      pS("print") ~ pR(value) map [AVoid] {
+      pS("print") ~ pR(value) map {
         case (_, (_, s)) =>
           APrint(s)
       }
@@ -68,7 +69,7 @@ class VerbalizationContextInDslTest extends FunSuite {
   object MyDsl extends BootVoc {
 
     val pi: Phrase[ANumber] = phrase(number)(
-      pS("pi").subject map [ANumber] {
+      pS("pi").subject map {
         case (_, t) =>
           Pi
       }
@@ -114,7 +115,7 @@ class VerbalizationContextInDslTest extends FunSuite {
         ","
       ) ~ pR(
         number
-      ) ~ pS(")") map [ANumber] {
+      ) ~ pS(")") map {
         case (_, (_, _, l, _, r, _)) =>
           // maps to user Ast type
           AMax(l, r)

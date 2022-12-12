@@ -66,7 +66,7 @@ class EnglishArticleBuilder(val voc: Vocabulary) extends DefaultArticleBuilder {
             None
           case IndefiniteArticle    =>
             val label = verbalizable.label
-            if (EnglishUtil.isVowel(label.charAt(0))) {
+            if EnglishUtil.isVowel(label.charAt(0)) then {
               Some("an")
             } else {
               Some("a")
@@ -101,9 +101,9 @@ class EnglishArticleBuilder(val voc: Vocabulary) extends DefaultArticleBuilder {
   private def handlePartitive(res: Option[String], context: VerbalizationContext): Option[String] =
     res.map {
       r =>
-        if (context.partitive) {
+        if context.partitive then {
           "of" + (
-            if (r.nonEmpty) " " + r else r
+            if r.nonEmpty then " " + r else r
           )
         } else {
           r
@@ -129,7 +129,7 @@ class EnglishArticleBuilder(val voc: Vocabulary) extends DefaultArticleBuilder {
             val sentence = context.sentence
             val factType = sentence.flatMap(voc.getFactType)
             val owner    = factType.flatMap(_.getOwnerRole).isDefined
-            if (owner) {
+            if owner then {
               val term = glossary.getTerm(verbalizable.label)
               term.flatMap(_.gender)
                 .map {
@@ -159,11 +159,11 @@ object EnglishPluralBuilder extends PluralBuilder {
   override def getPlural(context: VerbalizationContext, verbalizable: Verbalizable): String = {
     val label = verbalizable.label
     val size  = label.length
-    if (size > 1) {
+    if size > 1 then {
       val lastChar = label.last
       lastChar match {
         case 'y' =>
-          if (size >= 2 && !EnglishUtil.isVowel(label.charAt(size - 2))) {
+          if size >= 2 && !EnglishUtil.isVowel(label.charAt(size - 2)) then {
             label + "ies"
           } else {
             label + "s"

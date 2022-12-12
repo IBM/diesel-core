@@ -20,7 +20,7 @@ import diesel.AstHelpers._
 import diesel.samples.Abort
 import diesel.samples.Abort.{Add, Constant, Mul}
 
-class AbortTest extends DslTestFunSuite {
+class AbortTest extends DslTestFunSuite[Dsl] {
 
   type Ast = Abort.Expr
   override def dsl = Abort.MyDsl
@@ -38,7 +38,7 @@ class AbortTest extends DslTestFunSuite {
   }
 
   test("left assoc expression") {
-    withAsts("1 + 2 + 3") { nav: Navigator =>
+    withAsts("1 + 2 + 3") { (nav: Navigator) =>
       val first = nav.next()
       assert(first.value == Add(Add(Constant(1), Constant(2)), Constant(3)))
       assert(first.markers.isEmpty)
@@ -51,7 +51,7 @@ class AbortTest extends DslTestFunSuite {
   }
 
   test("precedence expression") {
-    withAsts("1 + 2 * 3 + 4") { nav: Navigator =>
+    withAsts("1 + 2 * 3 + 4") { (nav: Navigator) =>
       val first = nav.next()
       assert(first.value == Add(
         Add(Constant(1.0), Mul(Constant(2.0), Constant(3.0))),

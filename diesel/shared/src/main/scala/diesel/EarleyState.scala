@@ -42,7 +42,7 @@ private[diesel] trait TerminalItem extends Item {
 
   def isErrorRecovery: Boolean = false
 
-  override def syntacticErrors(ctx: Result): Int = if (isErrorRecovery) 1 else 0
+  override def syntacticErrors(ctx: Result): Int = if isErrorRecovery then 1 else 0
 
   def reportErrors(): Seq[Marker]
 }
@@ -133,11 +133,11 @@ private[diesel] case class State(
     val builder = new mutable.StringBuilder()
     builder.append(rule.name).append(" -> ")
     production.symbols.zipWithIndex.foreach { case (symbol: Bnf.Symbol, index: Int) =>
-      if (index == dot)
+      if index == dot then
         builder.append(". ")
       builder.append(symbol.name).append(" ")
     }
-    if (production.symbols.length == dot)
+    if production.symbols.length == dot then
       builder.append(". ")
     builder.append("[").append(begin).append(", ").append(end).append("] ").append(feature)
     //    states.get(this).foreach(ctx => {
@@ -165,10 +165,10 @@ private[diesel] class Chart(
 
   def `+=`(state: State): Chart = {
     states += state
-    if (!state.isCompleted && state.nextSymbol.isRule) {
+    if !state.isCompleted && state.nextSymbol.isRule then {
       _activeStates += state
     }
-    if (!state.isCompleted) {
+    if !state.isCompleted then {
       _notCompletedStates += state
     }
     this
@@ -227,7 +227,7 @@ private[diesel] object StateKind extends Enumeration {
   val Kernel, Processed, ErrorRecovery = Value
 
   def next(value: Value): Value =
-    if (value.id < ErrorRecovery.id) values.iteratorFrom(value).next() else value
+    if value.id < ErrorRecovery.id then values.iteratorFrom(value).next() else value
 }
 
 private[diesel] class StateContext(
@@ -238,21 +238,21 @@ private[diesel] class StateContext(
 ) {
 
   def mergeBackPtr(kind: StateKind.Value, backPtr: BackPtr, ctx: Result): StateContext = {
-    if (this.kind != kind) {
-      if (this.kind.id > kind.id) {
+    if this.kind != kind then {
+      if this.kind.id > kind.id then {
         this.kind = kind;
       }
     }
     val syntacticErrors = backPtr.syntacticErrors(ctx)
-    if (backPtrs.isEmpty) {
+    if backPtrs.isEmpty then {
       this.syntacticErrors = syntacticErrors
       backPtrs += backPtr
-    } else if (syntacticErrors < this.syntacticErrors) {
+    } else if syntacticErrors < this.syntacticErrors then {
       this.syntacticErrors = syntacticErrors
       backPtrs.clear()
       backPtrs += backPtr
-    } else if (syntacticErrors == this.syntacticErrors && syntacticErrors == 0) {
-      if (!backPtrs.contains(backPtr)) // TODO: use better implementation O(n)
+    } else if syntacticErrors == this.syntacticErrors && syntacticErrors == 0 then {
+      if !backPtrs.contains(backPtr) then // TODO: use better implementation O(n)
         backPtrs += backPtr
     }
     this
@@ -285,7 +285,7 @@ class Result(val axiom: Bnf.Axiom) {
   private[diesel] def reportErrors(): Seq[Marker] = markers.toSeq
 
   private[diesel] def beginChart(index: Int, token: Lexer.Token): Chart = {
-    val chart = if (index == charts.size) pushChart else chartAt(index)
+    val chart = if index == charts.size then pushChart else chartAt(index)
     chart.setToken(token)
     chart.toQueue(processingQueue)
     currentChart = Some(chart)
@@ -305,7 +305,7 @@ class Result(val axiom: Bnf.Axiom) {
     })
 
     def tokenEndsAt(offset: Int) = {
-      t: Token => t.offset + t.length == offset
+      (t: Token) => t.offset + t.length == offset
     }
 
     val prefix = errorTokens
@@ -319,7 +319,7 @@ class Result(val axiom: Bnf.Axiom) {
   }
 
   private[diesel] def chartAt(index: Int) = {
-    while (index >= charts.size)
+    while index >= charts.size do
       pushChart
     charts(index)
   }
@@ -341,7 +341,7 @@ class Result(val axiom: Bnf.Axiom) {
   ): Unit = {
     val ctx = states.getOrElseUpdate(
       state, {
-        val res = new StateContext(states.size, kind, if (state.dot == 0) 0 else Int.MaxValue)
+        val res = new StateContext(states.size, kind, if state.dot == 0 then 0 else Int.MaxValue)
         states.put(state, res)
         enqueue(state)
         res

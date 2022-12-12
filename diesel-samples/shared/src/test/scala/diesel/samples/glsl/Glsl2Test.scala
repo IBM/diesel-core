@@ -19,7 +19,7 @@ package diesel.samples.glsl
 import diesel.DslTestFunSuite
 import diesel.samples.glsl.Ast._
 
-class Glsl2Test extends DslTestFunSuite {
+class Glsl2Test extends DslTestFunSuite[Glsl.type] {
 
   type Ast = TranslationUnit
   override def dsl: Glsl.type = Glsl

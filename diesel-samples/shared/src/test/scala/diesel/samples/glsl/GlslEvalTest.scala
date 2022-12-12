@@ -21,7 +21,7 @@ import diesel.samples.glsl.eval.Expr._
 import diesel.samples.glsl.eval.{EValue, GlslEval, Scope}
 import diesel.{DslTestFunSuite, GenericTree}
 
-class GlslEvalTest extends DslTestFunSuite {
+class GlslEvalTest extends DslTestFunSuite[Glsl.type] {
 
   override def dsl = Glsl
   type Ast = Scope

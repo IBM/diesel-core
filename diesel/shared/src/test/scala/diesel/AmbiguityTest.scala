@@ -20,7 +20,7 @@ import diesel.AstHelpers._
 import diesel.samples.Ambiguity
 import diesel.samples.Ambiguity._
 
-class AmbiguityTest extends DslTestFunSuite {
+class AmbiguityTest extends DslTestFunSuite[Dsl] {
 
   type Ast = Expr
   override def dsl = Ambiguity.MyDsl
@@ -38,7 +38,7 @@ class AmbiguityTest extends DslTestFunSuite {
   }
 
   test("left assoc") {
-    withAsts("1 + 2 + 3") { nav: Navigator =>
+    withAsts("1 + 2 + 3") { (nav: Navigator) =>
       val first  = nav.next()
       assert(first.value == Add(Add(Constant(1), Constant(2)), Constant(3)))
       assert(first.toSeq.exists(n => n.hasAmbiguity))
@@ -57,7 +57,7 @@ class AmbiguityTest extends DslTestFunSuite {
   }
 
   test("precedence") {
-    withAsts("1 + 2 * 3 + 4") { nav: Navigator =>
+    withAsts("1 + 2 * 3 + 4") { (nav: Navigator) =>
       val first  = nav.next()
       assert(first.value == Add(
         Mul(Add(Constant(1.0), Constant(2.0)), Constant(3.0)),

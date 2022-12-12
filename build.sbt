@@ -3,12 +3,12 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 import scala.sys.process._
 
-val scalaVersion2 = "2.13.10"
-// val scalaVersion3 = "3.2.1"
+// val scalaVersion2 = "2.13.10"
+val scalaVersion3 = "3.2.1"
 
 lazy val commonSettings = Seq(
   organization  := "com.ibm.cloud.diesel",
-  scalaVersion  := scalaVersion2,
+  scalaVersion  := scalaVersion3,
   versionScheme := Some("semver-spec"),
   description   := "Diesel is a library for creating and using languages easily."
 )
@@ -55,14 +55,18 @@ lazy val root = project
 
 lazy val sharedSettings_scalac = Seq(
   scalacOptions ++= Seq(
+    // "-source:3.0-migration",
+    "-source:3.0",
+    "-new-syntax",
+    "-rewrite",
     "-unchecked",
     "-deprecation",
     "-feature",
     "-Xfatal-warnings",
-    "-Wconf:cat=deprecation:i",
-    "-language:existentials",
-    "-Wunused:imports",
-    "-Ytasty-reader"
+    // "-Wconf:cat=deprecation:i",
+    "-language:existentials"
+    // "-Wunused:imports",
+    // "-Ytasty-reader"
   )
 )
 
@@ -77,28 +81,28 @@ lazy val sharedSettings_test = Seq(
 )
 
 lazy val sharedSettings_lint = Seq(
-  addCompilerPlugin(scalafixSemanticdb),
-  ThisBuild / scalafixScalaBinaryVersion := CrossVersion.binaryScalaVersion(scalaVersion.value),
-  ThisBuild / semanticdbEnabled          := true,
-  ThisBuild / semanticdbVersion          := scalafixSemanticdb.revision
+  // addCompilerPlugin(scalafixSemanticdb),
+  // ThisBuild / scalafixScalaBinaryVersion := CrossVersion.binaryScalaVersion(scalaVersion.value),
+  ThisBuild / semanticdbEnabled := true
+  // ThisBuild / semanticdbVersion          := scalafixSemanticdb.revision
 )
 
 lazy val sharedJsSettings = Seq(
-  scalacOptions += {
-    val branch        =
-      if (version.value.endsWith("SNAPSHOT")) {
-        "develop"
-      } else {
-        version.value
-      }
-    val local: String = baseDirectory.value.getParentFile.getParentFile.toURI.toString
-    val remote        = s"https://raw.github.ibm.com/IBM/diesel-core/$branch/"
-    println(s"sourceURIs : \nLOCAL:$local\nREMOTE:$remote")
-    s"-P:scalajs:mapSourceURI:$local->$remote"
-  },
+  // scalacOptions += {
+  //   val branch        =
+  //     if (version.value.endsWith("SNAPSHOT")) {
+  //       "develop"
+  //     } else {
+  //       version.value
+  //     }
+  //   val local: String = baseDirectory.value.getParentFile.getParentFile.toURI.toString
+  //   val remote        = s"https://raw.github.ibm.com/diesel/diesel/$branch/"
+  //   println(s"sourceURIs : \nLOCAL:$local\nREMOTE:$remote")
+  //   s"-P:scalajs:mapSourceURI:$local->$remote"
+  // }
   // for dependency: pine
-  libraryDependencies := libraryDependencies.value.filterNot(_.name == "scalajs-compiler"),
-  addCompilerPlugin("org.scala-js" % "scalajs-compiler" % scalaJSVersion cross CrossVersion.patch)
+//  libraryDependencies := libraryDependencies.value.filterNot(_.name == "scalajs-compiler"),
+//  addCompilerPlugin("org.scala-js" % "scalajs-compiler" % scalaJSVersion cross CrossVersion.patch)
 )
 
 lazy val diesel = crossProject(JSPlatform, JVMPlatform)
@@ -115,9 +119,8 @@ lazy val diesel = crossProject(JSPlatform, JVMPlatform)
   .settings(sharedSettings_scalac)
   .settings(
     libraryDependencies ++= Seq(
-      "com.ibm.cloud.diesel" %%% "diesel-i18n"   % Dependencies.dieselI18nVersion,
-      scalaOrganization.value  % "scala-reflect" % scalaVersion.value,
-      "org.scalameta"        %%% "munit"         % "1.0.0-M7" % Test
+      "com.ibm.cloud.diesel" %%% "diesel-i18n" % Dependencies.dieselI18nVersion cross (CrossVersion.for3Use2_13),
+      "org.scalameta"        %%% "munit"       % "1.0.0-M7" % Test
     )
   )
   .settings(sharedSettings_test)

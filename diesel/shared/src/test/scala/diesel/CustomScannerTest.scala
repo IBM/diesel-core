@@ -31,11 +31,11 @@ class CustomScannerTest extends FunSuite {
     override def findPrefixOf(source: CharSequence): Option[String] = {
       var i      = 0
       var prefix = ""
-      while (i < source.length() && digits.contains(source.charAt(i))) {
+      while i < source.length() && digits.contains(source.charAt(i)) do {
         prefix += source.charAt(i)
         i = i + 1
       }
-      if (prefix == "")
+      if prefix == "" then
         None
       else
         Some(prefix)

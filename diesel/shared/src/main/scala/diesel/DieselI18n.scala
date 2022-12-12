@@ -18,6 +18,7 @@ package diesel
 
 import diesel.i18n.Messages.{Lang, Resolver}
 import diesel.i18n.{Lang, Loader, MessageFormat, Messages}
+import diesel.i18n.DeclaringSourceName.given
 
 object DieselI18n extends Messages {
 

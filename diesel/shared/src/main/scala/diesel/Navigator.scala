@@ -66,7 +66,7 @@ private[diesel] class ParsingContext(
   override def hasAborted: Boolean = aborted
 
   override def abort(): Boolean = {
-    if (!aborted) {
+    if !aborted then {
       ambiguity.foreach(_.abort())
       aborted = true
     }
@@ -99,7 +99,7 @@ object GenericTree {
 
       override def next(): GenericNode = {
         val res = processingQueue.dequeue()
-        if (descendants) {
+        if descendants then {
           res.getChildren.foreach(child => processingQueue.enqueue(child))
         }
         res
@@ -142,7 +142,7 @@ case class GenericTree(
   override def toString: String = prettyPrint(this.root, 0).mkString("\n")
 
   private def nodeToStr(node: GenericNode): String =
-    (node.toString + (if (node.value == null) "" else " => " + node.value.toString))
+    (node.toString + (if node.value == null then "" else " => " + node.value.toString))
 
   private def prettyPrint(node: GenericNode, indent: Int): Seq[String] = {
     Seq(
@@ -182,14 +182,14 @@ abstract class GenericNode(var parent: Option[GenericNode], val context: Context
   def toSeq(descendants: Boolean = false): Seq[GenericNode] = toIterable(descendants).toSeq
 
   def findNodeAtIndex(index: Int): Option[GenericNode] =
-    if (containsIndex(index)) {
+    if containsIndex(index) then {
       getChildren.foreach(child => {
         child.findNodeAtIndex(index) match {
           case Some(value) => return Some(value)
           case _           =>
         }
       })
-      if (startsAtIndex(index))
+      if startsAtIndex(index) then
         Some(this)
       else
         None
@@ -212,7 +212,7 @@ abstract class GenericNode(var parent: Option[GenericNode], val context: Context
   def findFirstParent(p: GenericNode => Boolean): Option[GenericNode] = {
     parent match {
       case Some(parent) =>
-        if (p(parent))
+        if p(parent) then
           Some(parent)
         else
           parent.findFirstParent(p)
@@ -300,27 +300,27 @@ object Navigator {
   def select(navigator: Navigator): Option[GenericTree] = {
     var asts: Seq[GenericTree] = Seq()
     var errorCount: Int        = Int.MaxValue
-    while (navigator.hasNext) {
+    while navigator.hasNext do {
       val candidate: GenericTree = navigator.next()
-      if (asts.isEmpty)
+      if asts.isEmpty then
         asts = Seq(candidate)
       else {
         val actualErrorCount = Marker.countErrors(candidate.markers)
-        if (errorCount > actualErrorCount)
+        if errorCount > actualErrorCount then
           asts = Seq(candidate)
-        else if (errorCount == 0 && actualErrorCount == 0)
+        else if errorCount == 0 && actualErrorCount == 0 then
           asts = asts ++ Seq(candidate)
       }
       errorCount = Marker.countErrors(asts.head.markers)
     }
-    if (errorCount == 0 && asts.size > 1) {
+    if errorCount == 0 && asts.size > 1 then {
       val ast                 = asts.head
       var errors: Seq[Marker] = Seq()
       ast.toSeq.foreach(node =>
-        if (node.hasAmbiguity)
+        if node.hasAmbiguity then
           errors = errors ++ Seq(Ambiguous.apply(node.offset, node.length))
       )
-      if (errors.isEmpty)
+      if errors.isEmpty then
         errors = Seq(Ambiguous.apply(ast.offset, ast.length))
       Some(GenericTree(ast.root, ast.value, ast.offset, ast.length, ast.markers ++ errors))
     } else asts.headOption
@@ -347,7 +347,7 @@ class Navigator(
   moveToFirst
 
   private[diesel] def choice(statement: Statement, state: State): Process = {
-    if (state.production.length == 0) {
+    if state.production.length == 0 then {
       pushSentinel()
       statement.next()
     } else {
@@ -396,7 +396,7 @@ class Navigator(
     var i                           = state.production.length
     var styles: Seq[(Token, Style)] = Seq()
     var errors: Seq[Marker]         = Seq()
-    while (i > 0) {
+    while i > 0 do {
       val value = stack.head
       value.value match {
         case InsertedTokenValue(_, _, _) => /* Ignore */
@@ -416,7 +416,7 @@ class Navigator(
     errors = popSentinel(errors)
     val offset                      = result.tokenAt(state.begin).map(_.offset).getOrElse(-1)
     val length                      =
-      if (state.begin == state.end) {
+      if state.begin == state.end then {
         0
       } else {
         result.tokenAt(state.end - 1).map(tk => tk.offset + tk.text.length).getOrElse(-1) - offset
@@ -441,7 +441,7 @@ class Navigator(
   private def popSentinel(errors: Seq[Marker]): Seq[Marker] = {
     var res = errors
     // Pop all remaining inserted token values
-    while (stack.head.value != Sentinel) {
+    while stack.head.value != Sentinel do {
       val value = stack.head
       value.value match {
         case InsertedTokenValue(_, _, _) =>
@@ -526,11 +526,11 @@ class Navigator(
   }
 
   private def moveToNext: Boolean = {
-    while (!proc.done) {
+    while !proc.done do {
       proc = proc.step()
-      if (proc.pause)
+      if proc.pause then
         return true
-      if (proc.stop || (proc.cut && canRetry))
+      if proc.stop || (proc.cut && canRetry) then
         proc = back()
     }
     current = null
@@ -542,7 +542,7 @@ class Navigator(
   def next(): GenericTree = {
     var tree =
       GenericTree(current.node, current.value, current.offset, current.length, current.markers)
-    if (postProcessors.nonEmpty) {
+    if postProcessors.nonEmpty then {
       var markers: Seq[Marker] = Seq()
       postProcessors.foreach(pp => markers = markers ++ pp(tree))
       tree = GenericTree(tree.root, tree.value, tree.offset, tree.length, tree.markers ++ markers)
@@ -561,9 +561,9 @@ class Navigator(
   }
 
   private def back(): Process = {
-    while (choices.nonEmpty) {
+    while choices.nonEmpty do {
       val choice = choices.head
-      if (choice.retry) {
+      if choice.retry then {
         stack = choice.base
         return choice
       }
@@ -573,7 +573,7 @@ class Navigator(
   }
 
   private def canRetry: Boolean = {
-    if (choices.nonEmpty) choices.exists(_.retry) else false
+    if choices.nonEmpty then choices.exists(_.retry) else false
   }
 }
 
@@ -617,7 +617,7 @@ object Analyzer {
     }
 
     override def next(): Statement = {
-      if (!navigator.push(item, ambiguity)) {
+      if !navigator.push(item, ambiguity) then {
         return new Cut(navigator)
       }
       super.next();
@@ -633,11 +633,11 @@ object Analyzer {
   ) extends Statement(navigator, parent) {
 
     override def step(): Process = {
-      if (
+      if
         backPtr.predecessor.dot == 0 && navigator.result.contextOf(backPtr.predecessor).forall(
           ctx => ctx.backPtrs.isEmpty
         )
-      ) {
+      then {
         navigator.pushSentinel()
         next()
       } else {
@@ -667,10 +667,10 @@ object Analyzer {
     private[diesel] val base: Seq[Parsing]   = navigator.stack
     private var index: Seq[BackPtr]          = backPtrs
     private val ambiguity: Option[Ambiguity] =
-      if (backPtrs.size > 1) Some(new Ambiguity(backPtrs.size)) else None
+      if backPtrs.size > 1 then Some(new Ambiguity(backPtrs.size)) else None
 
     override def step(): Process = {
-      if (index.nonEmpty) {
+      if index.nonEmpty then {
         val backPtr = index.head
         index = index.tail
         return new Sequence(navigator, parent, state, backPtr, ambiguity)
@@ -687,7 +687,7 @@ object Analyzer {
     override def step(): Process = navigator.choice(this, root.state)
 
     override def next(): Statement = {
-      if (navigator.tree(root.state))
+      if navigator.tree(root.state) then
         new Pause(navigator, root)
       else
         super.next()

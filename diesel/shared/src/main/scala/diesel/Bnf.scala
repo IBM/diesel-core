@@ -92,16 +92,16 @@ object Bnf {
           case None => this
 
           case Precedence(_, _, associativity, level) =>
-            if (this.level > level)
+            if this.level > level then
               Incompatible
-            else if (this.level < level)
+            else if this.level < level then
               this
             else {
-              if (dot < from) {
-                if (this.associativity == Associativity.Left)
+              if dot < from then {
+                if this.associativity == Associativity.Left then
                   return this
-              } else if (dot > to) {
-                if (this.associativity == Associativity.Right)
+              } else if dot > to then {
+                if this.associativity == Associativity.Right then
                   return this
               }
               Incompatible
@@ -120,7 +120,7 @@ object Bnf {
     case class Propagate(from: Int) extends Feature {
 
       override def merge(dot: Int, other: Feature): Feature = {
-        if (from == dot) other else None
+        if from == dot then other else None
       }
 
       override def shift(prefix: Int): Feature = Propagate(prefix + from)
@@ -279,7 +279,7 @@ object Bnf {
       val to      = symbols.length - 1
       var from    = to
       var current = symbols.reverse.tail
-      while (current.nonEmpty && current.head.isToken) {
+      while current.nonEmpty && current.head.isToken do {
         from -= 1
         current = current.tail
       }
@@ -519,7 +519,7 @@ object Bnf {
         )
 
       def propagate(first: Boolean): GrammarContext =
-        if (first) this else GrammarContext(concept, cardinality, None, None, None)
+        if first then this else GrammarContext(concept, cardinality, None, None, None)
 
       override def toString: String = s"${concept match {
           case Some(value) => value.name
@@ -531,20 +531,20 @@ object Bnf {
           case Some(value) => value.name
           case None        => "_"
         }},${plural match {
-          case Some(value) => if (value) "PLURAL" else "SINGULAR"
+          case Some(value) => if value then "PLURAL" else "SINGULAR"
           case None        => "_"
         }},${partitive match {
-          case Some(value) => if (value) "PARTITIVE" else "NON-PARTITIVE"
+          case Some(value) => if value then "PARTITIVE" else "NON-PARTITIVE"
           case None        => "_"
         }}"
     }
 
     def ruleNameOf(prefix: String, ctx: GrammarContext, suffix: String): String = {
-      s"$prefix[$ctx]${if (suffix.isEmpty) "" else s".$suffix"}"
+      s"$prefix[$ctx]${if suffix.isEmpty then "" else s".$suffix"}"
     }
 
     def getOrCreateRule(name: String, suffix: String = ""): Rule = {
-      val ruleName = s"$name${if (suffix.isEmpty) "" else s".$suffix"}"
+      val ruleName = s"$name${if suffix.isEmpty then "" else s".$suffix"}"
       rules.getOrElse(
         ruleName, {
           val rule = Rule(ruleName)
@@ -562,7 +562,7 @@ object Bnf {
     var generated: mutable.Set[String]             = mutable.Set()
 
     def forwardGeneration(rule: Rule, task: () => Unit): Unit = {
-      if (!generated.contains(rule.name)) {
+      if !generated.contains(rule.name) then {
         processingQueue.enqueue(task)
         generated = generated ++ Seq(rule.name)
       }
@@ -837,7 +837,7 @@ object Bnf {
           Partial(Seq(item), Propagate(0))
 
         case SPConceptRef(c, _, m, vc) =>
-          val newCtx = ctx.derive(c, if (m) Multiple else Single, vc)
+          val newCtx = ctx.derive(c, if m then Multiple else Single, vc)
           val target = getOrCreateRuleWithContext("target", newCtx)
           forwardGeneration(target, () => generateTarget(target, newCtx))
           Partial(Seq(target), Propagate(0))
@@ -909,7 +909,7 @@ object Bnf {
               args.head.asInstanceOf[Seq[Any]] ++ Seq(args.tail.head)
             }
           )
-          if (zeroIncluded)
+          if zeroIncluded then
             repRule >> new Production(
               Some(repRule),
               Seq(),
@@ -1118,7 +1118,7 @@ object Bnf {
 
     def generateValue(rule: Rule, ctx: GrammarContext): Boolean = {
       ctx.cardinality foreach { cardinality =>
-        if (cardinality == Single) {
+        if cardinality == Single then {
           ctx.concept foreach { concept =>
             concept.data foreach { data =>
               rule >> new Production(
@@ -1159,10 +1159,10 @@ object Bnf {
 
     def generateInstances(rule: Bnf.Rule, ctx: GrammarContext): Boolean = {
       ctx.cardinality foreach { cardinality =>
-        if (cardinality == Single) {
+        if cardinality == Single then {
           ctx.concept foreach { concept =>
             dsl.getInstances.foreach(instance =>
-              if (instance.concept == concept) {
+              if instance.concept == concept then {
                 instance match {
                   case instance: Instance[_] =>
                     addProduction(
@@ -1199,7 +1199,7 @@ object Bnf {
         ctx.concept foreach { concept =>
           dsl.getPhrases.foreach {
             case phrase: PhraseSingle[_]   =>
-              if (cardinality == Single && phrase.concept == concept) {
+              if cardinality == Single && phrase.concept == concept then {
                 val phraseRule = getOrCreateRuleWithContext("phrase", ctx, phrase.name)
                 forwardGeneration(phraseRule, () => generatePhrase(phrase, phraseRule, ctx))
                 rule >> new Production(
@@ -1211,7 +1211,7 @@ object Bnf {
                 )
               }
             case phrase: PhraseMulti[_, _] =>
-              if (cardinality == Multiple && phrase.concept == concept) {
+              if cardinality == Multiple && phrase.concept == concept then {
                 val phraseRule = getOrCreateRuleWithContext("phrase", ctx, phrase.name)
                 forwardGeneration(phraseRule, () => generatePhrase(phrase, phraseRule, ctx))
                 rule >> new Production(
@@ -1263,16 +1263,16 @@ object Bnf {
         ctx.concept foreach { concept =>
           dsl.getSyntaxes.foreach {
             case syntax: SyntaxTyped[_]    =>
-              if (
+              if
                 cardinality == Single && syntax.expression && dsl.isSubtypeOf(
                   syntax.concept,
                   concept
                 )
-              ) {
+              then {
                 addSyntax(syntax)
               }
             case syntax: SyntaxMulti[_, _] =>
-              if (cardinality == Multiple && dsl.isSubtypeOf(syntax.concept, concept)) {
+              if cardinality == Multiple && dsl.isSubtypeOf(syntax.concept, concept) then {
                 addSyntax(syntax)
               }
             case _                         =>
@@ -1280,11 +1280,11 @@ object Bnf {
           // Generic syntaxes
           dsl.getGenericSyntaxes.foreach {
             case genericSyntax: SyntaxGeneric[_]         =>
-              if (cardinality == Single) {
+              if cardinality == Single then {
                 genericSyntax.apply(concept, exprTypes, dsl, addSyntax)
               }
             case genericSyntax: SyntaxGenericMulti[_, _] =>
-              if (cardinality == Multiple) {
+              if cardinality == Multiple then {
                 genericSyntax.apply(concept, exprTypes, dsl, addSyntax)
               }
           }
@@ -1343,9 +1343,9 @@ object Bnf {
     def generateExpr(rule: Rule, exprTypes: Expressions.Types, ctx: GrammarContext): Boolean = {
       ctx.cardinality foreach { cardinality =>
         ctx.concept foreach { _ =>
-          if (cardinality == Single) {
+          if cardinality == Single then {
             // Value
-            if (exprTypes.has(Expressions.Values)) {
+            if exprTypes.has(Expressions.Values) then {
               val value = getOrCreateRuleWithContext("value", ctx)
               forwardGeneration(value, () => generateValue(value, ctx))
               rule >> new Production(
@@ -1357,7 +1357,7 @@ object Bnf {
               )
             }
             // Instances
-            if (exprTypes.has(Expressions.Instances)) {
+            if exprTypes.has(Expressions.Instances) then {
               val instances = getOrCreateRuleWithContext("instances", ctx)
               forwardGeneration(instances, () => generateInstances(instances, ctx))
               rule >> new Production(
@@ -1370,7 +1370,7 @@ object Bnf {
             }
           }
           // Phrases
-          if (exprTypes.has(Expressions.Phrases)) {
+          if exprTypes.has(Expressions.Phrases) then {
             val phrases = getOrCreateRuleWithContext("phrases", ctx)
             forwardGeneration(phrases, () => generatePhrases(phrases, ctx))
             rule >> new Production(
@@ -1382,7 +1382,7 @@ object Bnf {
             )
           }
           // Syntaxes
-          if (exprTypes.has(Expressions.Syntaxes)) {
+          if exprTypes.has(Expressions.Syntaxes) then {
             val syntaxes = getOrCreateRuleWithContext("syntaxes", ctx)
             forwardGeneration(syntaxes, () => generateSyntaxes(syntaxes, exprTypes, ctx))
             rule >> new Production(
@@ -1435,33 +1435,33 @@ object Bnf {
 
     def cleanGrammar(): Unit = {
       var rulesToRemove: Set[String] = Set()
-      var cont                       = false
-      do {
+      var cont                       = true
+      while cont do {
         rules.values.foreach {
           case rule: Rule   =>
-            if (rule.productions.isEmpty)
+            if rule.productions.isEmpty then
               rulesToRemove = rulesToRemove ++ Seq(rule.name)
           case axiom: Axiom =>
-            if (axiom.rule.productions.isEmpty)
+            if axiom.rule.productions.isEmpty then
               rulesToRemove = rulesToRemove ++ Seq(axiom.name)
           case _            =>
         }
         cont = false;
-        if (rulesToRemove.nonEmpty) {
+        if rulesToRemove.nonEmpty then {
           rules.values.foreach {
             case rule: Rule =>
               var productionsToRemove: Seq[Production] = Seq()
               rule.productions.foreach(p => {
-                if (
+                if
                   p.symbols.exists {
                     case r: Rule => rulesToRemove.contains(r.name)
                     case _       => false
                   }
-                ) {
+                then {
                   productionsToRemove = productionsToRemove ++ Seq(p)
                 }
               })
-              if (productionsToRemove.nonEmpty) {
+              if productionsToRemove.nonEmpty then {
                 rule.productions = rule.productions.filter(p => !productionsToRemove.contains(p))
                 cont = true
               }
@@ -1471,7 +1471,7 @@ object Bnf {
           rulesToRemove.foreach(ruleName => rules = rules - ruleName)
           rulesToRemove = Set()
         }
-      } while (cont)
+      }
     }
 
     def dumpGrammar(): Unit = {
@@ -1488,7 +1488,7 @@ object Bnf {
 
     def generateGrammar(): Seq[NonTerminal] = {
       generateAxioms()
-      while (processingQueue.nonEmpty) {
+      while processingQueue.nonEmpty do {
         val task = processingQueue.dequeue()
         task()
       }

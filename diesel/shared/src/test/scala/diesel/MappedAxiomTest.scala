@@ -26,14 +26,14 @@ object MappedAxiomDsl extends Dsl {
 
   val number: Concept[Int] = concept("\\d+".r, 0) map { (c, t) =>
     val i = t.text.toInt
-    if (i > 999) {
+    if i > 999 then {
       c.addMarkers(Marker(Errors.SemanticError, c.offset, c.length, "Value is too high"))
     }
     i
   }
 
   val ax: Axiom[Num] = axiom(number) map { (c, i) =>
-    if (i == 111) {
+    if i == 111 then {
       c.addMarkers(Marker(Errors.SemanticError, c.offset, c.length, "Zorba le grec"))
     }
     Num(i)
@@ -41,7 +41,7 @@ object MappedAxiomDsl extends Dsl {
 
 }
 
-class MappedAxiomTest extends DslTestFunSuite {
+class MappedAxiomTest extends DslTestFunSuite[Dsl] {
 
   override def dsl = MappedAxiomDsl
 

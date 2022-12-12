@@ -78,9 +78,9 @@ case class JsModelDecl(root: Root, types: Seq[TypeDefinition] = Seq()) {
 
   def format: String =
     s"""root : ${formatTypeRef(root.rootType)}""" +
-      (if (types.isEmpty) "" else "\n\n") +
+      (if types.isEmpty then "" else "\n\n") +
       types.zipWithIndex.map(x =>
-        formatTypeDefinition(x._1) + (if (x._2 < types.length - 1) "\n\n" else "")
+        formatTypeDefinition(x._1) + (if x._2 < types.length - 1 then "\n\n" else "")
       ).mkString
 
   private def formatDiscriminator(discriminator: Discriminator): String =
@@ -100,7 +100,7 @@ case class JsModelDecl(root: Root, types: Seq[TypeDefinition] = Seq()) {
         formatDiscriminator
       ).getOrElse("") + " {\n" +
         attributes.map(a =>
-          s"  ${a.name}${if (a.optional) "?" else ""} : ${formatTypeRef(a.declaredType)}"
+          s"  ${a.name}${if a.optional then "?" else ""} : ${formatTypeRef(a.declaredType)}"
         ).mkString(
           "\n"
         ) +
@@ -109,7 +109,7 @@ case class JsModelDecl(root: Root, types: Seq[TypeDefinition] = Seq()) {
       s"domain ${name} [\n" +
         values.zipWithIndex.map {
           case (v, i) =>
-            s"""  "${v}"${if (i < values.size - 1) ",\n" else ""}"""
+            s"""  "${v}"${if i < values.size - 1 then ",\n" else ""}"""
         }.mkString +
         "\n]"
   }

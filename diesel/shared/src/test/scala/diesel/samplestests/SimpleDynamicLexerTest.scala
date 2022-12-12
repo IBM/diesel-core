@@ -37,7 +37,7 @@ object MyDsl extends Dsl with DynamicLexer {
 
 }
 
-class MyTest extends DslTestFunSuite {
+class MyTest extends DslTestFunSuite[Dsl] {
 
   type Ast = String
   override def dsl = MyDsl
