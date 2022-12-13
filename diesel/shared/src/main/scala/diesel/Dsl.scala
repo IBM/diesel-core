@@ -366,7 +366,7 @@ object Dsl {
   case class SyntaxGeneric[T: ClassTag](
     override val name: String,
     accept: (Concept[T], Expressions.Types, Dsl) => Boolean,
-    syntaxOf: Concept[T] => SyntaxTyped[T]
+    syntaxOf: (Concept[T], Dsl) => SyntaxTyped[T]
   )(implicit tag: ClassTag[T])
       extends SyntaxGenericBase[T] {
     def apply(
@@ -378,7 +378,7 @@ object Dsl {
       if (concept.typeOf == tag) {
         val c = concept.asInstanceOf[Concept[T]]
         if (accept(c, exprTypes, dsl))
-          consumer(syntaxOf(c))
+          consumer(syntaxOf(c, dsl))
       }
     }
   }
@@ -386,7 +386,7 @@ object Dsl {
   case class SyntaxGenericMulti[T: ClassTag, T2](
     override val name: String,
     accept: (Concept[T], Expressions.Types, Dsl) => Boolean,
-    syntaxOf: Concept[T] => SyntaxMulti[T, T2]
+    syntaxOf: (Concept[T], Dsl) => SyntaxMulti[T, T2]
   )(implicit tag: ClassTag[T])
       extends SyntaxGenericBase[T] {
     def apply(
@@ -398,7 +398,7 @@ object Dsl {
       if (concept.typeOf == tag) {
         val c = concept.asInstanceOf[Concept[T]]
         if (accept(c, exprTypes, dsl))
-          consumer(syntaxOf(c))
+          consumer(syntaxOf(c, dsl))
       }
   }
 
@@ -949,12 +949,15 @@ trait Dsl {
   private var axioms: Seq[AxiomBase]                     = Seq()
   private var inheritances: Seq[Inheritance]             = Seq()
 
-  def getConcepts: Seq[ConceptBase]                        = concepts
-  def getInstances: Seq[InstanceBase]                      = instances
-  def getPhrases: Seq[Phrase[_]]                           = phrases
-  def getSyntaxes: Seq[Syntax[_]]                          = syntaxes
-  def getGenericSyntaxes: Seq[SyntaxGenericBase[_]]        = genericSyntaxes
-  def getAxioms: Seq[AxiomBase]                            = axioms
+  def getConcepts: Seq[ConceptBase]                 = concepts
+  def getInstances: Seq[InstanceBase]               = instances
+  def getPhrases: Seq[Phrase[_]]                    = phrases
+  def getSyntaxes: Seq[Syntax[_]]                   = syntaxes
+  def getGenericSyntaxes: Seq[SyntaxGenericBase[_]] = genericSyntaxes
+  def getAxioms: Seq[AxiomBase]                     = axioms
+
+  def getConcept(name: String): Option[ConceptBase]        =
+    concepts.find(c => name == c.name)
   def getParent(c: ConceptBase): Option[ConceptBase]       =
     inheritances.find(i => i.child == c).map(_.parent)
   def subConceptsOf(c: ConceptBase): Seq[ConceptBase]      = inheritances collect {
@@ -1106,7 +1109,10 @@ trait Dsl {
     syntax
   }
 
-  def genericSyntax[T: ClassTag](base: Concept[T], toProduction: Concept[T] => SyntaxProduction[T])(
+  def genericSyntax[T: ClassTag](
+    base: Concept[T],
+    toProduction: (Concept[T], Dsl) => SyntaxProduction[T]
+  )(
     implicit name: DeclaringSourceName
   ): SyntaxGeneric[T] = {
     genericSyntax[T](
@@ -1116,7 +1122,7 @@ trait Dsl {
   }
 
   def genericSyntax[T: ClassTag](
-    toProduction: Concept[T] => SyntaxProduction[T],
+    toProduction: (Concept[T], Dsl) => SyntaxProduction[T],
     accept: (Concept[T], Expressions.Types, Dsl) => Boolean =
       (_: Concept[T], _: Expressions.Types, _: Dsl) => true
   )(
@@ -1126,10 +1132,11 @@ trait Dsl {
     addGenericSyntax(SyntaxGeneric[T](
       name.name,
       accept,
-      concept => {
+      (concept, dsl) => {
         cache.getOrElse(
           concept, {
-            val rule = SyntaxTyped(name.name, concept, expression = true, toProduction(concept))
+            val rule =
+              SyntaxTyped(name.name, concept, expression = true, toProduction(concept, dsl))
             cache += concept -> rule
             rule
           }
@@ -1140,7 +1147,7 @@ trait Dsl {
 
   def genericSyntaxMultiple[T: ClassTag, T2](
     base: Concept[T],
-    toProduction: Concept[T] => SyntaxProduction[T2]
+    toProduction: (Concept[T], Dsl) => SyntaxProduction[T2]
   )(
     implicit name: DeclaringSourceName
   ): SyntaxGenericMulti[T, T2] = {
@@ -1151,7 +1158,7 @@ trait Dsl {
   }
 
   def genericSyntaxMultiple[T: ClassTag, T2](
-    toProduction: Concept[T] => SyntaxProduction[T2],
+    toProduction: (Concept[T], Dsl) => SyntaxProduction[T2],
     accept: (Concept[T], Expressions.Types, Dsl) => Boolean =
       (_: Concept[T], _: Expressions.Types, _: Dsl) => true
   )(
@@ -1161,10 +1168,10 @@ trait Dsl {
     addGenericSyntax(SyntaxGenericMulti[T, T2](
       name.name,
       accept,
-      concept => {
+      (concept, dsl) => {
         cache.getOrElse(
           concept, {
-            val rule = SyntaxMulti(name.name, concept, toProduction(concept))
+            val rule = SyntaxMulti(name.name, concept, toProduction(concept, dsl))
             cache += concept -> rule
             rule
           }
