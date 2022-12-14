@@ -33,7 +33,7 @@ class GenericSyntaxTest extends DslTestFunSuite {
     )
 
     val sGenericList: SyntaxGenericMulti[Result, MyList[Result]] =
-      genericSyntaxMultiple[Result, MyList[Result]]((typeParam: Concept[Result], _: Dsl) => {
+      genericSyntaxMultiple[Result, MyList[Result]]((typeParam: Concept[Result]) => {
         ("[" ~ typeParam.rep(true) ~ "]") map {
           case (_, (_, items, _)) => MyList(items)
         }
