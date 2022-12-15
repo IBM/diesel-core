@@ -1,5 +1,13 @@
 #!/bin/bash
 
+if [ -z "$TRAVIS_TAG" ]
+then
+   echo "Publishing Scala SNAPSHOT only, ignore yarn."
+   sbt ci-release
+   exit
+fi
+
+
 sbt ci-release && \
 sbt samplesBundle/fastOptJS && \
 cd facade && \
