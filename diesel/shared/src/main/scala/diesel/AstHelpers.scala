@@ -17,7 +17,7 @@
 package diesel
 
 import diesel.Dsl.Axiom
-import diesel.voc.Verbalizer
+import diesel.voc.{Verbalizer, VocDsl}
 
 object AstHelpers {
 
@@ -58,7 +58,11 @@ object AstHelpers {
     userDataProvider: Option[UserDataProvider] = None,
     axiom: Option[Axiom[_]] = None
   ): Seq[CompletionProposal] = {
-    val bnf: Bnf       = Bnf(dsl)
+    val verbalizer: Option[Verbalizer] = dsl match {
+      case dslWithVoc: VocDsl => Some(dslWithVoc.verbalizer)
+      case _ => None
+    }
+    val bnf: Bnf       = Bnf(dsl,  verbalizer)
     val parser: Earley = Earley(bnf, dsl.dynamicLexer)
     val a              = getBnfAxiomOrThrow(bnf, axiom)
     val res            = new CompletionProcessor(
