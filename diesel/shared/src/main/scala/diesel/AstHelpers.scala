@@ -73,20 +73,22 @@ object AstHelpers {
   def assertAsts(
     dsl: Dsl,
     verbalizer: Option[Verbalizer] = None,
-    axiom: Option[Axiom[_]] = None
+    axiom: Option[Axiom[_]] = None,
+    navigatorFactory: Result => Navigator = Navigator(_)
   )(s: String)(f: Navigator => Unit): Unit = {
     val result    = parse(dsl, s, verbalizer, axiom)
     assert(result.success)
-    val navigator = Navigator(result)
+    val navigator = navigatorFactory(result)
     f(navigator)
   }
 
   def assertAst(
     dsl: Dsl,
     verbalizer: Option[Verbalizer] = None,
-    axiom: Option[Axiom[_]] = None
+    axiom: Option[Axiom[_]] = None,
+    navigatorFactory: Result => Navigator = Navigator(_)
   )(s: String)(f: GenericTree => Unit): Unit = {
-    assertAsts(dsl, verbalizer, axiom)(s) { n: Navigator =>
+    assertAsts(dsl, verbalizer, axiom, navigatorFactory)(s) { n: Navigator =>
       assert(n.hasNext)
       val a = n.next()
       // println(a.root)
@@ -98,11 +100,12 @@ object AstHelpers {
   def withAst[T](
     dsl: Dsl,
     verbalizer: Option[Verbalizer] = None,
-    axiom: Option[Axiom[_]] = None
+    axiom: Option[Axiom[_]] = None,
+    navigatorFactory: Result => Navigator = Navigator(_)
   )(s: String)(f: GenericTree => T): T = {
     val result = parse(dsl, s, verbalizer, axiom)
     assert(result.success)
-    val n      = Navigator(result)
+    val n      = navigatorFactory(result)
     assert(n.hasNext)
     f(n.next())
   }
@@ -110,11 +113,12 @@ object AstHelpers {
   def selectAst(
     dsl: Dsl,
     verbalizer: Option[Verbalizer] = None,
-    axiom: Option[Axiom[_]] = None
+    axiom: Option[Axiom[_]] = None,
+    navigatorFactory: Result => Navigator = Navigator(_)
   )(s: String)(f: GenericTree => Unit): Unit = {
     val result    = parse(dsl, s, verbalizer, axiom)
     assert(result.success)
-    val astOption = Navigator.select(Navigator.apply(result))
+    val astOption = Navigator.select(navigatorFactory(result))
     assert(astOption.nonEmpty)
     f(astOption.get)
   }

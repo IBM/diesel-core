@@ -30,7 +30,8 @@ class DieselParserFacade(
   val dsl: Dsl,
   val config: Option[CompletionConfiguration] = None,
   val userDataProvider: Option[UserDataProvider] = None,
-  val markerPostProcessor: Option[MarkerPostProcessor] = None
+  val markerPostProcessor: Option[MarkerPostProcessor] = None,
+  val navigatorFactory: Result => Navigator = Navigator(_)
 ) {
 
   val bnf: Bnf       = Bnf(dsl, None)
@@ -43,7 +44,7 @@ class DieselParserFacade(
 
   @JSExport
   def parse(request: ParseRequest): DieselParseResult =
-    DieselParseResult(doParse(request), markerPostProcessor)
+    DieselParseResult(doParse(request), markerPostProcessor, navigatorFactory)
 
   @JSExport
   def predict(request: PredictRequest): DieselPredictResult = {
@@ -140,19 +141,18 @@ object DieselParseResult {
   private def errorResult(reason: String): DieselParseResult =
     new DieselParseResult(Left(reason), None)
 
-  def apply(result: Result, markerPostProcessor: Option[MarkerPostProcessor]): DieselParseResult = {
+  def apply(
+    result: Result,
+    markerPostProcessor: Option[MarkerPostProcessor],
+    navigatorFactory: Result => Navigator = Navigator(_)
+  ): DieselParseResult = {
     if (result.success) {
-      val navigator = Navigator(result)
-      if (navigator.hasNext) {
-        val ast = navigator.next()
-        if (navigator.hasNext) {
-          // TODO how to debug ?
-          errorResult("too many ASTs")
-        } else {
+      val navigator = navigatorFactory(result)
+      Navigator.select(navigator) match {
+        case Some(ast) =>
           new DieselParseResult(Right(ast), markerPostProcessor)
-        }
-      } else {
-        errorResult("No AST found ??")
+        case None      =>
+          errorResult("AST not found")
       }
     } else {
       errorResult("parsing failure :/")

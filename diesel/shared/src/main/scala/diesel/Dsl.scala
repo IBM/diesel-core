@@ -955,6 +955,8 @@ trait Dsl {
   def getSyntaxes: Seq[Syntax[_]]                          = syntaxes
   def getGenericSyntaxes: Seq[SyntaxGenericBase[_]]        = genericSyntaxes
   def getAxioms: Seq[AxiomBase]                            = axioms
+  def getConcept(name: String): Option[ConceptBase]        =
+    concepts.find(c => name == c.name)
   def getParent(c: ConceptBase): Option[ConceptBase]       =
     inheritances.find(i => i.child == c).map(_.parent)
   def subConceptsOf(c: ConceptBase): Seq[ConceptBase]      = inheritances collect {
