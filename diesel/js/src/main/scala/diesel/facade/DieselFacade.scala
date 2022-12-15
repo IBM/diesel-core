@@ -37,10 +37,10 @@ class DieselParserFacade(
 
   val verbalizer: Option[Verbalizer] = dsl match {
     case dslWithVoc: VocDsl => Some(dslWithVoc.verbalizer)
-    case _ => None
+    case _                  => None
   }
-  val bnf: Bnf       = Bnf(dsl, verbalizer)
-  val parser: Earley = Earley(bnf, dsl.dynamicLexer)
+  val bnf: Bnf                       = Bnf(dsl, verbalizer)
+  val parser: Earley                 = Earley(bnf, dsl.dynamicLexer)
 
   private def doParse(request: ParseRequest): Result = {
     val a = getBnfAxiomOrThrow(request.axiom.toOption)

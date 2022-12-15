@@ -60,12 +60,12 @@ object AstHelpers {
   ): Seq[CompletionProposal] = {
     val verbalizer: Option[Verbalizer] = dsl match {
       case dslWithVoc: VocDsl => Some(dslWithVoc.verbalizer)
-      case _ => None
+      case _                  => None
     }
-    val bnf: Bnf       = Bnf(dsl,  verbalizer)
-    val parser: Earley = Earley(bnf, dsl.dynamicLexer)
-    val a              = getBnfAxiomOrThrow(bnf, axiom)
-    val res            = new CompletionProcessor(
+    val bnf: Bnf                       = Bnf(dsl, verbalizer)
+    val parser: Earley                 = Earley(bnf, dsl.dynamicLexer)
+    val a                              = getBnfAxiomOrThrow(bnf, axiom)
+    val res                            = new CompletionProcessor(
       parser.parse(new Lexer.Input(text), a),
       config,
       userDataProvider
