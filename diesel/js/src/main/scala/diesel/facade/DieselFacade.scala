@@ -17,6 +17,7 @@
 package diesel.facade
 
 import diesel._
+import diesel.voc.{Verbalizer, VocDsl}
 
 import scala.scalajs.js
 import scala.scalajs.js.JSConverters._
@@ -34,7 +35,11 @@ class DieselParserFacade(
   val navigatorFactory: Result => Navigator = Navigator(_)
 ) {
 
-  val bnf: Bnf       = Bnf(dsl, None)
+  val verbalizer: Option[Verbalizer] = dsl match {
+    case dslWithVoc: VocDsl => Some(dslWithVoc.verbalizer)
+    case _ => None
+  }
+  val bnf: Bnf       = Bnf(dsl, verbalizer)
   val parser: Earley = Earley(bnf, dsl.dynamicLexer)
 
   private def doParse(request: ParseRequest): Result = {
