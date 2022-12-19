@@ -16,15 +16,9 @@
 
 package diesel.voc
 
-import diesel.voc.SentenceCategory
-
 object Ast {
 
-  trait Node {}
-
-  case class Syntax(syntaxId: String, children: Seq[Node]) extends Node
-
-  trait Expr extends Node {
+  sealed trait Expr {
     val conceptId: String
     val multiple: Boolean
   }
