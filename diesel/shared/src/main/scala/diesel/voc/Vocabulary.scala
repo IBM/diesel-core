@@ -209,6 +209,24 @@ case class Vocabulary(
       ft.sentences.contains(sentence)
     }
   }
+
+  def getConcept(conceptId: String): Option[Concept] = concepts.find(_.identifier == conceptId)
+
+  def isAssignableFrom(parent: Concept, child: Concept): Boolean = {
+    if (child.identifier == parent.identifier) {
+      true
+    } else {
+      child.parentIds.exists { pId =>
+        getConcept(pId) match {
+          case Some(p) =>
+            isAssignableFrom(parent, p)
+          case None    =>
+            false
+        }
+      }
+    }
+  }
+
 }
 
 object Vocabulary {
