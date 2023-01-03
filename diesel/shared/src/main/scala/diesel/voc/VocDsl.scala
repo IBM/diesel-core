@@ -17,12 +17,10 @@
 package diesel.voc
 
 import diesel.Dsl
-import diesel.Dsl.{Associativity, Instance, Phrase, SPAndN, SPStr, Syntax, Concept => DslConcept}
+import diesel.Dsl.{Associativity, Instance, Phrase, Concept => DslConcept}
 import diesel.Lexer.Token
-import diesel.voc.Ast.DslConceptKey
-import diesel.voc.Ast
-
 import diesel.i18n.DeclaringSourceName
+import diesel.voc.Ast.DslConceptKey
 
 import scala.reflect.classTag
 
@@ -34,10 +32,10 @@ trait VocDsl extends Dsl {
     ("+", (Associativity.Left, 100))
   )
 
-  protected def concept(conceptId: String): DslConcept[Ast.Expr] =
+  protected def concept(conceptId: String): DslConcept[Ast.VocNode] =
     dslConcepts(DslConceptKey(conceptId))
 
-  private def mapPhrase(ft: FactType, sentence: Sentence)(vs: Seq[Ast.Expr]): Ast.Expr = {
+  private def mapPhrase(ft: FactType, sentence: Sentence)(vs: Seq[Ast.VocNode]): Ast.VocNode = {
     val indexed = vs.toIndexedSeq
     val args    = ft.roles.flatMap(r => indexed.lift(r.index))
     val subject = sentence.getSubject match {
@@ -52,30 +50,30 @@ trait VocDsl extends Dsl {
 
   private val lookup: Map[String, Concept] = vocabulary.concepts.map(c => c.identifier -> c).toMap
 
-  private val dslConcepts: Map[DslConceptKey, DslConcept[Ast.Expr]] = vocabulary.concepts
-    .foldLeft(Map.empty[DslConceptKey, DslConcept[Ast.Expr]]) { case (acc, c) =>
+  private val dslConcepts: Map[DslConceptKey, DslConcept[Ast.VocNode]] = vocabulary.concepts
+    .foldLeft(Map.empty[DslConceptKey, DslConcept[Ast.VocNode]]) { case (acc, c) =>
       val more = createConcept(acc)(c)
       acc ++ more
     }
 
   private def createConcept(
-    concepts: Map[DslConceptKey, DslConcept[Ast.Expr]],
+    concepts: Map[DslConceptKey, DslConcept[Ast.VocNode]],
     scope: Option[String] = None
-  )(c: Concept): Seq[(DslConceptKey, DslConcept[Ast.Expr])] = {
+  )(c: Concept): Seq[(DslConceptKey, DslConcept[Ast.VocNode])] = {
     val key        = DslConceptKey(c.identifier)
     val sourceName = scope match {
       case Some(value) => DeclaringSourceName(s"${value}-${key}")
       case None        => DeclaringSourceName(s"${key}")
     }
     if (c.parentIds.isEmpty) {
-      Seq(key -> concept[Ast.Expr](classTag[Ast.Expr], sourceName))
+      Seq(key -> concept[Ast.VocNode](classTag[Ast.VocNode], sourceName))
     } else {
       // TODO multiple inheritance?
       val parent = c.parentIds.headOption
         .map(DslConceptKey)
         .flatMap(concepts.get)
       if (parent.isDefined) {
-        Seq(key -> concept[Ast.Expr, Ast.Expr](parent.get)(classTag[Ast.Expr], sourceName))
+        Seq(key -> concept[Ast.VocNode, Ast.VocNode](parent.get)(classTag[Ast.VocNode], sourceName))
       } else {
         val created = c.parentIds.headOption.flatMap(lookup.get)
           .map(createConcept(concepts)(_))
@@ -84,7 +82,10 @@ trait VocDsl extends Dsl {
           .flatMap(pid => created.find(_._1 == DslConceptKey(pid))).map(_._2)
         parent
           .map(p =>
-            created :+ key -> concept[Ast.Expr, Ast.Expr](p)(classTag[Ast.Expr], sourceName)
+            created :+ key -> concept[Ast.VocNode, Ast.VocNode](p)(
+              classTag[Ast.VocNode],
+              sourceName
+            )
           )
           .getOrElse(Seq())
       }
@@ -112,43 +113,13 @@ trait VocDsl extends Dsl {
     }
   }
 
-  private val dslConceptInstances: Seq[Instance[Ast.Expr]] = vocabulary.conceptInstances.map { ci =>
-    implicit val sourceName = DeclaringSourceName("voc" + dedupCounter)
-    dedupCounter += 1
-    val dslResultConcept    = dslConcepts(DslConceptKey(ci.conceptId))
-    instance(dslResultConcept)(ci.name) map { _ => Ast.Instance(ci.conceptId, ci.identifier) }
-  }
-
-  // generate implicit variables for plural subjects, to be used with indefinite singular
-  // TODO implicit this
-//  private val dslSyntaxes_implicits: Seq[Syntax[Ast.Expr]] = vocabulary.factTypes
-//    .filter(ft =>
-//      ft.sentences.exists(s => s.syntacticRoles.exists(sr => sr.category == Subject && sr.cardinality == Multiple))
-//    )
-//    .flatMap(_.getOwnerRole)
-//    .map { holder =>
-//      val dslResultConcept = dslConcepts(DslConceptKey(holder.conceptId))
-//      val vc               = VerbalizationContext(article = DemonstrativeArticle, plural = false)
-//      val text             = verbalizer.verbalize(
-//        vc,
-//        RoleVerbalizable(holder)
-//      )
-//      syntax(dslResultConcept)(SPStr(text) map { case _ => Ast.SyntaxExpr("variable", ) }) // TODO SPStr(text) must be split into several words
-//    }
-
-  // Temporary in order to have some variables available to do test
-  private val dslSyntaxes_implicits: Seq[Syntax[Ast.Expr]] = vocabulary.concepts map { concept =>
-    implicit val sourceName = DeclaringSourceName("voc" + dedupCounter)
-    dedupCounter += 1
-    val dslResultConcept    = dslConcepts(DslConceptKey(concept.identifier))
-    val vc                  = VerbalizationContext(article = DemonstrativeArticle)
-    val text                = verbalizer.verbalize(vc, ConceptVerbalizable(concept))
-    val words               = text.trim().split(" ").map(t => SPStr(t))
-    val production          = if (words.length > 1) SPAndN(words.toSeq) else words(0)
-    syntax(dslResultConcept)(production map { case _ =>
-      Ast.SyntaxExpr("this", concept.identifier, multiple = false, Seq())
-    })
-  }
+  private val dslConceptInstances: Seq[Instance[Ast.VocNode]] =
+    vocabulary.conceptInstances.map { ci =>
+      implicit val sourceName = DeclaringSourceName("voc" + dedupCounter)
+      dedupCounter += 1
+      val dslResultConcept    = dslConcepts(DslConceptKey(ci.conceptId))
+      instance(dslResultConcept)(ci.name) map { _ => Ast.Instance(ci.conceptId, ci.identifier) }
+    }
 
 }
 

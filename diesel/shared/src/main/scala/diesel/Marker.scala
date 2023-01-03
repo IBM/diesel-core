@@ -76,7 +76,7 @@ case class InsertedTokenMsg(token: String)                              extends 
 }
 case class TokenMutationMsg(actualToken: String, expectedToken: String) extends InternalMsg {
   override def format(locale: String): String = {
-    DieselI18n.tokenMutation(actualToken, expectedToken)(resolver(locale))
+    DieselI18n.tokenMutation(expectedToken, actualToken)(resolver(locale))
   }
 }
 case class UnknownTokenMsg(token: String)                               extends InternalMsg {
@@ -123,7 +123,7 @@ object Errors {
         SyntacticError,
         offset,
         actualToken.text.length,
-        TokenMutationMsg(expectedToken.text, actualToken.text)
+        TokenMutationMsg(actualToken.text, expectedToken.text)
       )
     }
   }

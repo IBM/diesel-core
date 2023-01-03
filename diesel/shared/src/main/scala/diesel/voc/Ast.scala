@@ -16,41 +16,36 @@
 
 package diesel.voc
 
-import diesel.voc.SentenceCategory
-
 object Ast {
 
-  trait Node {}
-
-  case class Syntax(syntaxId: String, children: Seq[Node]) extends Node
-
-  trait Expr extends Node {
-    val conceptId: String
-    val multiple: Boolean
+  sealed trait VocNode {
+    val conceptId: String;
+//    val multiple: Boolean;
   }
 
-  case class Target(conceptId: String, multiple: Boolean) extends Expr
-
-  case class Value[T](value: T, conceptId: String) extends Expr {
-    override val multiple: Boolean = false
+  case class Instance(conceptId: String, name: String) extends VocNode {
+    val multiple: Boolean = false
   }
-
-  case class Instance(conceptId: String, name: String) extends Expr {
-    override val multiple: Boolean = false
-  }
-
-  case class SyntaxExpr(syntaxId: String, conceptId: String, multiple: Boolean, children: Seq[Expr])
-      extends Expr
+//
+//  case class SyntaxExpr(
+//    syntaxId: String,
+//    conceptId: String,
+//    multiple: Boolean,
+//    children: Seq[VocNode]
+//  ) extends VocNode
 
   case class Phrase(
     factTypeId: String,
     sentenceCategory: SentenceCategory,
     conceptId: String,
     multiple: Boolean,
-    children: Seq[Expr]
-  ) extends Expr
+    children: Seq[VocNode]
+  ) extends VocNode
 
   case class DslConceptKey(conceptId: String) {
     override def toString: String = conceptId
   }
+
+  trait CustomVocNode extends VocNode
+
 }
