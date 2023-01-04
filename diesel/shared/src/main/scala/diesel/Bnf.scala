@@ -866,8 +866,9 @@ object Bnf {
         case SPMapped(p, _) =>
           val mapRule = getOrCreateRule(owner.name, "map." + counter)
           counter += 1
-          mapAction(mapRule, p, mapSyntaxProduction(mapRule, p, ctx, None, first), element)
-          Partial(Seq(mapRule))
+          val partial = mapSyntaxProduction(mapRule, p, ctx, None, first)
+          mapAction(mapRule, p, partial, element)
+          Partial(Seq(mapRule)).merge(0, partial.feature)
 
         case SPAssoc(p, associativity, level) =>
           val partial = mapSyntaxProduction(owner, p, ctx, None, first)
