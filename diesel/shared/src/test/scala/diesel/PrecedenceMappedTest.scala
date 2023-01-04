@@ -20,8 +20,9 @@ import diesel.Dsl.{Axiom, Syntax}
 import diesel.samples.calc.Ast._
 import diesel.samples.calc.MathBase
 
-object MyDslWithMappedPrededence extends MathBase {
+object MyDslWithMappedPrecedence extends MathBase {
   case class Div(d1: Expr, d2: Expr) extends Expr
+  case class Abs(d: Expr)            extends Expr
 
   val div: Syntax[Expr] = syntax(number)(
     number ~ ("/".leftAssoc(13) map { case (_, t) => t }) ~ number map {
@@ -31,15 +32,22 @@ object MyDslWithMappedPrededence extends MathBase {
     }
   )
 
+  val abs: Syntax[Expr] = syntax(number)(
+    "abs".leftAssoc(9) ~ number map {
+      case (_, (_, n)) =>
+        Abs(n)
+    }
+  )
+
   val expr: Axiom[Expr] = axiom(number)
 
 }
 
 class PrecedenceMappedTest extends DslTestFunSuite {
-  import MyDslWithMappedPrededence.Div
+  import MyDslWithMappedPrecedence.{Div, Abs}
 
   type Ast = Expr
-  override def dsl = MyDslWithMappedPrededence
+  override def dsl = MyDslWithMappedPrecedence
 
   test("unmapped precedence") {
     assertAst("1 + 2 + 3") {
@@ -61,6 +69,41 @@ class PrecedenceMappedTest extends DslTestFunSuite {
           Value(2)
         ),
         Value(3)
+      )
+    }
+  }
+
+  test("mixed precedence") {
+    assertAst("abs 1 + 2") {
+      Abs(
+        Add(
+          Value(1),
+          Value(2)
+        )
+      )
+    }
+  }
+
+  test("nested precedence".only) {
+    assertAst("abs abs 1 + 2") {
+      Abs(
+        Abs(
+          Add(
+            Value(1),
+            Value(2)
+          )
+        )
+      )
+    }
+  }
+
+  test("mapped mixed precedence") {
+    assertAst("abs 1 / 2") {
+      Abs(
+        Div(
+          Value(1),
+          Value(2)
+        )
       )
     }
   }
