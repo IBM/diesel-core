@@ -101,6 +101,18 @@ object AstHelpers {
     }
   }
 
+  def assertAllAsts(
+    dsl: Dsl,
+    verbalizer: Option[Verbalizer] = None,
+    axiom: Option[Axiom[_]] = None,
+    navigatorFactory: Result => Navigator = Navigator(_)
+  )(s: String)(f: Seq[GenericTree] => Unit): Unit = {
+    assertAsts(dsl, verbalizer, axiom, navigatorFactory)(s) { n: Navigator =>
+      val as = Seq.from(n.toIterator)
+      f(as)
+    }
+  }
+
   def withAst[T](
     dsl: Dsl,
     verbalizer: Option[Verbalizer] = None,
