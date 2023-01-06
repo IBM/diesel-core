@@ -17,7 +17,6 @@
 package diesel
 
 import diesel.Dsl.{Axiom, Syntax}
-import diesel.MyDslWithMappedPrecedence.Div
 import diesel.samples.calc.Ast._
 import diesel.samples.calc.MathBase
 
