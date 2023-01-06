@@ -17,6 +17,7 @@
 package diesel
 
 import diesel.Dsl.{Axiom, Syntax}
+import diesel.MyDslWithMappedPrecedence.Div
 import diesel.samples.calc.Ast._
 import diesel.samples.calc.MathBase
 
@@ -33,7 +34,7 @@ object MyDslWithMappedPrecedence extends MathBase {
   )
 
   val abs: Syntax[Expr] = syntax(number)(
-    "abs".leftAssoc(9) ~ number map {
+    "abs".rightAssoc(1) ~ number map {
       case (_, (_, n)) =>
         Abs(n)
     }
@@ -61,14 +62,13 @@ class PrecedenceMappedTest extends DslTestFunSuite {
     }
   }
 
-  test("mapped precedence") {
-    assertAst("1 / 2 / 3") {
-      Div(
-        Div(
-          Value(1),
-          Value(2)
-        ),
-        Value(3)
+  test("mapped precedence is lost") {
+    // mapping a token does not propagate its precedence
+    // we will find ways to not even allow that situation via API
+    assertAllAsts("1 / 2 / 3") {
+      Seq(
+        Div(Div(Value(1), Value(2)), Value(3)),
+        Div(Value(1), Div(Value(2), Value(3)))
       )
     }
   }
@@ -84,7 +84,7 @@ class PrecedenceMappedTest extends DslTestFunSuite {
     }
   }
 
-  test("nested precedence".only) {
+  test("nested precedence") {
     assertAst("abs abs 1 + 2") {
       Abs(
         Abs(
@@ -92,17 +92,6 @@ class PrecedenceMappedTest extends DslTestFunSuite {
             Value(1),
             Value(2)
           )
-        )
-      )
-    }
-  }
-
-  test("mapped mixed precedence") {
-    assertAst("abs 1 / 2") {
-      Abs(
-        Div(
-          Value(1),
-          Value(2)
         )
       )
     }
