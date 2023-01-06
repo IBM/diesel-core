@@ -252,7 +252,7 @@ class GenericNonTerminal(
       }
     )
 
-  private[diesel] def toString(buf: StringBuilder): Unit = {
+  private[diesel] def toString(buf: mutable.StringBuilder): Unit = {
     // TODO useful for debugging?
 //    buf.append("[").append(production.element.getOrElse("?")).append("]")
     buf.append(production.rule.get.name).append("(")
@@ -330,7 +330,7 @@ object Navigator {
 
 class Navigator(
   val result: Result,
-  postProcessors: Seq[GenericTree => Seq[Marker]],
+  val postProcessors: Seq[GenericTree => Seq[Marker]],
   private val userDataProvider: Option[UserDataProvider]
 ) {
 
@@ -575,6 +575,10 @@ class Navigator(
   private def canRetry: Boolean = {
     if (choices.nonEmpty) choices.exists(_.retry) else false
   }
+
+  private[diesel] def filterTrees(trees: Seq[GenericNode]): Seq[GenericNode] = {
+    trees
+  }
 }
 
 object Analyzer {
@@ -659,6 +663,30 @@ object Analyzer {
     private[diesel] def ambiguous: Boolean = branchCount - abortedBranchCount > 1
   }
 
+  private[diesel] class Subtree(
+    val choice: Choice,
+    val state: State,
+    val backPtr: BackPtr,
+    val ambiguity: Option[Ambiguity]
+  ) extends Statement(choice.navigator, choice.parent) {
+
+    override def step(): Process = new Sequence(navigator, this, state, backPtr, ambiguity)
+
+    override def next(): Statement = {
+      choice.addSubtree()
+      new Stop(navigator)
+    }
+  }
+
+  private[diesel] class Propose(val choice: Choice, val stack: Seq[Parsing])
+      extends Statement(choice.navigator, choice.parent) {
+
+    override def step(): Process = {
+      navigator.stack = stack
+      next()
+    }
+  }
+
   private[diesel] class Choice(val navigator: Navigator, val parent: Statement, val state: State)
       extends Process {
 
@@ -668,17 +696,39 @@ object Analyzer {
     private var index: Seq[BackPtr]          = backPtrs
     private val ambiguity: Option[Ambiguity] =
       if (backPtrs.size > 1) Some(new Ambiguity(backPtrs.size)) else None
+    private var subtrees: Seq[Seq[Parsing]]  = Seq()
 
     override def step(): Process = {
-      if (index.nonEmpty) {
-        val backPtr = index.head
-        index = index.tail
-        return new Sequence(navigator, parent, state, backPtr, ambiguity)
+      if (state.isCompleted) {
+        if (index.nonEmpty) {
+          val backPtr = index.head
+          index = index.tail
+          return new Subtree(this, state, backPtr, ambiguity)
+        } else {
+          if (subtrees.nonEmpty) {
+            val subtree = subtrees.head
+            subtrees = subtrees.tail
+            return new Propose(this, subtree)
+          }
+        }
+      } else {
+        if (index.nonEmpty) {
+          val backPtr = index.head
+          index = index.tail
+          return new Sequence(navigator, parent, state, backPtr, ambiguity)
+        }
       }
       new Stop(navigator)
     }
 
-    def retry: Boolean = index.nonEmpty
+    def addSubtree(): Unit = {
+      subtrees = subtrees ++ Seq(navigator.stack)
+      if (index.isEmpty) {
+        // subtrees = navigator.filterTrees(subtrees.map(s => s.head.node))
+      }
+    }
+
+    def retry: Boolean = index.nonEmpty || subtrees.nonEmpty
   }
 
   private[diesel] class Tree(override val navigator: Navigator, val root: Root)
