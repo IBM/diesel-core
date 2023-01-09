@@ -17,8 +17,6 @@
 package diesel
 
 import diesel.Lexer.{RegexScanner, Scanner, Token}
-import diesel.voc.Article
-
 import diesel.i18n.DeclaringSourceName
 
 import scala.language.implicitConversions
@@ -105,220 +103,8 @@ object Dsl {
     def multiple: Boolean
   }
 
-  sealed trait Phrase[T] extends PhraseBase {
-    val production: PhraseProduction[T]
-  }
-
-  case class PhraseSingle[T](
-    name: String,
-    concept: Concept[T],
-    production: PhraseProduction[_ <: T]
-  ) extends Phrase[T] {
-    override def multiple: Boolean = false
-  }
-
-  case class PhraseMulti[T, T2](
-    name: String,
-    concept: Concept[T],
-    production: PhraseProduction[_ <: T2]
-  ) extends Phrase[T2] {
-    override def multiple: Boolean = true
-  }
-
-  trait PPAssociable[T] { this: PhraseProduction[T] =>
-    def leftAssoc(order: Int = 0): PPAssoc[T]  = PPAssoc(this, Associativity.Left, order)
-    def noneAssoc(order: Int = 0): PPAssoc[T]  = PPAssoc(this, Associativity.None, order)
-    def rightAssoc(order: Int = 0): PPAssoc[T] = PPAssoc(this, Associativity.Right, order)
-  }
-
-  trait PPAppendable[T] { this: PhraseProduction[T] =>
-    def ~[T2](o: PhraseProduction[T2]): PPAnd2[T, T2] = PPAnd2(this, o)
-    def ~[T2](s: String): PPAnd2[T, Token]            = PPAnd2(this, PPStr(s))
-  }
-
   trait Applicable[+T] {
     def applyDynamic(context: Context, args: Any): T
-  }
-
-  sealed trait PhraseProduction[+T] extends Applicable[T] {
-    def map[T2](f: (Context, T) => T2): PhraseProduction[T2] = PPMapped[T, T2](this, f)
-  }
-
-  case class PPMapped[T, T2](e: PhraseProduction[T], f: (Context, T) => T2)
-      extends PhraseProduction[T2]
-      with PPAssociable[T2]
-      with PPAppendable[T2] {
-
-    override def applyDynamic(context: Context, args: Any): T2 = {
-      // do not go deep, to fit parsers' polnish evaluation pattern
-      val argsAsT = args.asInstanceOf[T]
-      f(context, argsAsT)
-    }
-  }
-
-  case class PPSubject(str: PPStr)
-      extends PhraseProduction[Seq[Token]]
-      with PPAppendable[Seq[Token]]
-      with PPAssociable[Seq[Token]] {
-    override def applyDynamic(context: Context, args: Any): Seq[Token] =
-      args match {
-        case t: Token   =>
-          Seq(t)
-        case p: Product =>
-          p.productIterator
-            .map(_.asInstanceOf[Token])
-            .toSeq
-      }
-  }
-
-  case class PPStr(s: String)
-      extends PhraseProduction[Token]
-      with PPAppendable[Token]
-      with PPAssociable[Token] {
-    override def applyDynamic(context: Context, args: Any): Token = { args.asInstanceOf[Token] }
-
-    def subject: PPSubject = PPSubject(this)
-  }
-
-  case class PPExprRef[T](
-    c: Concept[T],
-    verbalizationContext: Option[SPVerbalizationContext] = None
-  ) extends PhraseProduction[T]
-      with PPAppendable[T]
-      with PPAssociable[T] {
-
-    override def applyDynamic(context: Context, args: Any): T = args.asInstanceOf[T]
-
-    def multiple[T2]: PPMultiple[T, T2] = PPMultiple(this)
-
-    def verbalization(vc: SPVerbalizationContext): PPExprRef[T] = this.copy(verbalizationContext =
-      Some(vc)
-    )
-  }
-
-  case class PPMultiple[T, T2](
-    ref: PPExprRef[T],
-    verbalizationContext: Option[SPVerbalizationContext] = None
-  ) extends PhraseProduction[T2] {
-    override def applyDynamic(context: Context, args: Any): T2 = args.asInstanceOf[T2]
-
-    def verbalization(vc: SPVerbalizationContext): PPMultiple[T, T2] =
-      this.copy(verbalizationContext =
-        Some(vc)
-      )
-  }
-
-  case class PPAssoc[T](e: PhraseProduction[T], associativity: Associativity.Value, order: Int = 0)
-      extends PhraseProduction[T]
-      with PPAppendable[T] {
-
-    override def applyDynamic(context: Context, args: Any): T = e.applyDynamic(context, args)
-  }
-
-  case class PPAnd2[T1, T2](e1: PhraseProduction[T1], e2: PhraseProduction[T2])
-      extends PhraseProduction[(T1, T2)]
-      with PPAssociable[(T1, T2)] {
-
-    def ~[T3](o: PhraseProduction[T3]): PPAnd3[T1, T2, T3] = PPAnd3(e1, e2, o)
-
-    override def applyDynamic(context: Context, args: Any): (T1, T2) = {
-      val (v1, v2) = args.asInstanceOf[(T1, T2)]
-      (e1.applyDynamic(context, v1), e2.applyDynamic(context, v2))
-    }
-  }
-
-  case class PPAnd3[T1, T2, T3](
-    e1: PhraseProduction[T1],
-    e2: PhraseProduction[T2],
-    e3: PhraseProduction[T3]
-  ) extends PhraseProduction[(T1, T2, T3)]
-      with PPAssociable[(T1, T2, T3)] {
-
-    def ~[T4](o: PhraseProduction[T4]): PPAnd4[T1, T2, T3, T4] = PPAnd4(e1, e2, e3, o)
-
-    override def applyDynamic(context: Context, args: Any): (T1, T2, T3) = {
-      val (v1, v2, v3) = args.asInstanceOf[(T1, T2, T3)]
-      (e1.applyDynamic(context, v1), e2.applyDynamic(context, v2), e3.applyDynamic(context, v3))
-    }
-  }
-
-  case class PPAnd4[T1, T2, T3, T4](
-    e1: PhraseProduction[T1],
-    e2: PhraseProduction[T2],
-    e3: PhraseProduction[T3],
-    e4: PhraseProduction[T4]
-  ) extends PhraseProduction[(T1, T2, T3, T4)]
-      with PPAssociable[(T1, T2, T3, T4)] {
-
-    def ~[T5](o: PhraseProduction[T5]): PPAnd5[T1, T2, T3, T4, T5] = PPAnd5(e1, e2, e3, e4, o)
-
-    override def applyDynamic(context: Context, args: Any): (T1, T2, T3, T4) = {
-      val (v1, v2, v3, v4) = args.asInstanceOf[(T1, T2, T3, T4)]
-      (
-        e1.applyDynamic(context, v1),
-        e2.applyDynamic(context, v2),
-        e3.applyDynamic(context, v3),
-        e4.applyDynamic(context, v4)
-      )
-    }
-  }
-
-  case class PPAnd5[T1, T2, T3, T4, T5](
-    e1: PhraseProduction[T1],
-    e2: PhraseProduction[T2],
-    e3: PhraseProduction[T3],
-    e4: PhraseProduction[T4],
-    e5: PhraseProduction[T5]
-  ) extends PhraseProduction[(T1, T2, T3, T4, T5)]
-      with PPAssociable[(T1, T2, T3, T4, T5)] {
-
-    def ~[T6](o: PhraseProduction[T6]): PPAnd6[T1, T2, T3, T4, T5, T6] =
-      PPAnd6(e1, e2, e3, e4, e5, o)
-
-    override def applyDynamic(context: Context, args: Any): (T1, T2, T3, T4, T5) = {
-      val (v1, v2, v3, v4, v5) = args.asInstanceOf[(T1, T2, T3, T4, T5)]
-      (
-        e1.applyDynamic(context, v1),
-        e2.applyDynamic(context, v2),
-        e3.applyDynamic(context, v3),
-        e4.applyDynamic(context, v4),
-        e5.applyDynamic(context, v5)
-      )
-    }
-  }
-
-  case class PPAnd6[T1, T2, T3, T4, T5, T6](
-    e1: PhraseProduction[T1],
-    e2: PhraseProduction[T2],
-    e3: PhraseProduction[T3],
-    e4: PhraseProduction[T4],
-    e5: PhraseProduction[T5],
-    e6: PhraseProduction[T6]
-  ) extends PhraseProduction[(T1, T2, T3, T4, T5, T6)]
-      with PPAssociable[(T1, T2, T3, T4, T5, T6)] {
-
-    override def applyDynamic(context: Context, args: Any): (T1, T2, T3, T4, T5, T6) = {
-      val (v1, v2, v3, v4, v5, v6) = args.asInstanceOf[(T1, T2, T3, T4, T5, T6)]
-      (
-        e1.applyDynamic(context, v1),
-        e2.applyDynamic(context, v2),
-        e3.applyDynamic(context, v3),
-        e4.applyDynamic(context, v4),
-        e5.applyDynamic(context, v5),
-        e6.applyDynamic(context, v6)
-      )
-    }
-  }
-
-  case class PPAndN[T](es: Seq[PhraseProduction[T]])
-      extends PhraseProduction[Seq[T]]
-      with PPAssociable[Seq[T]] {
-
-    override def applyDynamic(context: Context, args: Any): Seq[T] = {
-      // the sequence comes in as a looong tuple
-      val vs = args.asInstanceOf[Product].productIterator.toSeq
-      es.zip(vs).map { case (e, v) => e.applyDynamic(context, v) }
-    }
   }
 
   /*
@@ -918,6 +704,10 @@ object Dsl {
   }
 
   trait DynamicLexer {}
+
+  trait Verbalizations {
+    def verbalizer: Verbalizer
+  }
 }
 
 /** Dsl trait : to be mixed in by language definitions. Holds all declared concepts, phrases,
@@ -943,7 +733,6 @@ trait Dsl {
 
   private var concepts: Seq[ConceptBase]                 = Seq()
   private var instances: Seq[InstanceBase]               = Seq()
-  private var phrases: Seq[Phrase[_]]                    = Seq()
   private var syntaxes: Seq[Syntax[_]]                   = Seq()
   private var genericSyntaxes: Seq[SyntaxGenericBase[_]] = Seq()
   private var axioms: Seq[AxiomBase]                     = Seq()
@@ -951,7 +740,6 @@ trait Dsl {
 
   def getConcepts: Seq[ConceptBase]                        = concepts
   def getInstances: Seq[InstanceBase]                      = instances
-  def getPhrases: Seq[Phrase[_]]                           = phrases
   def getSyntaxes: Seq[Syntax[_]]                          = syntaxes
   def getGenericSyntaxes: Seq[SyntaxGenericBase[_]]        = genericSyntaxes
   def getAxioms: Seq[AxiomBase]                            = axioms
@@ -1062,23 +850,6 @@ trait Dsl {
       instances ++= Seq(i)
       i
     }
-  }
-
-  private def addPhrase[T](p: Phrase[T]): Phrase[T] = {
-    phrases ++= Seq(p)
-    p
-  }
-
-  def phrase[T](concept: Concept[T])(production: PhraseProduction[T])(implicit
-    name: DeclaringSourceName
-  ): Phrase[T] = {
-    addPhrase(PhraseSingle(name.name, concept, production))
-  }
-
-  def phraseMultiple[T, T2](concept: Concept[T])(production: PhraseProduction[T2])(implicit
-    name: DeclaringSourceName
-  ): Phrase[T2] = {
-    addPhrase(PhraseMulti(name.name, concept, production))
   }
 
   private def addSyntax[T](syntax: Syntax[T]): Syntax[T] = {
@@ -1195,10 +966,6 @@ trait Dsl {
   implicit def builderToAxiom[T](builder: AxiomBuilder[T]): Axiom[T] = builder.build
 
   def iS(s: String): IPStr = IPStr(s)
-
-  def pS(s: String): PPStr = PPStr(s)
-
-  def pR[T](c: Concept[T]): PPExprRef[T] = PPExprRef(c)
 
   // enable implicit conversions for Syntaxes only
 

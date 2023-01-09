@@ -31,7 +31,7 @@ class InfiniteLoopTest extends FunSuite {
   }
 
   test("grammar cleanup removes empty axiom") {
-    val bnf: Bnf = Bnf(MyDsl, None)
+    val bnf: Bnf = Bnf(MyDsl)
     assert(bnf.axioms.isEmpty)
   }
 

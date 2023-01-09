@@ -17,8 +17,6 @@
 package diesel
 
 import diesel.Dsl._
-import diesel.voc.i18n.EnglishVerbalizer
-import diesel.voc.{Concept => _, _}
 import munit.FunSuite
 
 class VerbalizationContextInDslTest extends FunSuite {
@@ -48,8 +46,8 @@ class VerbalizationContextInDslTest extends FunSuite {
 
     val void: Concept[AVoid] = concept
 
-    val print: Phrase[AVoid] = phrase(void)(
-      pS("print") ~ pR(value) map [AVoid] {
+    val print: Syntax[AVoid] = syntax(void)(
+      "print" ~ value map [AVoid] {
         case (_, (_, s)) =>
           APrint(s)
       }
@@ -65,11 +63,13 @@ class VerbalizationContextInDslTest extends FunSuite {
   case object Pi                                 extends ANumber
   case class Statement(void: AVoid)              extends AVerbalized
 
-  object MyDsl extends BootVoc {
+  object MyDsl extends BootVoc with Verbalizations {
 
-    val pi: Phrase[ANumber] = phrase(number)(
-      pS("pi").subject map [ANumber] {
-        case (_, t) =>
+    override val verbalizer: Verbalizer = DummyVerbalizer
+
+    val pi: Syntax[ANumber] = syntax(number)(
+      "pi".subject map [ANumber] {
+        case (_, _) =>
           Pi
       }
     )
@@ -106,15 +106,11 @@ class VerbalizationContextInDslTest extends FunSuite {
       }
     )
 
-    val max: Phrase[ANumber] = phrase[ANumber](number)(
+    val max: Syntax[ANumber] = syntax[ANumber](number)(
       // references "number" and decorates with article
-      pS("max").subject ~ pS("(") ~ pR(number).verbalization(
+      "max".subject ~ "(" ~ number.verbalization(
         SPVerbalizationContext(Some(DefiniteArticle))
-      ) ~ pS(
-        ","
-      ) ~ pR(
-        number
-      ) ~ pS(")") map [ANumber] {
+      ) ~ "," ~ number ~ ")" map [ANumber] {
         case (_, (_, _, l, _, r, _)) =>
           // maps to user Ast type
           AMax(l, r)
@@ -132,15 +128,28 @@ class VerbalizationContextInDslTest extends FunSuite {
 
   }
 
-  private val verbalizer = new EnglishVerbalizer(Vocabulary.empty)
+  object DummyVerbalizer extends Verbalizer {
+    override def verbalize(context: VerbalizationContext, concept: Concept[_]): String =
+      verbalize(context, concept.name)
+
+    override def verbalize(context: VerbalizationContext, label: String): String = {
+      val article = context.article match {
+        case DefiniteArticle   => Some("the")
+        case IndefiniteArticle => Some("a")
+        case NoArticle         => None
+        case _                 => Some(context.article.name)
+      }
+      article.map(a => s"$a $label").getOrElse(label)
+    }
+  }
 
   test("definite") {
     val text =
       """
         |definite the pi
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl, verbalizer = Some(verbalizer))(text) { tree =>
-      assert(tree.markers.isEmpty)
+    AstHelpers.assertAst(MyDsl)(text) { tree =>
+      assertEquals(tree.markers, Seq())
       assert(tree.root.value == ADefinite(Pi))
     }
   }
@@ -150,7 +159,7 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |definite a pi
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl, verbalizer = Some(verbalizer))(text) { tree =>
+    AstHelpers.assertAst(MyDsl)(text) { tree =>
       assert(tree.markers.length == 1)
       assert(
         tree.markers.head.message.format("en") == "The word 'the' is expected in place of 'a'."
@@ -163,7 +172,7 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |indefinite a pi
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl, verbalizer = Some(verbalizer))(text) { tree =>
+    AstHelpers.assertAst(MyDsl)(text) { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == AInDefinite(Pi))
     }
@@ -174,7 +183,7 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |indefinite 123
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl, verbalizer = Some(verbalizer))(text) { tree =>
+    AstHelpers.assertAst(MyDsl)(text) { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == AInDefinite(ANumberValue(123)))
     }
@@ -185,7 +194,7 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |print min(the max(the pi, pi), pi)
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl, verbalizer = Some(verbalizer))(text) { tree =>
+    AstHelpers.assertAst(MyDsl)(text) { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == Statement(APrint(AMin(AMax(Pi, Pi), Pi))))
     }
@@ -196,14 +205,14 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |print max(the max(the pi, pi), pi)
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl, verbalizer = Some(verbalizer))(text) { tree =>
+    AstHelpers.assertAst(MyDsl)(text) { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == Statement(APrint(AMax(AMax(Pi, Pi), Pi))))
     }
   }
 
   test("print") {
-    AstHelpers.assertAst(MyDsl, verbalizer = Some(verbalizer))("print pi") { tree =>
+    AstHelpers.assertAst(MyDsl)("print pi") { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == Statement(APrint(Pi)))
     }
