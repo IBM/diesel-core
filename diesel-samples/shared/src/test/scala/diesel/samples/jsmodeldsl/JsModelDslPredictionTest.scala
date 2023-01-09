@@ -28,7 +28,6 @@ class JsModelDslPredictionTest extends FunSuite {
     expectedReplace: Option[Seq[Option[(Int, Int)]]] = None
   ): Unit = {
     val proposals = predict(JsModelDsl, text, offset, Some(JsModelDsl.completionConfiguration))
-    println("FW", proposals.map(_.replace))
     assert(
       proposals.map(_.text) == expectedPredictions
     )
