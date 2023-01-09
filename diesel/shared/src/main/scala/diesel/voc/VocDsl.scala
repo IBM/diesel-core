@@ -17,7 +17,7 @@
 package diesel.voc
 
 import diesel.Dsl
-import diesel.Dsl.{Associativity, Instance, Phrase, Concept => DslConcept}
+import diesel.Dsl.{Associativity, Instance, Syntax, Concept => DslConcept}
 import diesel.Lexer.Token
 import diesel.i18n.DeclaringSourceName
 import diesel.voc.Ast.DslConceptKey
@@ -94,7 +94,7 @@ trait VocDsl extends Dsl {
 
 //  // TODO avoid counter dedupCounter
   var dedupCounter                       = 0
-  private val dslPhrases: Seq[Phrase[_]] = vocabulary.factTypes.flatMap { ft =>
+  private val dslPhrases: Seq[Syntax[_]] = vocabulary.factTypes.flatMap { ft =>
     ft.sentences.map { s =>
       implicit val sourceName = DeclaringSourceName("voc" + dedupCounter)
       dedupCounter += 1
@@ -103,12 +103,13 @@ trait VocDsl extends Dsl {
         s,
         ft.roles,
         VerbalizationContext(article = DefiniteArticle),
+        this,
         dslConcepts
       )(mapPhrase(ft, s))
       if (s.syntacticRoles.last.cardinality == Multiple) {
-        phraseMultiple(dslResultConcept)(production)
+        syntaxMultiple(dslResultConcept)(production)
       } else {
-        phrase(dslResultConcept)(production)
+        syntax(dslResultConcept)(production)
       }
     }
   }
@@ -221,10 +222,11 @@ private object VocDslUtils {
     sentence: Sentence,
     roles: Seq[Role],
     context: VerbalizationContext,
+    dsl: Dsl,
     dslConcepts: Map[DslConceptKey, DslConcept[T]]
-  )(f: Seq[T] => S): PhraseProduction[S] = {
+  )(f: Seq[T] => S): SyntaxProduction[S] = {
     val parts = toParts(verbalizer, sentence, roles, context).toIndexedSeq
-    PPAndN(parts.zipWithIndex
+    SPAndN(parts.zipWithIndex
       .map {
         case (TextPart(t), index)               =>
           precedences.get(t) match {
@@ -232,39 +234,39 @@ private object VocDslUtils {
               if (index == 0) {
                 if (parts.isDefinedAt(index + 1)) {
                   if (parts.apply(index + 1).isRole && parts.length == 2) {
-                    PPAssoc(PPStr(t), value._1, value._2)
+                    SPAssoc(SPStr(t), value._1, value._2)
                   } else {
-                    PPStr(t)
+                    SPStr(t)
                   }
                 } else {
-                  PPStr(t)
+                  SPStr(t)
                 }
               } else {
                 if (parts.apply(index - 1).isRole) {
                   if (parts.isDefinedAt(index + 1)) {
                     if (parts.apply(index + 1).isRole && parts.length == 3) {
-                      PPAssoc(PPStr(t), value._1, value._2)
+                      SPAssoc(SPStr(t), value._1, value._2)
                     } else {
-                      PPStr(t)
+                      SPStr(t)
                     }
                   } else {
                     if (parts.length == 2) {
-                      PPAssoc(PPStr(t), value._1, value._2)
+                      SPAssoc(SPStr(t), value._1, value._2)
                     } else {
-                      PPStr(t)
+                      SPStr(t)
                     }
                   }
                 } else {
-                  PPStr(t)
+                  SPStr(t)
                 }
               }
-            case None        => PPStr(t)
+            case None        => SPStr(t)
           }
         case (SubjectRolePart(role, plural), _) =>
           // TODO plural?
-          PPStr(role.label.getOrElse("?")).subject
+          SPStr(role.label.getOrElse("?")).subject
         case (ObjectRolePart(syntacticRole), _) =>
-          val ref = PPExprRef[T](useConcept(Some(syntacticRole), roles, dslConcepts))
+          val ref = dsl.syntaxExprRef(useConcept(Some(syntacticRole), roles, dslConcepts))
           if (syntacticRole.cardinality == Multiple) {
             ref
               .multiple[T]

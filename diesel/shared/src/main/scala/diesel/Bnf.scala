@@ -46,8 +46,6 @@ object Bnf {
     implicit def dslInstance[T](instance: Instance[T]): DslInstance[T] = DslInstance[T](instance)
 
     implicit def dslSyntax[T](syntax: Syntax[T]): DslSyntax[T] = DslSyntax[T](syntax)
-
-    implicit def dslPhrase[T](phrase: Phrase[T]): DslPhrase[T] = DslPhrase[T](phrase)
   }
 
   sealed trait Symbol {
@@ -161,8 +159,6 @@ object Bnf {
   case class DslInstance[T](instance: Instance[T]) extends DslElement
 
   case class DslSyntax[T](syntax: Syntax[T]) extends DslElement
-
-  case class DslPhrase[T](syntax: Phrase[T]) extends DslElement
 
   case class DslVocElement[T](vocElement: VocElement) extends DslElement
 
@@ -966,144 +962,6 @@ object Bnf {
       )
     }
 
-    def mapPhraseProduction(
-      owner: Rule,
-      production: PhraseProduction[_],
-      ctx: GrammarContext,
-      first: Boolean = true
-    ): Partial = {
-      production match {
-        case PPStr(s) =>
-          Partial(Seq(Bnf.Token(s, IdentifiedToken(s))))
-
-        case PPMultiple(ref, vc) =>
-          val newCtx = vc
-            .map { c => ctx.derive(ref.c, Multiple, c) }
-            .getOrElse(ctx.derive(ref.c, Multiple))
-          val item   = getOrCreateRuleWithContext("expr", newCtx, dsl.internalDefaultExprs.toString)
-          forwardGeneration(item, () => generateExpr(item, dsl.internalDefaultExprs, newCtx))
-          Partial(Seq(item), Propagate(0))
-
-        case PPSubject(str) =>
-          // verbalize str and split
-          verbalizer match {
-            case Some(v) =>
-              verbalizeSubject(owner, ctx, str.s, v)
-            case None    =>
-              splitText(str.s)
-          }
-
-        case PPAnd2(i1, i2) =>
-          mapPhraseProduction(owner, i1, ctx.propagate(first), first) ++ mapPhraseProduction(
-            owner,
-            i2,
-            ctx.propagate(false),
-            first = false
-          )
-
-        case PPAnd3(i1, i2, i3) =>
-          mapPhraseProduction(owner, i1, ctx.propagate(first), first) ++ mapPhraseProduction(
-            owner,
-            i2,
-            ctx.propagate(false),
-            first = false
-          ) ++ mapPhraseProduction(
-            owner,
-            i3,
-            ctx.propagate(false),
-            first = false
-          )
-
-        case PPAnd4(i1, i2, i3, i4) =>
-          mapPhraseProduction(owner, i1, ctx.propagate(first), first) ++ mapPhraseProduction(
-            owner,
-            i2,
-            ctx.propagate(false),
-            first = false
-          ) ++ mapPhraseProduction(
-            owner,
-            i3,
-            ctx.propagate(false),
-            first = false
-          ) ++ mapPhraseProduction(owner, i4, ctx.propagate(false), first = false)
-
-        case PPAnd5(i1, i2, i3, i4, i5) =>
-          mapPhraseProduction(owner, i1, ctx.propagate(first), first) ++ mapPhraseProduction(
-            owner,
-            i2,
-            ctx.propagate(false),
-            first = false
-          ) ++ mapPhraseProduction(
-            owner,
-            i3,
-            ctx.propagate(false),
-            first = false
-          ) ++ mapPhraseProduction(
-            owner,
-            i4,
-            ctx.propagate(false),
-            first = false
-          ) ++ mapPhraseProduction(
-            owner,
-            i5,
-            ctx.propagate(false),
-            first = false
-          )
-
-        case PPAnd6(i1, i2, i3, i4, i5, i6) =>
-          mapPhraseProduction(owner, i1, ctx.propagate(first), first) ++ mapPhraseProduction(
-            owner,
-            i2,
-            ctx.propagate(false),
-            first = false
-          ) ++ mapPhraseProduction(
-            owner,
-            i3,
-            ctx.propagate(false),
-            first = false
-          ) ++ mapPhraseProduction(
-            owner,
-            i4,
-            ctx.propagate(false),
-            first = false
-          ) ++ mapPhraseProduction(
-            owner,
-            i5,
-            ctx.propagate(false),
-            first = false
-          ) ++ mapPhraseProduction(
-            owner,
-            i6,
-            ctx
-          )
-
-        case PPAndN(ps) =>
-          ps.zipWithIndex.map { case (p, n) =>
-            val mustBePropagated = n == 0 && first
-            mapPhraseProduction(owner, p, ctx.propagate(mustBePropagated), mustBePropagated)
-          }
-            .foldLeft(Partial(Seq())) { (acc, p) => acc ++ p }
-
-        case PPExprRef(concept, vc) =>
-          val newCtx = vc
-            .map { vc => ctx.derive(concept, Single, vc) }
-            .getOrElse(ctx.derive(concept, Single))
-          val item   = getOrCreateRuleWithContext("expr", newCtx, dsl.internalDefaultExprs.toString)
-          forwardGeneration(item, () => generateExpr(item, dsl.internalDefaultExprs, newCtx))
-          Partial(Seq(item), Propagate(0)) // or Partial(Seq(item))
-
-        case PPAssoc(p, associativity, level) =>
-          val partial = mapPhraseProduction(owner, p, ctx, first)
-          val to      = partial.symbols.length - 1
-          partial.merge(0, Constraints.Precedence(0, to, associativity, level))
-
-        case PPMapped(p, _) =>
-          val mapRule = getOrCreateRule(owner.name, "map")
-          mapAction(mapRule, p, mapPhraseProduction(mapRule, p, ctx, first))
-          Partial(Seq(mapRule))
-      }
-    }
-
     def generateAxioms(): Unit = {
       dsl.getAxioms.foreach {
         case Dsl.Axiom(name, production) =>
@@ -1188,54 +1046,6 @@ object Bnf {
                   Propagate(0)
                 )
             }
-          }
-        }
-      }
-      rule.productions.nonEmpty
-    }
-
-    def generatePhrases(rule: Bnf.Rule, ctx: GrammarContext): Boolean = {
-      ctx.cardinality foreach { cardinality =>
-        ctx.concept foreach { concept =>
-          dsl.getPhrases.foreach {
-            case phrase: PhraseSingle[_]   =>
-              if (cardinality == Single && phrase.concept == concept) {
-                val phraseRule = getOrCreateRuleWithContext("phrase", ctx, phrase.name)
-                forwardGeneration(phraseRule, () => generatePhrase(phrase, phraseRule, ctx))
-                rule >> new Production(
-                  Some(rule),
-                  Seq(phraseRule),
-                  { (_, args) => args.head },
-                  None,
-                  Propagate(0)
-                )
-              }
-            case phrase: PhraseMulti[_, _] =>
-              if (cardinality == Multiple && phrase.concept == concept) {
-                val phraseRule = getOrCreateRuleWithContext("phrase", ctx, phrase.name)
-                forwardGeneration(phraseRule, () => generatePhrase(phrase, phraseRule, ctx))
-                rule >> new Production(
-                  Some(rule),
-                  Seq(phraseRule),
-                  { (_, args) => args.head },
-                  None,
-                  Propagate(0)
-                )
-              }
-          }
-          // Hierarchy
-          dsl.subConceptsOf(concept) foreach {
-            case subConcept: Concept[_] =>
-              val newCtx  = ctx.derive(subConcept, cardinality)
-              val phrases = getOrCreateRuleWithContext("phrases", newCtx)
-              forwardGeneration(phrases, () => generatePhrases(phrases, newCtx))
-              rule >> new Production(
-                Some(rule),
-                Seq(phrases),
-                { (_, args) => args.head },
-                None,
-                Propagate(0)
-              )
           }
         }
       }
@@ -1369,18 +1179,6 @@ object Bnf {
               )
             }
           }
-          // Phrases
-          if (exprTypes.has(Expressions.Phrases)) {
-            val phrases = getOrCreateRuleWithContext("phrases", ctx)
-            forwardGeneration(phrases, () => generatePhrases(phrases, ctx))
-            rule >> new Production(
-              Some(rule),
-              Seq(phrases),
-              { (_, args) => args.head },
-              None,
-              Propagate(0)
-            )
-          }
           // Syntaxes
           if (exprTypes.has(Expressions.Syntaxes)) {
             val syntaxes = getOrCreateRuleWithContext("syntaxes", ctx)
@@ -1427,10 +1225,6 @@ object Bnf {
         case _: SyntaxMulti[_, _] =>
           generateTypedSyntax(syntax, rule, ctx)
       }
-    }
-
-    def generatePhrase[T](phrase: Phrase[T], rule: Rule, ctx: GrammarContext): Unit = {
-      mapAction(rule, phrase.production, mapPhraseProduction(rule, phrase.production, ctx))
     }
 
     def cleanGrammar(): Unit = {

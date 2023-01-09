@@ -48,8 +48,8 @@ class VerbalizationContextInDslTest extends FunSuite {
 
     val void: Concept[AVoid] = concept
 
-    val print: Phrase[AVoid] = phrase(void)(
-      pS("print") ~ pR(value) map [AVoid] {
+    val print: Syntax[AVoid] = syntax(void)(
+      "print" ~ value map [AVoid] {
         case (_, (_, s)) =>
           APrint(s)
       }
@@ -67,9 +67,9 @@ class VerbalizationContextInDslTest extends FunSuite {
 
   object MyDsl extends BootVoc {
 
-    val pi: Phrase[ANumber] = phrase(number)(
-      pS("pi").subject map [ANumber] {
-        case (_, t) =>
+    val pi: Syntax[ANumber] = syntax(number)(
+      "pi".subject map [ANumber] {
+        case (_, _) =>
           Pi
       }
     )
@@ -106,15 +106,11 @@ class VerbalizationContextInDslTest extends FunSuite {
       }
     )
 
-    val max: Phrase[ANumber] = phrase[ANumber](number)(
+    val max: Syntax[ANumber] = syntax[ANumber](number)(
       // references "number" and decorates with article
-      pS("max").subject ~ pS("(") ~ pR(number).verbalization(
+      "max".subject ~ "(" ~ number.verbalization(
         SPVerbalizationContext(Some(DefiniteArticle))
-      ) ~ pS(
-        ","
-      ) ~ pR(
-        number
-      ) ~ pS(")") map [ANumber] {
+      ) ~ "," ~ number ~ ")" map [ANumber] {
         case (_, (_, _, l, _, r, _)) =>
           // maps to user Ast type
           AMax(l, r)
