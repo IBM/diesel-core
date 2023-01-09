@@ -22,14 +22,12 @@ import diesel.Lexer._
 import diesel.voc.{
   Article,
   Cardinality,
-  ConceptVerbalizable,
   LabelVerbalizable,
   Multiple,
   NoArticle,
   Single,
   VerbalizationContext,
   Verbalizer,
-  VocDsl,
   VocElement
 }
 
@@ -293,7 +291,7 @@ object Bnf {
 
   implicit def stringToRule(name: String): Rule = Rule(name)
 
-  private def computeRules(dsl: Dsl, verbalizer: Option[Verbalizer]): Seq[NonTerminal] = {
+  private def computeRules(dsl: Dsl): Seq[NonTerminal] = {
 
     var rules: Map[String, NonTerminal] = Map()
 
@@ -564,6 +562,13 @@ object Bnf {
       }
     }
 
+    def verbalizations(dsl: Dsl): Option[Verbalizations] = {
+      dsl match {
+        case dsl: Verbalizations => Some(dsl)
+        case _                   => None
+      }
+    }
+
     var counter: Int = 0
 
     def verbalizeSubject[T](
@@ -621,9 +626,9 @@ object Bnf {
 
         case SPSubject(str) =>
           // verbalize str and split
-          verbalizer match {
+          verbalizations(dsl) match {
             case Some(v) =>
-              verbalizeSubject(owner, ctx, str.text, v)
+              verbalizeSubject(owner, ctx, str.text, v.verbalizer)
             case None    =>
               splitText(str.text)
           }
@@ -1106,23 +1111,20 @@ object Bnf {
     def generateTarget(rule: Rule, ctx: GrammarContext): Boolean = {
       ctx.cardinality foreach { cardinality =>
         ctx.concept foreach { concept =>
-          val p = verbalizer match {
-            case Some(verbalizer) =>
+          val p = dsl match {
+            case dsl: Verbalizations =>
               val verbCtx = VerbalizationContext(
                 article = ctx.article.getOrElse(NoArticle),
                 plural = ctx.plural.getOrElse(cardinality == Multiple),
                 partitive = ctx.partitive.getOrElse(false)
               )
-              val l       = dsl match {
-                case dsl: VocDsl =>
-                  dsl.vocabulary.concepts.find(vc => vc.identifier == concept.name) match {
-                    case Some(value) => ConceptVerbalizable(value)
-                    case None        => LabelVerbalizable(concept.name)
-                  }
-                case _           => LabelVerbalizable(concept.name)
-              }
-              splitText(verbalizer.verbalize(verbCtx, l))
-            case None             =>
+              val l       = dsl.verbalizable(concept).getOrElse(LabelVerbalizable(concept.name))
+//                  dsl.vocabulary.concepts.find(vc => vc.identifier == concept.name) match {
+//                    case Some(value) => ConceptVerbalizable(value)
+//                    case None        => LabelVerbalizable(concept.name)
+//                  }
+              splitText(dsl.verbalizer.verbalize(verbCtx, l))
+            case _                   =>
               splitText(concept.name)
           }
           rule >> new Production(
@@ -1296,14 +1298,10 @@ object Bnf {
   }
 
   def apply[T](dsl: Dsl): Bnf = {
-    val rules: Seq[NonTerminal] = computeRules(dsl, None)
+    val rules: Seq[NonTerminal] = computeRules(dsl)
     Bnf(Lexer(dsl, rules), rules)
   }
 
-  def apply[T](dsl: Dsl, verbalizer: Option[Verbalizer]): Bnf = {
-    val rules: Seq[NonTerminal] = computeRules(dsl, verbalizer)
-    Bnf(Lexer(dsl, rules), rules)
-  }
 }
 
 import diesel.Bnf._

@@ -65,7 +65,11 @@ class VerbalizationContextInDslTest extends FunSuite {
   case object Pi                                 extends ANumber
   case class Statement(void: AVoid)              extends AVerbalized
 
-  object MyDsl extends BootVoc {
+  object MyDsl extends BootVoc with Verbalizations {
+
+    override val verbalizer: Verbalizer = new EnglishVerbalizer(Vocabulary.empty)
+
+    override def verbalizable[T](concept: Concept[T]): Option[Verbalizable] = None
 
     val pi: Syntax[ANumber] = syntax(number)(
       "pi".subject map [ANumber] {
@@ -128,14 +132,12 @@ class VerbalizationContextInDslTest extends FunSuite {
 
   }
 
-  private val verbalizer = new EnglishVerbalizer(Vocabulary.empty)
-
   test("definite") {
     val text =
       """
         |definite the pi
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl, verbalizer = Some(verbalizer))(text) { tree =>
+    AstHelpers.assertAst(MyDsl)(text) { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == ADefinite(Pi))
     }
@@ -146,7 +148,7 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |definite a pi
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl, verbalizer = Some(verbalizer))(text) { tree =>
+    AstHelpers.assertAst(MyDsl)(text) { tree =>
       assert(tree.markers.length == 1)
       assert(
         tree.markers.head.message.format("en") == "The word 'the' is expected in place of 'a'."
@@ -159,7 +161,7 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |indefinite a pi
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl, verbalizer = Some(verbalizer))(text) { tree =>
+    AstHelpers.assertAst(MyDsl)(text) { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == AInDefinite(Pi))
     }
@@ -170,7 +172,7 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |indefinite 123
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl, verbalizer = Some(verbalizer))(text) { tree =>
+    AstHelpers.assertAst(MyDsl)(text) { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == AInDefinite(ANumberValue(123)))
     }
@@ -181,7 +183,7 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |print min(the max(the pi, pi), pi)
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl, verbalizer = Some(verbalizer))(text) { tree =>
+    AstHelpers.assertAst(MyDsl)(text) { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == Statement(APrint(AMin(AMax(Pi, Pi), Pi))))
     }
@@ -192,14 +194,14 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |print max(the max(the pi, pi), pi)
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl, verbalizer = Some(verbalizer))(text) { tree =>
+    AstHelpers.assertAst(MyDsl)(text) { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == Statement(APrint(AMax(AMax(Pi, Pi), Pi))))
     }
   }
 
   test("print") {
-    AstHelpers.assertAst(MyDsl, verbalizer = Some(verbalizer))("print pi") { tree =>
+    AstHelpers.assertAst(MyDsl)("print pi") { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == Statement(APrint(Pi)))
     }

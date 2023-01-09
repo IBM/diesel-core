@@ -17,21 +17,15 @@
 package diesel
 
 import diesel.Dsl.Axiom
-import diesel.voc.{Verbalizer, VocDsl}
 
 object AstHelpers {
-
-  def parse(dsl: Dsl, text: String, axiom: Option[Axiom[_]]): Result = {
-    parse(dsl, text, None, axiom)
-  }
 
   def parse(
     dsl: Dsl,
     text: String,
-    verbalizer: Option[Verbalizer] = None,
     axiom: Option[Axiom[_]] = None
   ): Result = {
-    val bnf: Bnf       = Bnf(dsl, verbalizer)
+    val bnf: Bnf       = Bnf(dsl)
     val parser: Earley = Earley(bnf, dsl.dynamicLexer)
     val a              = getBnfAxiomOrThrow(bnf, axiom)
     parser.parse(new Lexer.Input(text), a)
@@ -58,14 +52,10 @@ object AstHelpers {
     userDataProvider: Option[UserDataProvider] = None,
     axiom: Option[Axiom[_]] = None
   ): Seq[CompletionProposal] = {
-    val verbalizer: Option[Verbalizer] = dsl match {
-      case dslWithVoc: VocDsl => Some(dslWithVoc.verbalizer)
-      case _                  => None
-    }
-    val bnf: Bnf                       = Bnf(dsl, verbalizer)
-    val parser: Earley                 = Earley(bnf, dsl.dynamicLexer)
-    val a                              = getBnfAxiomOrThrow(bnf, axiom)
-    val res                            = new CompletionProcessor(
+    val bnf: Bnf       = Bnf(dsl)
+    val parser: Earley = Earley(bnf, dsl.dynamicLexer)
+    val a              = getBnfAxiomOrThrow(bnf, axiom)
+    val res            = new CompletionProcessor(
       parser.parse(new Lexer.Input(text), a),
       config,
       userDataProvider
@@ -76,11 +66,10 @@ object AstHelpers {
 
   def assertAsts(
     dsl: Dsl,
-    verbalizer: Option[Verbalizer] = None,
     axiom: Option[Axiom[_]] = None,
     navigatorFactory: Result => Navigator = Navigator(_)
   )(s: String)(f: Navigator => Unit): Unit = {
-    val result    = parse(dsl, s, verbalizer, axiom)
+    val result    = parse(dsl, s, axiom)
     assert(result.success)
     val navigator = navigatorFactory(result)
     f(navigator)
@@ -88,11 +77,10 @@ object AstHelpers {
 
   def assertAst(
     dsl: Dsl,
-    verbalizer: Option[Verbalizer] = None,
     axiom: Option[Axiom[_]] = None,
     navigatorFactory: Result => Navigator = Navigator(_)
   )(s: String)(f: GenericTree => Unit): Unit = {
-    assertAsts(dsl, verbalizer, axiom, navigatorFactory)(s) { n: Navigator =>
+    assertAsts(dsl, axiom, navigatorFactory)(s) { n: Navigator =>
       assert(n.hasNext)
       val a = n.next()
       // println(a.root)
@@ -103,11 +91,10 @@ object AstHelpers {
 
   def withAst[T](
     dsl: Dsl,
-    verbalizer: Option[Verbalizer] = None,
     axiom: Option[Axiom[_]] = None,
     navigatorFactory: Result => Navigator = Navigator(_)
   )(s: String)(f: GenericTree => T): T = {
-    val result = parse(dsl, s, verbalizer, axiom)
+    val result = parse(dsl, s, axiom)
     assert(result.success)
     val n      = navigatorFactory(result)
     assert(n.hasNext)
@@ -116,11 +103,10 @@ object AstHelpers {
 
   def selectAst(
     dsl: Dsl,
-    verbalizer: Option[Verbalizer] = None,
     axiom: Option[Axiom[_]] = None,
     navigatorFactory: Result => Navigator = Navigator(_)
   )(s: String)(f: GenericTree => Unit): Unit = {
-    val result    = parse(dsl, s, verbalizer, axiom)
+    val result    = parse(dsl, s, axiom)
     assert(result.success)
     val astOption = Navigator.select(navigatorFactory(result))
     assert(astOption.nonEmpty)

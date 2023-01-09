@@ -17,17 +17,12 @@
 package diesel
 
 import diesel.Dsl.Axiom
-import diesel.voc.{Verbalizer, VocDsl}
 import munit.FunSuite
 
 abstract class DslTestFunSuite extends FunSuite {
 
   protected def dsl: Dsl
-  protected def axiom: Option[Axiom[_]]        = None
-  protected def verbalizer: Option[Verbalizer] = dsl match {
-    case dslWithVoc: VocDsl => Some(dslWithVoc.verbalizer)
-    case _                  => None
-  }
+  protected def axiom: Option[Axiom[_]] = None
 
   type Ast
   def ast(tree: GenericTree): Ast = tree.value.asInstanceOf[Ast]
@@ -67,7 +62,7 @@ abstract class DslTestFunSuite extends FunSuite {
   }
 
   protected def withTree(text: String)(f: GenericTree => Unit): Unit = {
-    AstHelpers.assertAst(dsl, verbalizer = verbalizer, axiom = axiom)(text) { tree =>
+    AstHelpers.assertAst(dsl, axiom = axiom)(text) { tree =>
       f(tree)
     }
   }

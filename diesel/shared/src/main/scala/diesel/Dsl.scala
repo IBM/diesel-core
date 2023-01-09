@@ -17,8 +17,7 @@
 package diesel
 
 import diesel.Lexer.{RegexScanner, Scanner, Token}
-import diesel.voc.Article
-
+import diesel.voc.{Article, Verbalizable, Verbalizer}
 import diesel.i18n.DeclaringSourceName
 
 import scala.language.implicitConversions
@@ -706,6 +705,12 @@ object Dsl {
   }
 
   trait DynamicLexer {}
+
+  trait Verbalizations {
+    def verbalizer: Verbalizer
+    def verbalizable[T](concept: Concept[T]): Option[Verbalizable]
+
+  }
 }
 
 /** Dsl trait : to be mixed in by language definitions. Holds all declared concepts, phrases,
