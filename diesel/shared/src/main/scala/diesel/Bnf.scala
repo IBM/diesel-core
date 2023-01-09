@@ -21,11 +21,8 @@ import diesel.Dsl._
 import diesel.Lexer._
 import diesel.voc.{
   Article,
-  Cardinality,
   LabelVerbalizable,
-  Multiple,
   NoArticle,
-  Single,
   VerbalizationContext,
   Verbalizer,
   VocElement
@@ -481,23 +478,23 @@ object Bnf {
 
     case class GrammarContext(
       concept: Option[Dsl.Concept[_ <: Any]],
-      cardinality: Option[Cardinality],
+      multiple: Option[Boolean],
       article: Option[Article],
       plural: Option[Boolean],
       partitive: Option[Boolean]
     ) {
 
-      def derive(concept: Concept[_ <: Any], cardinality: Cardinality): GrammarContext =
-        GrammarContext(Some(concept), Some(cardinality), article, plural, partitive)
+      def derive(concept: Concept[_ <: Any], multiple: Boolean): GrammarContext =
+        GrammarContext(Some(concept), Some(multiple), article, plural, partitive)
 
       def derive(
         concept: Concept[_ <: Any],
-        cardinality: Cardinality,
+        multiple: Boolean,
         vc: SPVerbalizationContext
       ): GrammarContext =
         GrammarContext(
           Some(concept),
-          Some(cardinality),
+          Some(multiple),
           vc.article match {
             case Some(value) => Some(value)
             case None        => this.article
@@ -513,13 +510,14 @@ object Bnf {
         )
 
       def propagate(first: Boolean): GrammarContext =
-        if (first) this else GrammarContext(concept, cardinality, None, None, None)
+        if (first) this else GrammarContext(concept, multiple, None, None, None)
 
       override def toString: String = s"${concept match {
           case Some(value) => value.name
           case None        => "_"
-        }},${cardinality match {
-          case Some(value) => value.name
+        }},${multiple match {
+          case Some(true)  => "MULTIPLE"
+          case Some(false) => "SINGLE"
           case None        => "_"
         }},${article match {
           case Some(value) => value.name
@@ -579,12 +577,7 @@ object Bnf {
     ): Partial = {
       val context      = VerbalizationContext(
         article = ctx.article.getOrElse(NoArticle),
-        plural = ctx.plural.getOrElse(
-          ctx.cardinality.exists {
-            case Single   => false
-            case Multiple => true
-          }
-        ),
+        plural = ctx.plural.orElse(ctx.multiple).getOrElse(false),
         partitive = ctx.partitive.getOrElse(false)
       )
       val verbalizable = LabelVerbalizable(text)
@@ -818,35 +811,35 @@ object Bnf {
             .foldLeft(Partial(Seq())) { (acc, p) => acc ++ p }
 
         case SPExprRef(concept, exprTypes) =>
-          val newCtx = ctx.derive(concept, Single)
+          val newCtx = ctx.derive(concept, multiple = false)
           val item   = getOrCreateRuleWithContext("expr", newCtx, exprTypes.toString)
           forwardGeneration(item, () => generateExpr(item, exprTypes, newCtx))
           Partial(Seq(item), Propagate(0))
 
         case SPMultiple(ref, vc) =>
           val newCtx = vc
-            .map { c => ctx.derive(ref.c, Multiple, c) }
-            .getOrElse(ctx.derive(ref.c, Multiple))
+            .map { c => ctx.derive(ref.c, multiple = true, c) }
+            .getOrElse(ctx.derive(ref.c, multiple = true))
           val item   = getOrCreateRuleWithContext("expr", newCtx, ref.exprTypes.toString)
           forwardGeneration(item, () => generateExpr(item, ref.exprTypes, newCtx))
           Partial(Seq(item), Propagate(0))
 
         case SPRefWithContext(ref, vc) =>
-          val newCtx = ctx.derive(ref.c, Single, vc)
+          val newCtx = ctx.derive(ref.c, multiple = false, vc)
           val item   = getOrCreateRuleWithContext("expr", newCtx, ref.exprTypes.toString)
           forwardGeneration(item, () => generateExpr(item, ref.exprTypes, newCtx))
           Partial(Seq(item), Propagate(0))
 
         case SPConceptRef(c, _, m, vc) =>
-          val newCtx = ctx.derive(c, if (m) Multiple else Single, vc)
+          val newCtx = ctx.derive(c, multiple = m, vc)
           val target = getOrCreateRuleWithContext("target", newCtx)
           forwardGeneration(target, () => generateTarget(target, newCtx))
           Partial(Seq(target), Propagate(0))
 
         case SPRuleRef(syntax) =>
           val newCtx = syntax match {
-            case SyntaxTyped(_, concept, _, _) => ctx.derive(concept, Single)
-            case SyntaxMulti(_, concept, _)    => ctx.derive(concept, Multiple)
+            case SyntaxTyped(_, concept, _, _) => ctx.derive(concept, multiple = false)
+            case SyntaxMulti(_, concept, _)    => ctx.derive(concept, multiple = true)
             case _                             => ctx
           }
           val item   = getOrCreateRuleWithContext("syntax", newCtx, syntax.name)
@@ -856,8 +849,8 @@ object Bnf {
         case SPLazyRuleRef(_, r) =>
           val syntax = r()
           val newCtx = syntax match {
-            case SyntaxTyped(_, concept, _, _) => ctx.derive(concept, Single)
-            case SyntaxMulti(_, concept, _)    => ctx.derive(concept, Multiple)
+            case SyntaxTyped(_, concept, _, _) => ctx.derive(concept, multiple = false)
+            case SyntaxMulti(_, concept, _)    => ctx.derive(concept, multiple = true)
             case _                             => ctx
           }
           val item   = getOrCreateRuleWithContext("syntax", newCtx, syntax.name)
@@ -980,8 +973,8 @@ object Bnf {
     }
 
     def generateValue(rule: Rule, ctx: GrammarContext): Boolean = {
-      ctx.cardinality foreach { cardinality =>
-        if (cardinality == Single) {
+      ctx.multiple foreach { multiple =>
+        if (!multiple) {
           ctx.concept foreach { concept =>
             concept.data foreach { data =>
               rule >> new Production(
@@ -1003,7 +996,7 @@ object Bnf {
             // Hierarchy
             dsl.subConceptsOf(concept) foreach {
               case subConcept: Concept[_] =>
-                val newCtx   = ctx.derive(subConcept, Single)
+                val newCtx   = ctx.derive(subConcept, multiple = false)
                 val subValue = getOrCreateRuleWithContext("value", newCtx)
                 forwardGeneration(subValue, () => generateValue(subValue, newCtx))
                 rule >> new Production(
@@ -1021,8 +1014,8 @@ object Bnf {
     }
 
     def generateInstances(rule: Bnf.Rule, ctx: GrammarContext): Boolean = {
-      ctx.cardinality foreach { cardinality =>
-        if (cardinality == Single) {
+      ctx.multiple foreach { multiple =>
+        if (!multiple) {
           ctx.concept foreach { concept =>
             dsl.getInstances.foreach(instance =>
               if (instance.concept == concept) {
@@ -1040,7 +1033,7 @@ object Bnf {
             // Hierarchy
             dsl.subConceptsOf(concept) foreach {
               case subConcept: Concept[_] =>
-                val newCtx    = ctx.derive(subConcept, Single)
+                val newCtx    = ctx.derive(subConcept, multiple = false)
                 val instances = getOrCreateRuleWithContext("instances", newCtx)
                 forwardGeneration(instances, () => generateInstances(instances, newCtx))
                 rule >> new Production(
@@ -1074,12 +1067,12 @@ object Bnf {
         )
       }
 
-      ctx.cardinality foreach { cardinality =>
+      ctx.multiple foreach { multiple =>
         ctx.concept foreach { concept =>
           dsl.getSyntaxes.foreach {
             case syntax: SyntaxTyped[_]    =>
               if (
-                cardinality == Single && syntax.expression && dsl.isSubtypeOf(
+                !multiple && syntax.expression && dsl.isSubtypeOf(
                   syntax.concept,
                   concept
                 )
@@ -1087,7 +1080,7 @@ object Bnf {
                 addSyntax(syntax)
               }
             case syntax: SyntaxMulti[_, _] =>
-              if (cardinality == Multiple && dsl.isSubtypeOf(syntax.concept, concept)) {
+              if (multiple && dsl.isSubtypeOf(syntax.concept, concept)) {
                 addSyntax(syntax)
               }
             case _                         =>
@@ -1095,11 +1088,11 @@ object Bnf {
           // Generic syntaxes
           dsl.getGenericSyntaxes.foreach {
             case genericSyntax: SyntaxGeneric[_]         =>
-              if (cardinality == Single) {
+              if (!multiple) {
                 genericSyntax.apply(concept, exprTypes, dsl, addSyntax)
               }
             case genericSyntax: SyntaxGenericMulti[_, _] =>
-              if (cardinality == Multiple) {
+              if (multiple) {
                 genericSyntax.apply(concept, exprTypes, dsl, addSyntax)
               }
           }
@@ -1109,12 +1102,12 @@ object Bnf {
     }
 
     def generateTarget(rule: Rule, ctx: GrammarContext): Boolean = {
-      ctx.cardinality foreach { cardinality =>
+      ctx.multiple foreach { multiple =>
         ctx.concept foreach { concept =>
           val p = verbalizations(dsl).map { v =>
             val verbCtx = VerbalizationContext(
               article = ctx.article.getOrElse(NoArticle),
-              plural = ctx.plural.getOrElse(cardinality == Multiple),
+              plural = ctx.plural.getOrElse(multiple),
               partitive = ctx.partitive.getOrElse(false)
             )
             val l       = v.verbalizable(concept).getOrElse(LabelVerbalizable(concept.name))
@@ -1129,7 +1122,7 @@ object Bnf {
           // Hierarchy
           dsl.subConceptsOf(concept) foreach {
             case subConcept: Concept[_] =>
-              val newCtx   = ctx.derive(subConcept, cardinality)
+              val newCtx   = ctx.derive(subConcept, multiple)
               val subValue = getOrCreateRuleWithContext("target", newCtx)
               forwardGeneration(subValue, () => generateTarget(subValue, newCtx))
               rule >> new Production(
@@ -1146,9 +1139,9 @@ object Bnf {
     }
 
     def generateExpr(rule: Rule, exprTypes: Expressions.Types, ctx: GrammarContext): Boolean = {
-      ctx.cardinality foreach { cardinality =>
+      ctx.multiple foreach { multiple =>
         ctx.concept foreach { _ =>
-          if (cardinality == Single) {
+          if (!multiple) {
             // Value
             if (exprTypes.has(Expressions.Values)) {
               val value = getOrCreateRuleWithContext("value", ctx)
