@@ -17,7 +17,6 @@
 package diesel
 
 import diesel.Lexer.{RegexScanner, Scanner, Token}
-import diesel.voc.{Article, Verbalizable, Verbalizer}
 import diesel.i18n.DeclaringSourceName
 
 import scala.language.implicitConversions
@@ -708,8 +707,6 @@ object Dsl {
 
   trait Verbalizations {
     def verbalizer: Verbalizer
-    def verbalizable[T](concept: Concept[T]): Option[Verbalizable]
-
   }
 }
 

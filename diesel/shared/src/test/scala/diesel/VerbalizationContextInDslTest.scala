@@ -17,8 +17,6 @@
 package diesel
 
 import diesel.Dsl._
-import diesel.voc.i18n.EnglishVerbalizer
-import diesel.voc.{Concept => _, _}
 import munit.FunSuite
 
 class VerbalizationContextInDslTest extends FunSuite {
@@ -67,9 +65,7 @@ class VerbalizationContextInDslTest extends FunSuite {
 
   object MyDsl extends BootVoc with Verbalizations {
 
-    override val verbalizer: Verbalizer = new EnglishVerbalizer(Vocabulary.empty)
-
-    override def verbalizable[T](concept: Concept[T]): Option[Verbalizable] = None
+    override val verbalizer: Verbalizer = DummyVerbalizer
 
     val pi: Syntax[ANumber] = syntax(number)(
       "pi".subject map [ANumber] {
@@ -132,13 +128,28 @@ class VerbalizationContextInDslTest extends FunSuite {
 
   }
 
+  object DummyVerbalizer extends Verbalizer {
+    override def verbalize(context: VerbalizationContext, concept: Concept[_]): String =
+      verbalize(context, concept.name)
+
+    override def verbalize(context: VerbalizationContext, label: String): String = {
+      val article = context.article match {
+        case DefiniteArticle   => Some("the")
+        case IndefiniteArticle => Some("a")
+        case NoArticle         => None
+        case _                 => Some(context.article.name)
+      }
+      article.map(a => s"$a $label").getOrElse(label)
+    }
+  }
+
   test("definite") {
     val text =
       """
         |definite the pi
         |""".stripMargin
     AstHelpers.assertAst(MyDsl)(text) { tree =>
-      assert(tree.markers.isEmpty)
+      assertEquals(tree.markers, Seq())
       assert(tree.root.value == ADefinite(Pi))
     }
   }

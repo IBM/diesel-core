@@ -19,14 +19,6 @@ package diesel
 import diesel.Bnf.Constraints.{Feature, Propagate}
 import diesel.Dsl._
 import diesel.Lexer._
-import diesel.voc.{
-  Article,
-  LabelVerbalizable,
-  NoArticle,
-  VerbalizationContext,
-  Verbalizer,
-  VocElement
-}
 
 import java.io.PrintStream
 import scala.Console.println
@@ -154,8 +146,6 @@ object Bnf {
   case class DslInstance[T](instance: Instance[T]) extends DslElement
 
   case class DslSyntax[T](syntax: Syntax[T]) extends DslElement
-
-  case class DslVocElement[T](vocElement: VocElement) extends DslElement
 
   class Production(
     var rule: Option[NonTerminal] = None,
@@ -575,18 +565,17 @@ object Bnf {
       text: String,
       v: Verbalizer
     ): Partial = {
-      val context      = VerbalizationContext(
+      val context     = VerbalizationContext(
         article = ctx.article.getOrElse(NoArticle),
         plural = ctx.plural.orElse(ctx.multiple).getOrElse(false),
         partitive = ctx.partitive.getOrElse(false)
       )
-      val verbalizable = LabelVerbalizable(text)
-      val verbalized   = v.verbalize(context, verbalizable).split(" ")
+      val verbalized  = v.verbalize(context, text).split(" ")
         .map { token =>
           Partial(Seq(Bnf.Token(token, IdentifiedToken(token))))
         }
         .reduce((p1, p2) => p1 ++ p2)
-      val subjectRule  = getOrCreateRule(owner.name, "subject")
+      val subjectRule = getOrCreateRule(owner.name, "subject")
       mapAction(
         subjectRule,
         (_: Context, args: Any) => {
@@ -1110,8 +1099,7 @@ object Bnf {
               plural = ctx.plural.getOrElse(multiple),
               partitive = ctx.partitive.getOrElse(false)
             )
-            val l       = v.verbalizable(concept).getOrElse(LabelVerbalizable(concept.name))
-            splitText(v.verbalizer.verbalize(verbCtx, l))
+            splitText(v.verbalizer.verbalize(verbCtx, concept))
           }.getOrElse(splitText(concept.name))
           rule >> new Production(
             Some(rule),
