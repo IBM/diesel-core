@@ -1111,22 +1111,15 @@ object Bnf {
     def generateTarget(rule: Rule, ctx: GrammarContext): Boolean = {
       ctx.cardinality foreach { cardinality =>
         ctx.concept foreach { concept =>
-          val p = dsl match {
-            case dsl: Verbalizations =>
-              val verbCtx = VerbalizationContext(
-                article = ctx.article.getOrElse(NoArticle),
-                plural = ctx.plural.getOrElse(cardinality == Multiple),
-                partitive = ctx.partitive.getOrElse(false)
-              )
-              val l       = dsl.verbalizable(concept).getOrElse(LabelVerbalizable(concept.name))
-//                  dsl.vocabulary.concepts.find(vc => vc.identifier == concept.name) match {
-//                    case Some(value) => ConceptVerbalizable(value)
-//                    case None        => LabelVerbalizable(concept.name)
-//                  }
-              splitText(dsl.verbalizer.verbalize(verbCtx, l))
-            case _                   =>
-              splitText(concept.name)
-          }
+          val p = verbalizations(dsl).map { v =>
+            val verbCtx = VerbalizationContext(
+              article = ctx.article.getOrElse(NoArticle),
+              plural = ctx.plural.getOrElse(cardinality == Multiple),
+              partitive = ctx.partitive.getOrElse(false)
+            )
+            val l       = v.verbalizable(concept).getOrElse(LabelVerbalizable(concept.name))
+            splitText(v.verbalizer.verbalize(verbCtx, l))
+          }.getOrElse(splitText(concept.name))
           rule >> new Production(
             Some(rule),
             p.symbols,
