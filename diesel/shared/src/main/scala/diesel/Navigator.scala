@@ -456,6 +456,34 @@ class Navigator(
     res
   }
 
+  private def computeErrors(state: State, stack: Seq[Parsing]): Seq[Marker] = {
+    var i                   = state.production.length
+    var cursor              = stack;
+    var errors: Seq[Marker] = Seq()
+    while (i > 0) {
+      val value = cursor.head
+      value.value match {
+        case InsertedTokenValue(_, _, _) => /* Ignore */
+        case _                           =>
+          i -= 1
+      }
+      errors = value.markers ++ errors
+      cursor = cursor.tail
+    }
+    // Pop all remaining inserted token values
+    while (cursor.head.value != Sentinel) {
+      val value = cursor.head
+      value.value match {
+        case InsertedTokenValue(_, _, _) =>
+          errors = value.markers ++ errors
+        case _                           =>
+          throw new RuntimeException()
+      }
+      cursor = cursor.tail
+    }
+    errors
+  }
+
   private def applyRule(
     production: Production,
     children: Seq[GenericNode],
@@ -576,8 +604,21 @@ class Navigator(
     if (choices.nonEmpty) choices.exists(_.retry) else false
   }
 
-  private[diesel] def filterTrees(trees: Seq[GenericNode]): Seq[GenericNode] = {
-    trees
+  private[diesel] def selectSubtrees(state: State, trees: Seq[Seq[Parsing]]): Seq[Seq[Parsing]] = {
+    var results: Seq[Seq[Parsing]] = Seq()
+    var cursor                     = trees
+    var errorCount                 = Int.MaxValue;
+    while (cursor.nonEmpty) {
+      val localErrorCount = Marker.countErrors(computeErrors(state, cursor.head))
+      if (localErrorCount < errorCount) {
+        results = Seq(cursor.head)
+        errorCount = localErrorCount;
+      } else if (localErrorCount == errorCount) {
+        results = results ++ Seq(cursor.head)
+      }
+      cursor = cursor.tail
+    }
+    results
   }
 }
 
@@ -723,8 +764,8 @@ object Analyzer {
 
     def addSubtree(): Unit = {
       subtrees = subtrees ++ Seq(navigator.stack)
-      if (index.isEmpty) {
-        // subtrees = navigator.filterTrees(subtrees.map(s => s.head.node))
+      if (index.isEmpty && subtrees.size > 1) {
+        subtrees = navigator.selectSubtrees(state, subtrees)
       }
     }
 
