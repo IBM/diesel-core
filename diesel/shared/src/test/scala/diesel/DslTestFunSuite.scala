@@ -36,6 +36,12 @@ abstract class DslTestFunSuite extends FunSuite {
     }
   }
 
+  protected def assertAllAsts(text: String)(expected: => Seq[Ast]): Unit = {
+    withAllAsts(text) { asts =>
+      assertEquals(expected, asts)
+    }
+  }
+
   protected def assertMarkers(text: String)(expected: => Seq[Marker]): Unit = {
     withTree(text) { tree =>
       assertEquals(tree.markers, expected)
@@ -46,6 +52,12 @@ abstract class DslTestFunSuite extends FunSuite {
     withTree(text) { tree =>
       AstHelpers.assertNoMarkers(tree, withAssertNoAmbiguity)
       f(ast(tree))
+    }
+  }
+
+  protected def withAllAsts(text: String)(f: Seq[Ast] => Unit): Unit = {
+    withAllTrees(text) { trees =>
+      f(trees.map(ast))
     }
   }
 
@@ -64,6 +76,12 @@ abstract class DslTestFunSuite extends FunSuite {
   protected def withTree(text: String)(f: GenericTree => Unit): Unit = {
     AstHelpers.assertAst(dsl, axiom = axiom)(text) { tree =>
       f(tree)
+    }
+  }
+
+  protected def withAllTrees(text: String)(f: Seq[GenericTree] => Unit): Unit = {
+    AstHelpers.assertAllAsts(dsl, verbalizer = verbalizer, axiom = axiom)(text) { trees =>
+      f(trees)
     }
   }
 
