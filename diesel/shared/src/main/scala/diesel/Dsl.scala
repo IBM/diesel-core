@@ -408,7 +408,7 @@ object Dsl {
   case class SPMultiple[T, T2](
     ref: SPExprRef[T],
     verbalizationContext: Option[SPVerbalizationContext] = None
-  ) extends SyntaxProduction[T2] {
+  ) extends SyntaxProduction[T2] with SPAppendable[T2] {
     override def applyDynamic(context: Context, args: Any): T2 = args.asInstanceOf[T2]
 
     def verbalization(vc: SPVerbalizationContext): SPMultiple[T, T2] =
