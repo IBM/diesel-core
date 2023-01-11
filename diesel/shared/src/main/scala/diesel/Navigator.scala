@@ -141,7 +141,7 @@ case class GenericTree(
   override def toString: String = prettyPrint(this.root, 0).mkString("\n")
 
   private def nodeToStr(node: GenericNode): String =
-    (node.toString + (if (node.value == null) "" else " => " + node.value.toString))
+    node.toString + (if (node.value == null) "" else " => " + node.value.toString)
 
   private def prettyPrint(node: GenericNode, indent: Int): Seq[String] = {
     Seq(
@@ -152,7 +152,7 @@ case class GenericTree(
 }
 
 abstract class GenericNode(var parent: Option[GenericNode], val context: Context, val value: Any) {
-  private[diesel] def toString(buf: mutable.StringBuilder): Unit
+  private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder
 
   def offset: Int = context.offset
 
@@ -199,7 +199,7 @@ abstract class GenericNode(var parent: Option[GenericNode], val context: Context
     context.begin == index
 
   def containsIndex(index: Int): Boolean =
-    (context.begin <= index && index <= context.end)
+    context.begin <= index && index <= context.end
 
   def isAtOffset(atOffset: Int): Boolean =
     (atOffset == offset && length == 0) || (atOffset >= offset && atOffset < offset + length)
@@ -251,13 +251,13 @@ class GenericNonTerminal(
       }
     )
 
-  private[diesel] def toString(buf: mutable.StringBuilder): Unit = {
+  private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder = {
     // TODO useful for debugging?
 //    buf.append("[").append(production.element.getOrElse("?")).append("]")
     buf.append(production.rule.get.name).append("(")
     buf.append(context.offset).append(", ").append(context.length)
     children.zipWithIndex.foreach {
-      case (child: GenericNode, index: Int) =>
+      case (child: GenericNode, _: Int) =>
         buf.append(", ").append(child)
     }
     buf.append(")")
@@ -270,7 +270,7 @@ class GenericNonTerminal(
 class GenericTerminal(override val context: Context, val token: Token)
     extends GenericNode(None, context, token) {
 
-  private[diesel] def toString(buf: StringBuilder): Unit = {
+  private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder = {
     buf.append(token.id.name).append("(").append(token.text).append(")")
   }
 }
@@ -282,7 +282,7 @@ private object GenericSentinel
       None
     ) {
 
-  private[diesel] def toString(buf: StringBuilder): Unit = {
+  private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder = {
     buf.append("Sentinel()")
   }
 }
@@ -373,6 +373,9 @@ class Navigator(
       override def next(): GenericTree = nav.next()
     }
   }
+
+  private def backPtrsOf(state: State): Seq[BackPtr] =
+    result.contextOf(state).fold[Seq[BackPtr]](Seq())(ctx => ctx.backPtrs.toSeq)
 
   private def sentinel(): Iterator[Seq[Parsing]] = Seq(Seq()).iterator
 
@@ -479,16 +482,14 @@ class Navigator(
       errors = value.markers ++ errors
       index = index.tail
     }
-    while (index.nonEmpty) {
-      val value = index.head
+    index.foreach(value =>
       value.value match {
         case InsertedTokenValue(_, _, _) =>
           errors = value.markers ++ errors
         case _                           =>
           throw new RuntimeException()
       }
-      index = index.tail
-    }
+    )
     val offset                      = result.tokenAt(state.begin).map(_.offset).getOrElse(-1)
     val length                      =
       if (state.begin == state.end) {
@@ -540,8 +541,7 @@ class Navigator(
   private class StateIterator(val state: State)
       extends Iterator[Seq[Parsing]] {
 
-    private val backPtrs: Seq[BackPtr]                  =
-      Navigator.this.result.contextOf(state).fold[Seq[BackPtr]](Seq())(ctx => ctx.backPtrs.toSeq)
+    private val backPtrs: Seq[BackPtr]                  = backPtrsOf(state)
     private val ambiguity: Option[Ambiguity]            =
       if (backPtrs.size > 1) Some(new Ambiguity(backPtrs.size)) else None
     private var index: Seq[BackPtr]                     = backPtrs
