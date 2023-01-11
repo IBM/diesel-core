@@ -23,7 +23,7 @@ import diesel.Lexer.{Eos, Token}
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-private[diesel] trait Item {
+private[diesel] sealed trait Item {
 
   def syntacticErrors(ctx: Result): Int
 }
