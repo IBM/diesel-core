@@ -156,6 +156,7 @@ object Bnf {
   ) {
     val symbols: Array[Symbol] = symbols0.toArray
     val length: Int            = symbols.length
+    def isEmpty: Boolean       = length == 0
   }
 
   trait NonTerminal extends Symbol {
