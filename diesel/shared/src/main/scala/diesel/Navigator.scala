@@ -380,12 +380,42 @@ class Navigator(
   private def sentinel(): Iterator[Seq[Parsing]] = Seq(Seq()).iterator
 
   private def terminal(item: TerminalItem): Iterator[Seq[Parsing]] =
-    Seq(Seq(applyToken(item))).iterator
+    singleton(applyToken(item))
 
-  private def nonTerminal(state: State): Iterator[Seq[Parsing]] =
-    new StateIterator(state)
+  private def singleton(value: Parsing): Iterator[Seq[Parsing]] =
+    Seq(Seq(value)).iterator
 
-  private def collectSubtrees(state: State, value: Iterator[Seq[Parsing]]): Seq[Seq[Parsing]] = {
+  private def alternative(
+    causal: Iterator[Seq[Parsing]],
+    predecessor: State
+  ): Iterator[Seq[Parsing]] =
+    new BackPtrIterator(causal, predecessor)
+
+  private def nonTerminal(state: State): Iterator[Seq[Parsing]] = {
+    val backPtrs: Seq[BackPtr] = backPtrsOf(state)
+    if (backPtrs.isEmpty) {
+      if (state.isCompleted) singleton(reduceState(state, Seq(), None))
+      else sentinel()
+    } else {
+      val subtrees = backPtrs.map(backPtr =>
+        alternative(
+          backPtr.causal match {
+            case item: TerminalItem => terminal(item)
+            case state: State       => nonTerminal(state)
+          },
+          backPtr.predecessor
+        )
+      ).reduce(_ ++ _)
+      if (state.isCompleted) {
+        val ambiguity: Option[Ambiguity] =
+          if (backPtrs.size > 1) Some(new Ambiguity(backPtrs.size)) else None
+        filterSubtrees(state, subtrees.map(s => Seq(reduceState(state, s, ambiguity)))).iterator
+      } else
+        subtrees
+    }
+  }
+
+  private def filterSubtrees(state: State, value: Iterator[Seq[Parsing]]): Seq[Seq[Parsing]] = {
     var subtrees: Seq[Seq[Parsing]] = Seq()
     value.foreach(subtree =>
       if (
@@ -536,66 +566,5 @@ class Navigator(
     }
 
     override def hasNext: Boolean = predIterator.hasNext || causal.hasNext
-  }
-
-  private class StateIterator(val state: State)
-      extends Iterator[Seq[Parsing]] {
-
-    private val backPtrs: Seq[BackPtr]                  = backPtrsOf(state)
-    private val ambiguity: Option[Ambiguity]            =
-      if (backPtrs.size > 1) Some(new Ambiguity(backPtrs.size)) else None
-    private var index: Seq[BackPtr]                     = backPtrs
-    private var current: Option[Iterator[Seq[Parsing]]] = moveToNext(true)
-
-    private def alternative(
-      causal: Iterator[Seq[Parsing]],
-      predecessor: State
-    ): Iterator[Seq[Parsing]] =
-      new BackPtrIterator(causal, predecessor)
-
-    private def moveToNext(first: Boolean): Option[Iterator[Seq[Parsing]]] = {
-      val res = if (index.isEmpty) {
-        if (first) Some(sentinel()) else None
-      } else {
-        val backPtr = index.head
-        index = index.tail
-        val causal  = backPtr.causal match {
-          case item: TerminalItem => terminal(item)
-          case state: State       => nonTerminal(state)
-        }
-        Some(alternative(causal, backPtr.predecessor))
-      }
-      if (state.isCompleted) {
-        res match {
-          case Some(value) =>
-            val subtrees = collectSubtrees(state, value)
-            Some(subtrees.iterator)
-          case None        => None
-        }
-      } else
-        res
-    }
-
-    override def next(): Seq[Parsing] = {
-      current match {
-        case Some(value) =>
-          val res = if (state.isCompleted) {
-            Seq(reduceState(state, value.next(), ambiguity))
-          } else {
-            value.next()
-          }
-          if (!value.hasNext) {
-            current = moveToNext(false)
-          }
-          res
-        case None        =>
-          throw new NoSuchElementException()
-      }
-    }
-
-    override def hasNext: Boolean = current match {
-      case Some(value) => value.hasNext || index.nonEmpty
-      case None        => false
-    }
   }
 }
