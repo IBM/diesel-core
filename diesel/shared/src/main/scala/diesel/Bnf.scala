@@ -1263,7 +1263,9 @@ object Bnf {
         task()
       }
       cleanGrammar()
-//      dumpGrammar()
+      if (System.getProperty("diesel.dumpbnf") == "true") {
+        dumpGrammar()
+      }
 
       rules.values.toSeq
     }
