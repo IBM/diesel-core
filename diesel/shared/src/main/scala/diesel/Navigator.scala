@@ -494,32 +494,30 @@ class Navigator(
     var i                           = state.production.length
     var styles: Seq[(Token, Style)] = Seq()
     var errors: Seq[Marker]         = Seq()
-    var index                       = stack
-    while (i > 0) {
-      val value = index.head
-      value.value match {
-        case InsertedTokenValue(_, _, _) => /* Ignore */
-        case item: TerminalItem          =>
-          children = value.node +: children
-          args = item.token +: args
-          item.style.foreach(s => styles = (item.token, s) +: styles)
-          i -= 1
-        case _                           =>
-          children = value.node +: children
-          args = value.value +: args
-          i -= 1
+    stack.foreach(arg => {
+      if (i > 0) {
+        arg.value match {
+          case InsertedTokenValue(_, _, _) => /* Ignore */
+          case item: TerminalItem          =>
+            children = arg.node +: children
+            args = item.token +: args
+            item.style.foreach(s => styles = (item.token, s) +: styles)
+            i -= 1
+          case _                           =>
+            children = arg.node +: children
+            args = arg.value +: args
+            i -= 1
+        }
+        errors = arg.markers ++ errors
+      } else {
+        arg.value match {
+          case InsertedTokenValue(_, _, _) =>
+            errors = arg.markers ++ errors
+          case _                           =>
+            throw new RuntimeException()
+        }
       }
-      errors = value.markers ++ errors
-      index = index.tail
-    }
-    index.foreach(value =>
-      value.value match {
-        case InsertedTokenValue(_, _, _) =>
-          errors = value.markers ++ errors
-        case _                           =>
-          throw new RuntimeException()
-      }
-    )
+    })
     val offset                      = result.tokenAt(state.begin).map(_.offset).getOrElse(-1)
     val length                      =
       if (state.begin == state.end) {
