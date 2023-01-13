@@ -17,6 +17,7 @@
 package diesel
 
 import diesel.Lexer.{RegexScanner, Scanner, Token}
+import diesel.voc.Article
 import diesel.i18n.DeclaringSourceName
 
 import scala.language.implicitConversions

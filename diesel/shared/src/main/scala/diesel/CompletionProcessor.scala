@@ -69,7 +69,7 @@ class CompletionProcessor(
 ) {
 
   def computeCompletionProposal(offset: Int): Seq[CompletionProposal] = {
-    val navigator = new Navigator(result, Seq(), userDataProvider)
+    val navigator = Navigator(result, userDataProvider)
     navigator.toIterator
       .toSeq
       .foldLeft(Seq.empty[CompletionProposal]) { case (acc, tree) =>

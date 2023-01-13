@@ -39,9 +39,9 @@ private[diesel] class ParsingContext(
   override def setUserData(key: Any, value: Any): Unit =
     userDataProvider.foreach(_.setUserData(key, value))
 
-  private var locals: Seq[Marker]              = Seq()
+  private var locals: Seq[Marker]              = Seq.empty
   private var style: Option[Style]             = None
-  private var tokenStyles: Seq[(Token, Style)] = Seq()
+  private var tokenStyles: Seq[(Token, Style)] = Seq.empty
   private var aborted: Boolean                 = children.exists(child => child.context.hasAborted)
 
   override def addMarkers(marker: Marker, markers: Marker*): Unit = {
@@ -168,7 +168,7 @@ abstract class GenericNode(var parent: Option[GenericNode], val context: Context
     buf.toString()
   }
 
-  def getChildren: Seq[GenericNode] = Seq()
+  def getChildren: Seq[GenericNode] = Seq.empty
 
   def toIterator(descendants: Boolean = false): Iterator[GenericNode] = {
     GenericTree.asIterator(getChildren, descendants)
@@ -278,7 +278,7 @@ class GenericTerminal(override val context: Context, val token: Token)
 private object GenericSentinel
     extends GenericNode(
       None,
-      new ParsingContext(None, -1, -1, 0, -1, None, Seq(), Seq()),
+      new ParsingContext(None, -1, -1, 0, -1, None, Seq.empty, Seq.empty),
       None
     ) {
 
@@ -291,13 +291,20 @@ object Navigator {
 
   def apply(
     result: Result,
+    userDataProvider: Option[UserDataProvider]
+  ): Navigator =
+    new Navigator(result, Seq.empty, Seq(Reducer.noAbortAsMushAsPossible), userDataProvider)
+
+  def apply(
+    result: Result,
     postProcessors: Seq[GenericTree => Seq[Marker]] = Seq.empty,
+    reducer: Seq[GenericNode => Reducer] = Seq(Reducer.noAbortAsMushAsPossible),
     userDataProvider: Option[UserDataProvider] = None
   ): Navigator =
-    new Navigator(result, postProcessors, userDataProvider)
+    new Navigator(result, postProcessors, reducer, userDataProvider)
 
   def select(navigator: Navigator): Option[GenericTree] = {
-    var asts: Seq[GenericTree] = Seq()
+    var asts: Seq[GenericTree] = Seq.empty
     var errorCount: Int        = Int.MaxValue
     while (navigator.hasNext) {
       val candidate: GenericTree = navigator.next()
@@ -314,7 +321,7 @@ object Navigator {
     }
     if (errorCount == 0 && asts.size > 1) {
       val ast                 = asts.head
-      var errors: Seq[Marker] = Seq()
+      var errors: Seq[Marker] = Seq.empty
       ast.toSeq.foreach(node =>
         if (node.hasAmbiguity)
           errors = errors ++ Seq(Ambiguous.apply(node.offset, node.length))
@@ -335,11 +342,62 @@ object Navigator {
 
     private[diesel] def ambiguous: Boolean = branchCount - abortedBranchCount > 1
   }
+
+  type Filter = Seq[GenericNode] => Seq[GenericNode]
+}
+
+trait Reducer {
+
+  def node: GenericNode
+
+  def compare(node: GenericNode): (Reducer.Kind.Kind, Reducer)
+}
+
+object Reducer {
+
+  object Kind extends Enumeration {
+    type Kind = Value
+    val Better, Same, Worse = Value
+  }
+
+  case class FewerErrorPossible(override val node: GenericNode) extends Reducer {
+
+    private val errorCount = Marker.countErrors(node.context.markers)
+
+    override def compare(node: GenericNode): (Reducer.Kind.Kind, Reducer) = {
+      val other = FewerErrorPossible(node)
+      if (other.errorCount < this.errorCount) {
+        (Reducer.Kind.Better, other)
+      } else if (other.errorCount > this.errorCount) {
+        (Reducer.Kind.Worse, this)
+      } else {
+        (Reducer.Kind.Same, this)
+      }
+    }
+  }
+
+  case class NoAbortAsMushAsPossible(override val node: GenericNode) extends Reducer {
+
+    override def compare(node: GenericNode): (Reducer.Kind.Kind, Reducer) = {
+      val other = NoAbortAsMushAsPossible(node)
+      if (this.node.context.hasAborted) {
+        (Reducer.Kind.Better, other)
+      } else if (other.node.context.hasAborted) {
+        (Reducer.Kind.Worse, this)
+      } else {
+        (Reducer.Kind.Same, other)
+      }
+    }
+  }
+
+  def noAbortAsMushAsPossible: GenericNode => Reducer =
+    (node: GenericNode) => NoAbortAsMushAsPossible(node)
 }
 
 class Navigator(
   val result: Result,
   val postProcessors: Seq[GenericTree => Seq[Marker]],
+  val reducer: Seq[GenericNode => Reducer],
   private val userDataProvider: Option[UserDataProvider]
 ) {
 
@@ -358,7 +416,7 @@ class Navigator(
         current.markers ++ result.reportErrors()
       )
     if (postProcessors.nonEmpty) {
-      var markers: Seq[Marker] = Seq()
+      var markers: Seq[Marker] = Seq.empty
       postProcessors.foreach(pp => markers = markers ++ pp(tree))
       tree = GenericTree(tree.root, tree.value, tree.offset, tree.length, tree.markers ++ markers)
     }
@@ -375,9 +433,9 @@ class Navigator(
   }
 
   private def backPtrsOf(state: State): Seq[BackPtr] =
-    result.contextOf(state).fold[Seq[BackPtr]](Seq())(ctx => ctx.backPtrs.toSeq)
+    result.contextOf(state).fold[Seq[BackPtr]](Seq.empty)(ctx => ctx.backPtrs.toSeq)
 
-  private def sentinel(): Iterator[Seq[Parsing]] = Seq(Seq()).iterator
+  private def sentinel(): Iterator[Seq[Parsing]] = Seq(Seq.empty).iterator
 
   private def terminal(item: TerminalItem): Iterator[Seq[Parsing]] =
     singleton(applyToken(item))
@@ -394,7 +452,7 @@ class Navigator(
   private def nonTerminal(state: State): Iterator[Seq[Parsing]] = {
     val backPtrs: Seq[BackPtr] = backPtrsOf(state)
     if (backPtrs.isEmpty) {
-      if (state.isCompleted) singleton(reduceState(state, Seq(), None))
+      if (state.isCompleted) singleton(reduceState(state, Seq.empty, None))
       else sentinel()
     } else {
       val subtrees = backPtrs.map(backPtr =>
@@ -416,15 +474,34 @@ class Navigator(
   }
 
   private def filterSubtrees(state: State, value: Iterator[Seq[Parsing]]): Seq[Seq[Parsing]] = {
-    var subtrees: Seq[Seq[Parsing]] = Seq()
-    value.foreach(subtree =>
-      if (
-        state.production.isEmpty || !subtree.head.node.context.hasAborted || (subtrees.isEmpty && !value.hasNext)
-      ) {
-        subtrees = subtrees :+ subtree
-      }
-    )
+    var subtrees: Seq[Seq[Parsing]] = value.toSeq
+    if (subtrees.nonEmpty) {
+      reducer.foreach(r => {
+        subtrees = reduceSubtrees(state, subtrees, r)
+      })
+    }
     subtrees
+  }
+
+  private def reduceSubtrees(
+    state: State,
+    subtrees: Seq[Seq[Parsing]],
+    reducer: GenericNode => Reducer
+  ): Seq[Seq[Parsing]] = {
+    var reduced: Seq[Seq[Parsing]] = Seq(subtrees.head)
+    var ctx                        = reducer(reduced.head.head.node)
+    subtrees.tail.foreach(subtree => {
+      val (kind, newCtx) = ctx.compare(subtree.head.node)
+      kind match {
+        case Reducer.Kind.Better =>
+          reduced = Seq(subtree)
+        case Reducer.Kind.Same   =>
+          reduced = reduced :+ subtree
+        case Reducer.Kind.Worse  =>
+      }
+      ctx = newCtx
+    })
+    reduced
   }
 
   private def applyToken(terminal: TerminalItem): Parsing = {
@@ -439,7 +516,7 @@ class Navigator(
         token.text.length,
         None,
         terminal.reportErrors(),
-        Seq()
+        Seq.empty
       ),
       token
     )
@@ -489,11 +566,11 @@ class Navigator(
     stack: Seq[Parsing],
     ambiguity: Option[Ambiguity]
   ): Parsing = {
-    var children: Seq[GenericNode]  = IndexedSeq()
-    var args: IndexedSeq[Any]       = IndexedSeq()
+    var children: Seq[GenericNode]  = IndexedSeq.empty
+    var args: IndexedSeq[Any]       = IndexedSeq.empty
     var i                           = state.production.length
-    var styles: Seq[(Token, Style)] = Seq()
-    var errors: Seq[Marker]         = Seq()
+    var styles: Seq[(Token, Style)] = Seq.empty
+    var errors: Seq[Marker]         = Seq.empty
     stack.foreach(arg => {
       if (i > 0) {
         arg.value match {
@@ -544,12 +621,12 @@ class Navigator(
     predecessor: State
   ) extends Iterator[Seq[Parsing]] {
 
-    private var current      = if (causal.hasNext) causal.next() else Seq()
+    private var current      = if (causal.hasNext) causal.next() else Seq.empty
     private var predIterator = nonTerminal(predecessor)
     private var finished     = false
 
     override def next(): Seq[Parsing] = {
-      if (!predIterator.hasNext && finished) {
+      if (finished) {
         throw new NoSuchElementException()
       }
       val result = current ++ predIterator.next()
