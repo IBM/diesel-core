@@ -58,7 +58,7 @@ trait Context extends UserDataProvider {
 
   def getTokenStyles: Seq[(Token, Style)]
 
-  def abort(): Boolean
+  def abort(): Unit
 
   def hasAborted: Boolean
 

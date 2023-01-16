@@ -100,7 +100,7 @@ class CompletionProcessor(
                     )
                     .toSeq
                 }
-                val element: Option[DslElement]         = state.production.element
+                val element: Option[DslElement]         = state.production.getElement
                 element
                   .filter(_ => state.dot == 0)
                   .flatMap { elem => config.flatMap(_.getProvider(elem)) }

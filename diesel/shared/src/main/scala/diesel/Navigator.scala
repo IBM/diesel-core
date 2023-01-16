@@ -64,12 +64,8 @@ private[diesel] class ParsingContext(
 
   override def hasAborted: Boolean = aborted
 
-  override def abort(): Boolean = {
-    if (!aborted) {
-      ambiguity.foreach(_.abort())
-      aborted = true
-    }
-    aborted
+  override def abort(): Unit = {
+    aborted = true
   }
 }
 
@@ -244,12 +240,13 @@ class GenericNonTerminal(
   override def getChildren: Seq[GenericNode] = children
 
   override def hasAmbiguity: Boolean =
-    getChildren.exists(child =>
-      child.context match {
-        case parsingCtx: ParsingContext => parsingCtx.ambiguity.isDefined
-        case _                          => false
-      }
-    )
+    context match {
+      case c: ParsingContext => c.ambiguity match {
+          case Some(a) => a.ambiguous
+          case None    => false
+        }
+      case _                 => false
+    }
 
   private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder = {
     // TODO useful for debugging?
@@ -340,7 +337,8 @@ object Navigator {
 
     private[diesel] def abort(count: Int): Unit = abortedBranchCount += count
 
-    private[diesel] def ambiguous: Boolean = branchCount - abortedBranchCount > 1
+    private[diesel] def ambiguous: Boolean =
+      branchCount - abortedBranchCount > 1
   }
 
   type Filter = Seq[GenericNode] => Seq[GenericNode]
@@ -375,6 +373,9 @@ object Reducer {
       }
     }
   }
+
+  def fewerErrorPossible: GenericNode => Reducer =
+    (node: GenericNode) => FewerErrorPossible(node)
 
   case class NoAbortAsMushAsPossible(override val node: GenericNode) extends Reducer {
 
@@ -465,20 +466,39 @@ class Navigator(
         )
       ).reduce(_ ++ _)
       if (state.isCompleted) {
-        val ambiguity: Option[Ambiguity] =
-          if (backPtrs.size > 1) Some(new Ambiguity(backPtrs.size)) else None
-        filterSubtrees(state, subtrees.map(s => Seq(reduceState(state, s, ambiguity)))).iterator
+        val candidates = subtrees.toSeq
+        if (candidates.size > 1 && state.production.isDslElement) {
+          val ambiguity = Some(new Ambiguity(candidates.size))
+          filterSubtrees(
+            state,
+            candidates.map(s => Seq(reduceState(state, s, ambiguity))),
+            ambiguity
+          ).iterator
+        } else
+          candidates.map(s => Seq(reduceState(state, s, None))).iterator
       } else
         subtrees
     }
   }
 
-  private def filterSubtrees(state: State, value: Iterator[Seq[Parsing]]): Seq[Seq[Parsing]] = {
-    var subtrees: Seq[Seq[Parsing]] = value.toSeq
+  private def filterSubtrees(
+    state: State,
+    candidates: Seq[Seq[Parsing]],
+    ambiguity: Option[Ambiguity]
+  ): Seq[Seq[Parsing]] = {
+    var subtrees: Seq[Seq[Parsing]] = candidates
     if (subtrees.nonEmpty) {
+      val branchCount = subtrees.size
       reducer.foreach(r => {
         subtrees = reduceSubtrees(state, subtrees, r)
       })
+      if (subtrees.size < branchCount) {
+        ambiguity match {
+          case Some(value) =>
+            value.abort(branchCount - subtrees.size)
+          case None        =>
+        }
+      }
     }
     subtrees
   }
