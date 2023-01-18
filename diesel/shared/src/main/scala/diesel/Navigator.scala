@@ -272,18 +272,6 @@ class GenericTerminal(override val context: Context, val token: Token)
   }
 }
 
-private object GenericSentinel
-    extends GenericNode(
-      None,
-      new ParsingContext(None, -1, -1, 0, -1, None, Seq.empty, Seq.empty),
-      None
-    ) {
-
-  private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder = {
-    buf.append("Sentinel()")
-  }
-}
-
 object Navigator {
 
   def apply(
@@ -398,7 +386,7 @@ object Reducer {
 class Navigator(
   val result: Result,
   val postProcessors: Seq[GenericTree => Seq[Marker]],
-  val reducer: Seq[GenericNode => Reducer],
+  val reducers: Seq[GenericNode => Reducer],
   private val userDataProvider: Option[UserDataProvider]
 ) {
 
@@ -470,7 +458,6 @@ class Navigator(
         if (candidates.size > 1 && state.production.isDslElement) {
           val ambiguity = Some(new Ambiguity(candidates.size))
           filterSubtrees(
-            state,
             candidates.map(s => Seq(reduceState(state, s, ambiguity))),
             ambiguity
           ).iterator
@@ -482,16 +469,13 @@ class Navigator(
   }
 
   private def filterSubtrees(
-    state: State,
     candidates: Seq[Seq[Parsing]],
     ambiguity: Option[Ambiguity]
   ): Seq[Seq[Parsing]] = {
     var subtrees: Seq[Seq[Parsing]] = candidates
     if (subtrees.nonEmpty) {
       val branchCount = subtrees.size
-      reducer.foreach(r => {
-        subtrees = reduceSubtrees(state, subtrees, r)
-      })
+      subtrees = reducers.foldLeft(subtrees)((acc, r) => reduceSubtrees(acc, r))
       if (subtrees.size < branchCount) {
         ambiguity match {
           case Some(value) =>
@@ -504,7 +488,6 @@ class Navigator(
   }
 
   private def reduceSubtrees(
-    state: State,
     subtrees: Seq[Seq[Parsing]],
     reducer: GenericNode => Reducer
   ): Seq[Seq[Parsing]] = {
