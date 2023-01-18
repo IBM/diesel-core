@@ -104,6 +104,7 @@ object Dsl {
   }
 
   trait Applicable[+T] {
+    // TODO Any => Product
     def applyDynamic(context: Context, args: Any): T
   }
 
@@ -654,8 +655,10 @@ object Dsl {
       with SPOrable[Seq[T]] {
 
     override def applyDynamic(context: Context, args: Any): Seq[T] = {
-      // the sequence comes in as a looong tuple
-      val vs = args.asInstanceOf[Product].productIterator.toSeq
+      val vs = args match {
+        case tuple: Product => tuple.productIterator.toSeq
+        case vs: Seq[Any]   => vs
+      }
       es.zip(vs).map { case (e, v) => e.applyDynamic(context, v) }
     }
   }

@@ -463,6 +463,16 @@ object Bnf {
             element,
             partial.feature
           )
+        case _                            =>
+          rule >> new Production(
+            Some(rule),
+            symbols,
+            { (context, args) =>
+              applicable.applyDynamic(context, args)
+            },
+            element,
+            partial.feature
+          )
       }
     }
 
