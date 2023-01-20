@@ -278,12 +278,12 @@ object Navigator {
     result: Result,
     userDataProvider: Option[UserDataProvider]
   ): Navigator =
-    new Navigator(result, Seq.empty, Seq(Reducer.noAbortAsMushAsPossible), userDataProvider)
+    new Navigator(result, Seq.empty, Seq(Reducer.noAbortAsMuchAsPossible), userDataProvider)
 
   def apply(
     result: Result,
     postProcessors: Seq[GenericTree => Seq[Marker]] = Seq.empty,
-    reducer: Seq[GenericNode => Reducer] = Seq(Reducer.noAbortAsMushAsPossible),
+    reducer: Seq[GenericNode => Reducer] = Seq(Reducer.noAbortAsMuchAsPossible),
     userDataProvider: Option[UserDataProvider] = None
   ): Navigator =
     new Navigator(result, postProcessors, reducer, userDataProvider)
@@ -379,7 +379,7 @@ object Reducer {
     }
   }
 
-  def noAbortAsMushAsPossible: GenericNode => Reducer =
+  def noAbortAsMuchAsPossible: GenericNode => Reducer =
     (node: GenericNode) => NoAbortAsMushAsPossible(node)
 }
 
