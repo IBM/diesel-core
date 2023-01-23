@@ -1,7 +1,6 @@
 package diesel
 
-import diesel.Dsl.{Axiom, Concept, Identifiers, Instance, Syntax}
-import diesel.Lexer.Scanner
+import diesel.Dsl.{Axiom, Concept, Instance, Syntax}
 import munit.FunSuite
 
 class NestedRepTest extends FunSuite {
@@ -34,17 +33,11 @@ class NestedRepTest extends FunSuite {
     sealed trait Value
     case object VNull             extends Value
     case class VNumber(v: String) extends Value
-
-    sealed trait BooleanLiteral extends Value
-    case object BTrue           extends BooleanLiteral
-    case object BFalse          extends BooleanLiteral
   }
 
   import NestedAst._
 
-  object NestedDsl extends Dsl with Identifiers {
-
-    override def identScanner: Scanner = "[a-zA-Z][a-zA-Z0-9]*".r
+  object NestedDsl extends Dsl {
 
     val cExpression: Concept[Expression]     = concept
     val cAndCondition: Concept[AndCondition] = concept
@@ -139,21 +132,6 @@ class NestedRepTest extends FunSuite {
           TValue(v)
       }
     )
-
-    val sTerm2: Syntax[Term] = syntax(cTerm)(
-      id map {
-        case (_, v) =>
-          TColumnName(v.text)
-      }
-    )
-
-    val iValueTrueTrue: Instance[Value] = instance(cValue)("TRUE") map { _ => BTrue }
-
-    val iValueTrueFalse: Instance[Value] = instance(cValue)("FALSE") map { _ => BFalse }
-
-    val iValueNull: Instance[Value] = instance(cValue)("NULL") map { _ => VNull }
-
-    val aValue: Axiom[Value] = axiom(cValue)
 
     val aExpression: Axiom[Expression] = axiom(cExpression)
 
