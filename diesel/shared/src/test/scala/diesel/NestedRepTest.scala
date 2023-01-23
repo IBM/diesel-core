@@ -57,7 +57,7 @@ class NestedRepTest extends FunSuite {
       case (_, t) =>
         VNumber(t.text)
     }
-
+//
 //    val sExpression1: Syntax[Expression] = syntax(cExpression)(
 //      cAndCondition map {
 //        case (_, (a)) =>
