@@ -65,7 +65,14 @@ class NestedRepTest extends FunSuite {
         VNumber(t.text)
     }
 
-    val sExpression: Syntax[Expression] = syntax(cExpression)(
+//    val sExpression1: Syntax[Expression] = syntax(cExpression)(
+//      cAndCondition map {
+//        case (_, (a)) =>
+//          Expression(a, Seq.empty)
+//      }
+//    )
+
+    val sExpression2: Syntax[Expression] = syntax(cExpression)(
       cAndCondition ~ ("OR" ~ cAndCondition).rep(true) map {
         case (_, (a, as)) =>
           Expression(a, as.map(_._2))
@@ -196,7 +203,39 @@ class NestedRepTest extends FunSuite {
       assertEquals(tree.markers, Seq.empty)
       assertEquals(
         tree.value,
-        1
+        Expression(
+          ac = AndCondition(conditions =
+            List(
+              CNot(e =
+                Expression(
+                  ac = AndCondition(conditions =
+                    List(
+                      COpCompOp(
+                        o = Operand(
+                          sa = Summand(
+                            f = Factor(
+                              f = TValue(v =
+                                VNumber(v =
+                                  "123"
+                                )
+                              ),
+                              rest = Nil
+                            ),
+                            rest = Nil
+                          ),
+                          rest = Nil
+                        ),
+                        rest = None
+                      )
+                    )
+                  ),
+                  rest = Nil
+                )
+              )
+            )
+          ),
+          rest = Nil
+        )
       )
     }
   }
@@ -263,7 +302,74 @@ class NestedRepTest extends FunSuite {
       assertEquals(tree.markers, Seq.empty)
       assertEquals(
         tree.value,
-        1
+        Expression(
+          AndCondition(List(CNot(Expression(
+            AndCondition(List(COpCompOp(
+              Operand(Summand(Factor(TValue(VNumber("1")), List()), List()), List()),
+              Some((CLtEq, Operand(Summand(Factor(TValue(VNumber("2")), List()), List()), List())))
+            ))),
+            List()
+          )))),
+          List()
+        )
+      )
+    }
+  }
+
+  test("expr 3") {
+    AstHelpers.assertAst(
+      NestedDsl,
+      Some(NestedDsl.aExpression)
+    )("1 OR 2") { tree =>
+      assertEquals(tree.markers, Seq.empty)
+      assertEquals(
+        tree.value,
+        Expression(
+          ac = AndCondition(conditions =
+            List(
+              COpCompOp(
+                o = Operand(
+                  sa = Summand(
+                    f = Factor(
+                      f = TValue(v =
+                        VNumber(v =
+                          "1"
+                        )
+                      ),
+                      rest = Nil
+                    ),
+                    rest = Nil
+                  ),
+                  rest = Nil
+                ),
+                rest = None
+              )
+            )
+          ),
+          rest = List(
+            AndCondition(conditions =
+              List(
+                COpCompOp(
+                  o = Operand(
+                    sa = Summand(
+                      f = Factor(
+                        f = TValue(v =
+                          VNumber(v =
+                            "2"
+                          )
+                        ),
+                        rest = Nil
+                      ),
+                      rest = Nil
+                    ),
+                    rest = Nil
+                  ),
+                  rest = None
+                )
+              )
+            )
+          )
+        )
       )
     }
   }
