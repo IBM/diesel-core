@@ -125,31 +125,42 @@ object Dsl {
     val production: SyntaxProduction[T]
   }
 
-  case class SyntaxUntyped[T](name: String, production: SyntaxProduction[_ <: T]) extends Syntax[T]
+  case class SyntaxUntyped[T](
+    name: String,
+    production: SyntaxProduction[_ <: T],
+    userData: Option[Any] = None
+  ) extends Syntax[T] {
+    def setUserData(d: Option[Any]): SyntaxUntyped[T] = copy(userData = d)
+  }
 
   case class SyntaxTyped[T](
     name: String,
     concept: Concept[T],
     expression: Boolean,
-    production: SyntaxProduction[_ <: T]
+    production: SyntaxProduction[_ <: T],
+    userData: Option[Any] = None
   ) extends Syntax[T]
       with SyntaxTypedBase {
-    override def multiple: Boolean = false
+    override def multiple: Boolean                  = false
+    def setUserData(d: Option[Any]): SyntaxTyped[T] = copy(userData = d)
   }
 
   case class SyntaxMulti[T, T2](
     name: String,
     concept: Concept[T],
-    production: SyntaxProduction[_ <: T2]
+    production: SyntaxProduction[_ <: T2],
+    userData: Option[Any] = None
   ) extends Syntax[T2]
       with SyntaxTypedBase {
-    override def multiple: Boolean = true
+    override def multiple: Boolean                      = true
+    def setUserData(d: Option[Any]): SyntaxMulti[T, T2] = copy(userData = d)
   }
 
-  case class SyntaxGeneric[T: ClassTag](
+  case class SyntaxGeneric[T](
     override val name: String,
     accept: (Concept[T], Expressions.Types, Dsl) => Boolean,
-    syntaxOf: Concept[T] => SyntaxTyped[T]
+    syntaxOf: Concept[T] => SyntaxTyped[T],
+    userData: Option[Any] = None
   )(implicit tag: ClassTag[T])
       extends SyntaxBase {
     def apply(
@@ -164,12 +175,14 @@ object Dsl {
           consumer(syntaxOf(c))
       }
     }
+    def setUserData(d: Option[Any]): SyntaxGeneric[T] = copy(userData = d)
   }
 
-  case class SyntaxGenericMulti[T: ClassTag, T2](
+  case class SyntaxGenericMulti[T, T2](
     override val name: String,
     accept: (Concept[T], Expressions.Types, Dsl) => Boolean,
-    syntaxOf: Concept[T] => SyntaxMulti[T, T2]
+    syntaxOf: Concept[T] => SyntaxMulti[T, T2],
+    userData: Option[Any] = None
   )(implicit tag: ClassTag[T])
       extends SyntaxBase {
     def apply(
@@ -183,6 +196,8 @@ object Dsl {
         if (accept(c, exprTypes, dsl))
           consumer(syntaxOf(c))
       }
+
+    def setUserData(d: Option[Any]): SyntaxGenericMulti[T, T2] = copy(userData = d)
   }
 
   sealed trait SyntaxProduction[+T] extends Applicable[T] {
