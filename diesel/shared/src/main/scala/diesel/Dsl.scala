@@ -146,7 +146,7 @@ object Dsl {
     override def multiple: Boolean = true
   }
 
-  trait SyntaxGenericBase[T] {
+  trait SyntaxGenericBase {
     val name: String
   }
 
@@ -155,7 +155,7 @@ object Dsl {
     accept: (Concept[T], Expressions.Types, Dsl) => Boolean,
     syntaxOf: Concept[T] => SyntaxTyped[T]
   )(implicit tag: ClassTag[T])
-      extends SyntaxGenericBase[T] {
+      extends SyntaxGenericBase {
     def apply(
       concept: Concept[_],
       exprTypes: Expressions.Types,
@@ -175,7 +175,7 @@ object Dsl {
     accept: (Concept[T], Expressions.Types, Dsl) => Boolean,
     syntaxOf: Concept[T] => SyntaxMulti[T, T2]
   )(implicit tag: ClassTag[T])
-      extends SyntaxGenericBase[T] {
+      extends SyntaxGenericBase {
     def apply(
       concept: Concept[_],
       exprTypes: Expressions.Types,
@@ -734,17 +734,17 @@ trait Dsl {
     override def toString: String = "default"
   }
 
-  private var concepts: Seq[ConceptBase]                 = Seq()
-  private var instances: Seq[InstanceBase]               = Seq()
-  private var syntaxes: Seq[Syntax[_]]                   = Seq()
-  private var genericSyntaxes: Seq[SyntaxGenericBase[_]] = Seq()
-  private var axioms: Seq[AxiomBase]                     = Seq()
-  private var inheritances: Seq[Inheritance]             = Seq()
+  private var concepts: Seq[ConceptBase]              = Seq()
+  private var instances: Seq[InstanceBase]            = Seq()
+  private var syntaxes: Seq[Syntax[_]]                = Seq()
+  private var genericSyntaxes: Seq[SyntaxGenericBase] = Seq()
+  private var axioms: Seq[AxiomBase]                  = Seq()
+  private var inheritances: Seq[Inheritance]          = Seq()
 
   def getConcepts: Seq[ConceptBase]                        = concepts
   def getInstances: Seq[InstanceBase]                      = instances
   def getSyntaxes: Seq[Syntax[_]]                          = syntaxes
-  def getGenericSyntaxes: Seq[SyntaxGenericBase[_]]        = genericSyntaxes
+  def getGenericSyntaxes: Seq[SyntaxGenericBase]           = genericSyntaxes
   def getAxioms: Seq[AxiomBase]                            = axioms
   def getConcept(name: String): Option[ConceptBase]        =
     concepts.find(c => name == c.name)
@@ -877,7 +877,7 @@ trait Dsl {
     addSyntax(SyntaxMulti(name.name, concept, production)).asInstanceOf[SyntaxMulti[T, T2]]
   }
 
-  private def addGenericSyntax[T](syntax: SyntaxGenericBase[T]): SyntaxGenericBase[T] = {
+  private def addGenericSyntax(syntax: SyntaxGenericBase): SyntaxGenericBase = {
     genericSyntaxes ++= Seq(syntax)
     syntax
   }
