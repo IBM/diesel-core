@@ -1285,7 +1285,11 @@ object Bnf {
 
   def apply[T](dsl: Dsl): Bnf = {
     val rules: Seq[NonTerminal] = computeRules(dsl)
-    Bnf(Lexer(dsl, rules), rules)
+    val bnf                     = Bnf(Lexer(dsl, rules), rules)
+    Option(System.getProperty("diesel.dumpbnf.html")) foreach { path =>
+      BnfHtml.dump(bnf, path)
+    }
+    bnf
   }
 
 }
