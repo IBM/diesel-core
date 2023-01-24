@@ -114,6 +114,7 @@ object Dsl {
 
   trait SyntaxBase {
     def name: String
+    def userData: Option[Any]
   }
 
   trait SyntaxTypedBase extends SyntaxBase {
