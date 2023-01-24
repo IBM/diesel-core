@@ -2,13 +2,11 @@ package diesel
 
 import diesel.Bnf.{Axiom, Rule}
 
-import java.io.PrintStream
-
 object BnfHtml {
 
   def dump(bnf: Bnf, path: String): Unit = {
-    Console.withOut(new PrintStream(path)) {
-      BnfHtml.dump(bnf)
+    Platform.consoleWithFile(path) {
+      dump(bnf)
     }
   }
 
