@@ -150,14 +150,14 @@ class BmdDslPredictionTest extends FunSuite {
       11,
       Seq(
         "concept",
+        "Bar",
+        "Gnu",
         "has",
         "can be",
         "is a",
-        "Bar",
-        "Gnu",
         "can be one of",
         "."
-      ) // TODO previous Seq("concept", "Bar", "Gnu")
+      )
     )
   }
 
@@ -181,12 +181,12 @@ class BmdDslPredictionTest extends FunSuite {
       17 + 19 + 2 + 11,
       Seq(
         "concept",
+        "Foo",
         "has",
         "can be",
         "is a",
-        "Foo",
         "can be one of"
-      ) // TODO previous: Seq("concept", "Foo")
+      )
     )
   }
 

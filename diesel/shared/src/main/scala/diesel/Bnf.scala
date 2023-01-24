@@ -897,9 +897,9 @@ object Bnf {
             )
           addProduction(
             repRule,
-            Partial(Seq(repRule) ++ Seq(itemRule)),
-            { (c, args) =>
-              args.head.asInstanceOf[Seq[Any]] ++ Seq(args.tail.head)
+            Partial(Seq(itemRule) ++ Seq(repRule)),
+            { (_, args) =>
+              Seq(args.head) ++ args.tail.head.asInstanceOf[Seq[Any]]
             }
           )
           if (zeroIncluded)
