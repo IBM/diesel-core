@@ -32,12 +32,14 @@ class GenericSyntaxTest extends DslTestFunSuite {
       Left(t.text.toIntOption.getOrElse(0)).withRight[String]
     )
 
-    val sGenericList: SyntaxGenericMulti[Result, MyList[Result]] =
-      genericSyntaxMultiple[Result, MyList[Result]]((typeParam: Concept[Result]) => {
-        ("[" ~ typeParam.rep(true) ~ "]") map {
-          case (_, (_, items, _)) => MyList(items)
-        }
-      })
+    val sGenericList: SyntaxGenericMulti[Result, MyList[Result]] = {
+      syntaxGeneric[Result]
+        .multi[MyList[Result]]((typeParam: Concept[Result]) => {
+          ("[" ~ typeParam.rep(true) ~ "]") map {
+            case (_, (_, items, _)) => MyList(items)
+          }
+        })
+    }
 
     val sSum: Syntax[Result] = syntax(number)(
       "sum" ~ number.multiple[MyList[Result]] map {
