@@ -36,19 +36,23 @@ class CardinalityInDslTest extends FunSuite {
         AInt(t.text.toInt)
     }
 
-    val primeNumbers: Syntax[AstNodeMulti] = syntaxMultiple(number)(
-      "prime" ~ number map {
-        case (_, (_, i)) =>
-          APrime(i)
-      }
-    )
+    val primeNumbers: Syntax[AstNodeMulti] = syntax
+      .typed(number)
+      .multi[AstNodeMulti](
+        "prime" ~ number map {
+          case (_, (_, i)) =>
+            APrime(i)
+        }
+      )
 
-    val firstK: Syntax[AstNodeMulti] = syntaxMultiple(number)(
-      "firstK" ~ number ~ "," ~ number.multiple[AstNodeMulti] map {
-        case (_, (_, n, _, n2)) =>
-          AFirstK(n, n2)
-      }
-    )
+    val firstK: Syntax[AstNodeMulti] = syntax
+      .typed(number)
+      .multi[AstNodeMulti](
+        "firstK" ~ number ~ "," ~ number.multiple[AstNodeMulti] map {
+          case (_, (_, n, _, n2)) =>
+            AFirstK(n, n2)
+        }
+      )
 
     val lengthOf: Syntax[AstNodeSingle] = syntax(number)(
       "length" ~ "of" ~ number /*.article(DefiniteArticle)*/ .multiple[AstNodeMulti] map {
