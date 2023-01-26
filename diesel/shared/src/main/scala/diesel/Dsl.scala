@@ -113,6 +113,7 @@ object Dsl {
 
   sealed trait Syntax[T] extends SyntaxBase {
     val production: SyntaxProduction[T]
+    val userData: Option[Any]
   }
 
   case class SyntaxUntyped[T](
