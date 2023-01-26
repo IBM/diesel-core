@@ -837,9 +837,9 @@ object Bnf {
 
         case SPRuleRef(syntax) =>
           val newCtx = syntax match {
-            case SyntaxTyped(_, concept, _, _) => ctx.derive(concept, multiple = false)
-            case SyntaxMulti(_, concept, _)    => ctx.derive(concept, multiple = true)
-            case _                             => ctx
+            case SyntaxTyped(_, concept, _, _, _) => ctx.derive(concept, multiple = false)
+            case SyntaxMulti(_, concept, _, _)    => ctx.derive(concept, multiple = true)
+            case _                                => ctx
           }
           val item   = getOrCreateRuleWithContext("syntax", newCtx, syntax.name)
           forwardGeneration(item, () => generateSyntax(syntax, item, newCtx))
@@ -848,9 +848,9 @@ object Bnf {
         case SPLazyRuleRef(_, r) =>
           val syntax = r()
           val newCtx = syntax match {
-            case SyntaxTyped(_, concept, _, _) => ctx.derive(concept, multiple = false)
-            case SyntaxMulti(_, concept, _)    => ctx.derive(concept, multiple = true)
-            case _                             => ctx
+            case SyntaxTyped(_, concept, _, _, _) => ctx.derive(concept, multiple = false)
+            case SyntaxMulti(_, concept, _, _)    => ctx.derive(concept, multiple = true)
+            case _                                => ctx
           }
           val item   = getOrCreateRuleWithContext("syntax", newCtx, syntax.name)
           forwardGeneration(item, () => generateSyntax(syntax, item, newCtx))
