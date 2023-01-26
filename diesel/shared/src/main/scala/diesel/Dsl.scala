@@ -144,7 +144,7 @@ object Dsl {
 
   case class SyntaxGeneric[T](
     override val name: String,
-    accept: (Concept[T], Expressions.Types, Dsl) => Boolean,
+    accept: Option[(Concept[T], Expressions.Types, Dsl) => Boolean],
     syntaxOf: Concept[T] => SyntaxTyped[T]
   )(implicit tag: ClassTag[T])
       extends SyntaxBase {
@@ -156,7 +156,7 @@ object Dsl {
     ): Unit = {
       if (concept.typeOf == tag) {
         val c = concept.asInstanceOf[Concept[T]]
-        if (accept(c, exprTypes, dsl))
+        if (accept.forall(_.apply(c, exprTypes, dsl)))
           consumer(syntaxOf(c))
       }
     }
@@ -164,7 +164,7 @@ object Dsl {
 
   case class SyntaxGenericMulti[T, T2](
     override val name: String,
-    accept: (Concept[T], Expressions.Types, Dsl) => Boolean,
+    accept: Option[(Concept[T], Expressions.Types, Dsl) => Boolean],
     syntaxOf: Concept[T] => SyntaxMulti[T, T2],
     userData: Option[Any] = None
   )(implicit tag: ClassTag[T])
@@ -177,7 +177,7 @@ object Dsl {
     ): Unit =
       if (concept.typeOf == tag) {
         val c = concept.asInstanceOf[Concept[T]]
-        if (accept(c, exprTypes, dsl))
+        if (accept.forall(_.apply(c, exprTypes, dsl)))
           consumer(syntaxOf(c))
       }
 
@@ -891,85 +891,81 @@ trait Dsl {
     name: String,
     concept: Concept[T],
     expression: Boolean = true,
-    userData: Option[Any] = None
+    userData: Option[Any] = None,
+    private val _doNotAdd: Boolean = false
   ) {
+    private[Dsl] def doNotAdd(): TypedSyntaxBuilder[T] = copy(_doNotAdd = true)
 
-    def apply(production: SyntaxProduction[T]): Syntax[T] =
-      addSyntax(SyntaxTyped(name, concept, expression, production, userData))
+    def apply(production: SyntaxProduction[T]): SyntaxTyped[T] = {
+      val syntax = SyntaxTyped(name, concept, expression, production, userData)
+      if (_doNotAdd) syntax else addSyntax(syntax)
+    }
 
     def expression(b: Boolean): TypedSyntaxBuilder[T] = copy(expression = b)
 
     def userData(x: Any): TypedSyntaxBuilder[T] = copy(userData = Some(x))
 
     def multi[T2]: SyntaxMultipleBuilder[T, T2] =
-      SyntaxMultipleBuilder(name, userData, concept)
+      SyntaxMultipleBuilder(name, userData, concept, _doNotAdd)
 
   }
 
   case class SyntaxMultipleBuilder[T, T2](
     name: String,
-    userData: Option[Any],
-    concept: Concept[T]
+    _userData: Option[Any],
+    concept: Concept[T],
+    private val _doNotAdd: Boolean = false
   ) {
+    private[Dsl] def doNotAdd(): SyntaxMultipleBuilder[T, T2] = copy(_doNotAdd = true)
 
-    def apply(production: SyntaxProduction[T2]): Syntax[T2] =
-      addSyntax(SyntaxMulti(name, concept, production, userData))
+    def userData(x: Any): SyntaxMultipleBuilder[T, T2] = copy(_userData = Some(x))
+
+    def apply(production: SyntaxProduction[T2]): SyntaxMulti[T, T2] = {
+      val syntax = SyntaxMulti(name, concept, production, _userData)
+      if (_doNotAdd) syntax else addSyntax(syntax)
+    }
 
   }
 
   case class SyntaxGenericBuilder[T: ClassTag](
     name: String,
-    _userData: Option[Concept[T] => Option[Any]] = None,
-    _accept: (Concept[T], Expressions.Types, Dsl) => Boolean =
-      (_: Concept[T], _: Expressions.Types, _: Dsl) => true
+    accept: Option[(Concept[T], Expressions.Types, Dsl) => Boolean] = None
   ) {
-
-    def userData(f: Concept[T] => Option[Any]): SyntaxGenericBuilder[T] =
-      copy(_userData = Some(f))
-
     def accept(f: (Concept[T], Expressions.Types, Dsl) => Boolean): SyntaxGenericBuilder[T] =
-      copy(_accept = f)
+      copy(accept = Some(f))
 
-    def accept(base: Concept[T]): SyntaxGenericBuilder[T] = copy(_accept =
-      (concept: Concept[T], _: Expressions.Types, dsl: Dsl) => dsl.isSubtypeOf(concept, base)
+    def accept(base: Concept[T]): SyntaxGenericBuilder[T] = copy(accept =
+      Some((concept: Concept[T], _: Expressions.Types, dsl: Dsl) => dsl.isSubtypeOf(concept, base))
     )
 
-    def multi[T2]: SyntaxGenericMultiBuilder[T, T2] =
-      SyntaxGenericMultiBuilder[T, T2](name, _userData, _accept)
+    def multi[T3]: SyntaxGenericMultiBuilder[T, T3] = SyntaxGenericMultiBuilder(name, accept)
 
-    def apply(toProduction: Concept[T] => SyntaxProduction[T]): SyntaxGeneric[T] = {
+    def apply(toSyntax: TypedSyntaxBuilder[T] => SyntaxTyped[T]): SyntaxGeneric[T] = {
       var cache: Map[Concept[T], SyntaxTyped[T]] = Map()
       addGenericSyntax(SyntaxGeneric[T](
         name,
-        _accept,
+        accept,
         concept => {
           cache.getOrElse(
             concept, {
-              val rule =
-                SyntaxTyped(
-                  name,
-                  concept,
-                  expression = true,
-                  toProduction(concept),
-                  userData = _userData.map(_.apply(concept))
-                )
+              val rule = toSyntax(
+                syntax(DeclaringSourceName(name)).typed(concept).doNotAdd()
+              )
               cache += concept -> rule
               rule
             }
           )
         }
-      )).asInstanceOf[SyntaxGeneric[T]]
+      ))
     }
   }
 
   case class SyntaxGenericMultiBuilder[T: ClassTag, T2](
     name: String,
-    userData: Option[Concept[T] => Option[Any]] = None,
-    accept: (Concept[T], Expressions.Types, Dsl) => Boolean =
-      (_: Concept[T], _: Expressions.Types, _: Dsl) => true
+    accept: Option[(Concept[T], Expressions.Types, Dsl) => Boolean] = None
   ) {
-
-    def apply(toProduction: Concept[T] => SyntaxProduction[T2]): SyntaxGenericMulti[T, T2] = {
+    def apply(toSyntax: SyntaxMultipleBuilder[T, T2] => SyntaxMulti[T, T2])
+      : SyntaxGenericMulti[T, T2] = {
       var cache: Map[Concept[T], SyntaxMulti[T, T2]] = Map()
       addGenericSyntax(SyntaxGenericMulti[T, T2](
         name,
@@ -977,124 +973,25 @@ trait Dsl {
         concept => {
           cache.getOrElse(
             concept, {
-              val rule = SyntaxMulti(name, concept, toProduction(concept))
+              val rule = toSyntax(
+                syntax(DeclaringSourceName(name)).typed(concept).doNotAdd().multi
+              )
               cache += concept -> rule
               rule
             }
           )
         }
-      )).asInstanceOf[SyntaxGenericMulti[T, T2]]
+      ))
     }
-
   }
 
   def syntaxGeneric[T: ClassTag](implicit name: DeclaringSourceName): SyntaxGenericBuilder[T] =
     SyntaxGenericBuilder(name.name)
 
-//  val c: Concept[String] = concept
-//
-//  val sUntyped: Syntax[String] = syntax
-//    .untyped
-//    .userData(123) {
-//      SPStr("toto") map { case _ => "titi" }
-//    }
-//
-//  val sTyped: Syntax[String] = syntax
-//    .typed(c)
-//    .userData(123) {
-//      SPStr("toto") map { case _ => "titi" }
-//    }
-//
-//  val xMulti: Syntax[Int] = syntax
-//    .typed(c)
-//    .userData(123)
-//    .multi {
-//      SPStr("toto") map { case _ => 123 }
-//    }
-//
-//  val xGeneric: SyntaxGeneric[String] = syntaxGeneric[String]
-//    .setUserData((c: Concept[String]) => Some(123))
-//    .setAccept((a: Concept[String], b, c) => true) { (c: Concept[String]) =>
-//      SPStr("toto") map { case _ => "foo" }
-//    }
-//
-//  val xGenericMulti: SyntaxGeneric[String] = syntaxGeneric[String]
-//    .setUserData((c: Concept[String]) => Some(123))
-//    .setAccept((a: Concept[String], b, c) => true) { (c: Concept[String]) =>
-//      SPStr("toto") map { case _ => "foo" }
-//    }
-
-//  def syntaxMultiple[T, T2](concept: Concept[T])(
-//    production: SyntaxProduction[T2],
-//    userData: Option[Any] = None
-//  )(implicit name: DeclaringSourceName): SyntaxMulti[T, T2] = {
-//    addSyntax(SyntaxMulti(name.name, concept, production, userData))
-//  }
-
-  private def addGenericSyntax(syntax: SyntaxBase): SyntaxBase = {
+  private def addGenericSyntax[X <: SyntaxBase](syntax: X): X = {
     genericSyntaxes ++= Seq(syntax)
     syntax
   }
-
-//  def genericSyntax[T: ClassTag](
-//    toProduction: Concept[T] => SyntaxProduction[T],
-//    accept: (Concept[T], Expressions.Types, Dsl) => Boolean =
-//      (_: Concept[T], _: Expressions.Types, _: Dsl) => true,
-//    userData: Option[Any] = None
-//  )(
-//    implicit name: DeclaringSourceName
-//  ): SyntaxGeneric[T] = {
-//    var cache: Map[Concept[T], SyntaxTyped[T]] = Map()
-//    addGenericSyntax(SyntaxGeneric[T](
-//      name.name,
-//      accept,
-//      concept => {
-//        cache.getOrElse(
-//          concept, {
-//            val rule =
-//              SyntaxTyped(name.name, concept, expression = true, toProduction(concept), userData)
-//            cache += concept -> rule
-//            rule
-//          }
-//        )
-//      }
-//    )).asInstanceOf[SyntaxGeneric[T]]
-//  }
-
-//  def genericSyntaxMultiple[T: ClassTag, T2](
-//    base: Concept[T],
-//    toProduction: Concept[T] => SyntaxProduction[T2]
-//  )(
-//    implicit name: DeclaringSourceName
-//  ): SyntaxGenericMulti[T, T2] = {
-//    genericSyntaxMultiple[T, T2](
-//      toProduction,
-//      (concept: Concept[T], _: Expressions.Types, dsl: Dsl) => dsl.isSubtypeOf(concept, base)
-//    )
-//  }
-
-//  def genericSyntaxMultiple[T: ClassTag, T2](
-//    toProduction: Concept[T] => SyntaxProduction[T2],
-//    accept: (Concept[T], Expressions.Types, Dsl) => Boolean =
-//      (_: Concept[T], _: Expressions.Types, _: Dsl) => true
-//  )(
-//    implicit name: DeclaringSourceName
-//  ): SyntaxGenericMulti[T, T2] = {
-//    var cache: Map[Concept[T], SyntaxMulti[T, T2]] = Map()
-//    addGenericSyntax(SyntaxGenericMulti[T, T2](
-//      name.name,
-//      accept,
-//      concept => {
-//        cache.getOrElse(
-//          concept, {
-//            val rule = SyntaxMulti(name.name, concept, toProduction(concept))
-//            cache += concept -> rule
-//            rule
-//          }
-//        )
-//      }
-//    )).asInstanceOf[SyntaxGenericMulti[T, T2]]
-//  }
 
   class AxiomBuilder[T](val name: String, val production: SyntaxProduction[T]) {
     def build: Axiom[T] = {
