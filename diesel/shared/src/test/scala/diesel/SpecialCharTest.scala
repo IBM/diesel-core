@@ -42,19 +42,21 @@ class SpecialCharTest extends FunSuite {
 
   test("special char") {
     AstHelpers.assertAst(MyDsl)("yalla€") { tree =>
-      assertEquals(tree.markers, List(
-        Marker(
-          descriptor = Descriptor(
-            kind = Lexical,
-            severity = Severity.Error
-          ),
-          offset = 5,
-          length = 1,
-          message = UnknownTokenMsg(
-            token = "\u20ac"
+      assertEquals(
+        tree.markers,
+        List(
+          Marker(
+            descriptor = Descriptor(
+              kind = Lexical,
+              severity = Severity.Error
+            ),
+            offset = 5,
+            length = 1,
+            message = UnknownTokenMsg(token =
+              "\u20ac"
+            )
           )
         )
-      )
       )
     }
   }
