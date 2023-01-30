@@ -189,6 +189,11 @@ object Lexer {
 
     def computeScanner(re: Scanner, tokenId: Lexer.TokenId, styleOpt: Option[Style]): Seq[Rule] = {
       if (!scanners.contains(re)) {
+
+        if (re.findPrefixOf("").isDefined) {
+          throw new IllegalArgumentException(s"found scanner matching empty string ${re}, tokenId=${tokenId.name}")
+        }
+
         val rule = SimpleRule(re, tokenId)
         styleOpt.foreach { style =>
           rule.styles = rule.styles ++ Seq(style)
