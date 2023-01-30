@@ -191,7 +191,9 @@ object Lexer {
       if (!scanners.contains(re)) {
 
         if (re.findPrefixOf("").isDefined) {
-          throw new IllegalArgumentException(s"found scanner matching empty string ${re}, tokenId=${tokenId.name}")
+          throw new IllegalArgumentException(
+            s"found scanner matching empty string ${re}, tokenId=${tokenId.name}"
+          )
         }
 
         val rule = SimpleRule(re, tokenId)

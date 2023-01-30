@@ -16,22 +16,32 @@
 
 package diesel
 
-import diesel.Dsl.{Axiom, Concept}
+import diesel.Dsl.{Axiom, Concept, Identifiers, Syntax}
 import munit.FunSuite
 
-class EmptyRegexTest extends FunSuite {
+class SpecialCharTest extends FunSuite {
 
-  object MyDsl extends Dsl {
+  object MyDsl extends Dsl with Identifiers {
 
-    val c1: Concept[String] = concept("".r, "") map { case (_, _) => "yalla" }
+    override def identScanner: Lexer.Scanner = "[a-zA-Z_][a-zA-Z0-9_]*".r
 
-    val a1: Axiom[String] = axiom(c1)
+    val c: Concept[String] = concept
 
+    val s: Syntax[String] = syntax(c)(id map { case (_, t) => t.text })
+
+    val a: Axiom[String] = axiom(c)
   }
 
-  test("empty regex throws") {
-    val ex = intercept[IllegalArgumentException](AstHelpers.parse(MyDsl, "1313"))
-    assertEquals(ex.getMessage, "found scanner matching empty string RegexScanner(), tokenId=c1")
+  test("no special char") {
+    AstHelpers.assertAst(MyDsl)("yalla") { tree =>
+      assertEquals(tree.value, "yalla")
+    }
+  }
+
+  test("special char") {
+    AstHelpers.assertAst(MyDsl)("yalla€") { tree =>
+      assertEquals(tree.markers, Seq.empty)
+    }
   }
 
 }
