@@ -284,9 +284,8 @@ class Result(val axiom: Bnf.Axiom) {
 
   private[diesel] def reportErrors(): Seq[Marker] = markers.toSeq
 
-  private[diesel] def beginChart(index: Int, token: Lexer.Token): Chart = {
+  private[diesel] def beginChart(index: Int): Chart = {
     val chart = if (index == charts.size) pushChart else chartAt(index)
-    chart.setToken(token)
     chart.toQueue(processingQueue)
     currentChart = Some(chart)
     chart
