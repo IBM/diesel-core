@@ -17,6 +17,8 @@
 package diesel
 
 import diesel.Dsl.{Axiom, Concept, Identifiers, Syntax}
+import diesel.Marker.{Descriptor, Severity}
+import diesel.Marker.Kind.Lexical
 import munit.FunSuite
 
 class SpecialCharTest extends FunSuite {
@@ -40,7 +42,20 @@ class SpecialCharTest extends FunSuite {
 
   test("special char") {
     AstHelpers.assertAst(MyDsl)("yalla€") { tree =>
-      assertEquals(tree.markers, Seq.empty)
+      assertEquals(tree.markers, List(
+        Marker(
+          descriptor = Descriptor(
+            kind = Lexical,
+            severity = Severity.Error
+          ),
+          offset = 5,
+          length = 1,
+          message = UnknownTokenMsg(
+            token = "\u20ac"
+          )
+        )
+      )
+      )
     }
   }
 
