@@ -48,4 +48,8 @@ class MyTest extends DslTestFunSuite {
     }
   }
 
+  test("infinite loop unrecognized char") {
+    assertMarkers("class class€")(Seq.empty)
+  }
+
 }
