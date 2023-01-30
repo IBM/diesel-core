@@ -53,21 +53,24 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
     lexer.skip(input)
   }
 
+  private def dynamicScan(input: Lexer.Input, context: Result): Lexer.Token = {
+    skip(input)
+    val scanQueue    = closure(context)
+    val tokens       = scanQueue.map(_.nextSymbol.asInstanceOf[Bnf.Token].tokenId)
+    val lexicalValue = scan(input, tokens, context)
+    scanQueue.foreach(s => context.processingQueue.enqueue(s))
+    lexicalValue
+  }
+
   private def buildCharts(input: Lexer.Input, axiom: Bnf.Axiom): Result = {
     val context      = new Result(axiom)
-    var lexicalValue = if (dynamicLexer) skip(input) else scan(input, context)
-    var length       = if (lexicalValue.id == Lexer.Eos) 0 else 1
     var index        = 0
+    var chart        = context.beginChart(index)
+    var lexicalValue = if (dynamicLexer) dynamicScan(input, context) else scan(input, context)
+    var length       = if (lexicalValue.id == Lexer.Eos) 0 else 1
     while (index <= length) {
       var scanned = false
-      val chart   = context.beginChart(index, lexicalValue)
-      if (dynamicLexer) {
-        val scanQueue = closure(context)
-        val tokens    = scanQueue.map(_.nextSymbol.asInstanceOf[Bnf.Token].tokenId)
-        lexicalValue = scan(input, tokens, context)
-        chart.setToken(lexicalValue)
-        scanQueue.foreach(context.processingQueue.enqueue(_))
-      }
+      chart.setToken(lexicalValue)
       while (context.processingQueue.nonEmpty) {
         val state: State = context.processingQueue.dequeue()
         if (state.isCompleted)
@@ -96,10 +99,13 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
       }
       context.endChart()
 
-      lexicalValue = if (dynamicLexer) skip(input) else scan(input, context)
-      if (lexicalValue.id != Lexer.Eos)
-        length += 1
       index += 1
+      if (!context.success) {
+        chart = context.beginChart(index)
+        lexicalValue = if (dynamicLexer) dynamicScan(input, context) else scan(input, context)
+        if (lexicalValue.id != Lexer.Eos)
+          length += 1
+      }
     }
     context
   }
@@ -132,6 +138,10 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
 
   private def errorRecovery(index: Int, lexicalValue: Lexer.Token, context: Result): Unit = {
     context.beginErrorRecovery()
+    if (context.processingQueue.isEmpty)
+      throw new RuntimeException(
+        "internal error, processing queue is empty while recovering from errors"
+      )
     while (context.processingQueue.nonEmpty) {
       val state: State = context.processingQueue.dequeue()
       if (state.isCompleted) {

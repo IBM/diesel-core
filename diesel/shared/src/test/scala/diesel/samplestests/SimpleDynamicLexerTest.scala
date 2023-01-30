@@ -17,7 +17,8 @@
 package diesel.samplestests
 
 import diesel.Dsl.{Axiom, Concept, DynamicLexer, Syntax}
-import diesel.{Dsl, DslTestFunSuite}
+import diesel.Marker.{Descriptor, Kind, Severity}
+import diesel.{Dsl, DslTestFunSuite, Marker, MissingTokenMsg, UnknownTokenMsg}
 
 object MyDsl extends Dsl with DynamicLexer {
 
@@ -49,7 +50,41 @@ class MyTest extends DslTestFunSuite {
   }
 
   test("infinite loop unrecognized char") {
-    assertMarkers("class class€")(Seq.empty)
+    assertMarkers("class toto€")(List(
+      Marker(
+        descriptor = Descriptor(
+          kind = Kind.Syntactic,
+          severity = Severity.Error
+        ),
+        offset = 11,
+        length = 0,
+        message = MissingTokenMsg(token =
+          "{"
+        )
+      ),
+      Marker(
+        descriptor = Descriptor(
+          kind = Kind.Syntactic,
+          severity = Severity.Error
+        ),
+        offset = 11,
+        length = 0,
+        message = MissingTokenMsg(token =
+          "}"
+        )
+      ),
+      Marker(
+        descriptor = Descriptor(
+          kind = Kind.Lexical,
+          severity = Severity.Error
+        ),
+        offset = 10,
+        length = 1,
+        message = UnknownTokenMsg(token =
+          "\u20ac"
+        )
+      )
+    ))
   }
 
 }
