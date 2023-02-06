@@ -30,7 +30,6 @@ private[diesel] class ParsingContext(
   val offset: Int,
   val length: Int,
   val ambiguity: Option[Ambiguity],
-  val markers: Seq[Marker],
   val children: Seq[GenericNode]
 ) extends Context {
 
@@ -44,11 +43,11 @@ private[diesel] class ParsingContext(
   private var tokenStyles: Seq[(Token, Style)] = Seq.empty
   private var aborted: Boolean                 = children.exists(child => child.context.hasAborted)
 
+  override def markers: Seq[Marker] = locals
+
   override def addMarkers(marker: Marker, markers: Marker*): Unit = {
     locals = locals ++ Seq(marker) ++ markers
   }
-
-  def reportErrors(): Seq[Marker] = locals
 
   def setStyle(style: Style): Unit = {
     this.style = Some(style)
@@ -156,7 +155,13 @@ abstract class GenericNode(var parent: Option[GenericNode], val context: Context
 
   def valueAs[T]: T = value.asInstanceOf[T]
 
+  def localMarkers: Seq[Marker] = context.markers
+
+  def markers: Seq[Marker] = localMarkers
+
   def hasAmbiguity: Boolean = false
+
+  def wasAmbiguous: Boolean = false
 
   override def toString: String = {
     val buf = new mutable.StringBuilder
@@ -230,14 +235,14 @@ abstract class GenericNode(var parent: Option[GenericNode], val context: Context
 
 class GenericNonTerminal(
   override val context: Context,
+  override val markers: Seq[Marker],
   val production: Production,
-  val children: Seq[GenericNode],
   override val value: Any
 ) extends GenericNode(None, context, value) {
 
-  children.foreach(child => child.parent = Some(this))
+  context.children.foreach(child => child.parent = Some(this))
 
-  override def getChildren: Seq[GenericNode] = children
+  override def getChildren: Seq[GenericNode] = context.children
 
   override def hasAmbiguity: Boolean =
     context match {
@@ -248,12 +253,21 @@ class GenericNonTerminal(
       case _                 => false
     }
 
+  override def wasAmbiguous: Boolean =
+    context match {
+      case c: ParsingContext => c.ambiguity match {
+          case Some(a) => a.branchCount > 1
+          case None    => false
+        }
+      case _                 => false
+    }
+
   private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder = {
     // TODO useful for debugging?
 //    buf.append("[").append(production.element.getOrElse("?")).append("]")
     buf.append(production.rule.get.name).append("(")
     buf.append(context.offset).append(", ").append(context.length)
-    children.zipWithIndex.foreach {
+    context.children.zipWithIndex.foreach {
       case (child: GenericNode, _: Int) =>
         buf.append(", ").append(child)
     }
@@ -288,34 +302,50 @@ object Navigator {
   ): Navigator =
     new Navigator(result, postProcessors, reducer, userDataProvider)
 
-  def select(navigator: Navigator): Option[GenericTree] = {
-    var asts: Seq[GenericTree] = Seq.empty
-    var errorCount: Int        = Int.MaxValue
-    while (navigator.hasNext) {
-      val candidate: GenericTree = navigator.next()
-      if (asts.isEmpty)
-        asts = Seq(candidate)
-      else {
-        val actualErrorCount = Marker.countErrors(candidate.markers)
-        if (errorCount > actualErrorCount)
-          asts = Seq(candidate)
-        else if (errorCount == 0 && actualErrorCount == 0)
-          asts = asts ++ Seq(candidate)
-      }
-      errorCount = Marker.countErrors(asts.head.markers)
-    }
-    if (errorCount == 0 && asts.size > 1) {
-      val ast                 = asts.head
-      var errors: Seq[Marker] = Seq.empty
-      ast.toSeq.foreach(node =>
-        if (node.hasAmbiguity)
-          errors = errors ++ Seq(Ambiguous.apply(node.offset, node.length))
-      )
-      if (errors.isEmpty)
-        errors = Seq(Ambiguous.apply(ast.offset, ast.length))
-      Some(GenericTree(ast.root, ast.value, ast.offset, ast.length, ast.markers ++ errors))
-    } else asts.headOption
+  def select(result: Result, userDataProvider: Option[UserDataProvider]): Option[GenericTree] = {
+    val navigator = apply(
+      result,
+      Seq.empty,
+      reducer =
+        Seq(Reducer.noAbortAsMuchAsPossible, /* Reducer.fewerErrorPossible, */ Reducer.selectOne),
+      userDataProvider
+    )
+    if (navigator.hasNext) {
+      val tree = Some(navigator.next())
+      if (navigator.hasNext)
+        throw new RuntimeException()
+      tree
+    } else None
   }
+
+//  def select(navigator: Navigator): Option[GenericTree] = {
+//    var asts: Seq[GenericTree] = Seq.empty
+//    var errorCount: Int        = Int.MaxValue
+//    while (navigator.hasNext) {
+//      val candidate: GenericTree = navigator.next()
+//      if (asts.isEmpty)
+//        asts = Seq(candidate)
+//      else {
+//        val actualErrorCount = Marker.countErrors(candidate.markers)
+//        if (errorCount > actualErrorCount)
+//          asts = Seq(candidate)
+//        else if (errorCount == 0 && actualErrorCount == 0)
+//          asts = asts ++ Seq(candidate)
+//      }
+//      errorCount = Marker.countErrors(asts.head.markers)
+//    }
+//    if (errorCount == 0 && asts.size > 1) {
+//      val ast                 = asts.head
+//      var errors: Seq[Marker] = Seq.empty
+//      ast.toSeq.foreach(node =>
+//        if (node.hasAmbiguity)
+//          errors = errors ++ Seq(Ambiguous.apply(node.offset, node.length))
+//      )
+//      if (errors.isEmpty)
+//        errors = Seq(Ambiguous.apply(ast.offset, ast.length))
+//      Some(GenericTree(ast.root, ast.value, ast.offset, ast.length, ast.markers ++ errors))
+//    } else asts.headOption
+//  }
 
   private[diesel] class Ambiguity(val branchCount: Int) {
 
@@ -348,7 +378,7 @@ object Reducer {
 
   case class FewerErrorPossible(override val node: GenericNode) extends Reducer {
 
-    private val errorCount = Marker.countErrors(node.context.markers)
+    private val errorCount = Marker.countErrors(node.markers)
 
     override def compare(node: GenericNode): (Reducer.Kind.Kind, Reducer) = {
       val other = FewerErrorPossible(node)
@@ -381,6 +411,37 @@ object Reducer {
 
   def noAbortAsMuchAsPossible: GenericNode => Reducer =
     (node: GenericNode) => NoAbortAsMushAsPossible(node)
+
+  case class SelectOne(override val node: GenericNode, ambiguous: Boolean = false) extends Reducer {
+
+    private val errorCount = Marker.countErrors(node.markers)
+
+    override def compare(node: GenericNode): (Reducer.Kind.Kind, Reducer) = {
+      val other = SelectOne(node)
+      if (this.errorCount > 0) {
+        if (other.errorCount < this.errorCount) {
+          (Reducer.Kind.Better, other)
+        } else {
+          (Reducer.Kind.Worse, this)
+        }
+      } else {
+        if (other.errorCount == 0) {
+          node.context.addMarkers(Ambiguous.apply(
+            node.offset,
+            node.length
+          )) // Not so good, find a way to copy node and context
+          (
+            Reducer.Kind.Worse,
+            SelectOne(node, ambiguous = true)
+          )
+        } else
+          (Reducer.Kind.Worse, this)
+      }
+    }
+  }
+
+  def selectOne: GenericNode => Reducer =
+    (node: GenericNode) => SelectOne(node)
 }
 
 class Navigator(
@@ -518,7 +579,6 @@ class Navigator(
         token.offset,
         token.text.length,
         None,
-        terminal.reportErrors(),
         Seq.empty
       ),
       token
@@ -527,7 +587,7 @@ class Navigator(
       case InsertedTokenValue(_, _, _) =>
         Parsing(node, terminal, token.offset, 0, errors)
       case _                           =>
-        Parsing(node, terminal, token.offset, token.text.length, terminal.reportErrors())
+        Parsing(node, terminal, token.offset, token.text.length, errors)
     }
   }
 
@@ -550,17 +610,17 @@ class Navigator(
       offset,
       length,
       ambiguity,
-      errors,
       children
     )
     val value   = production.action(context, args)
     styles.foreach(pair => context.setTokenStyle(pair._1, pair._2))
+    val markers = errors ++ context.markers
     Parsing(
-      new GenericNonTerminal(context, production, children, value),
+      new GenericNonTerminal(context, markers, production, value),
       value,
       offset,
       length,
-      errors ++ context.reportErrors()
+      markers
     )
   }
 

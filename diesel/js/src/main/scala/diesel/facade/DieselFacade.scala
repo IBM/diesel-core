@@ -147,8 +147,7 @@ object DieselParseResult {
     navigatorFactory: Result => Navigator = Navigator(_)
   ): DieselParseResult = {
     if (result.success) {
-      val navigator = navigatorFactory(result)
-      Navigator.select(navigator) match {
+      Navigator.select(result, None) match {
         case Some(ast) =>
           new DieselParseResult(Right(ast), markerPostProcessor)
         case None      =>
