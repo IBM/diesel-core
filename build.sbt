@@ -58,7 +58,7 @@ lazy val sharedSettings_scalac = Seq(
     "-unchecked",
     "-deprecation",
     "-feature",
-    "-Xfatal-warnings",
+//    "-Xfatal-warnings",
     "-Wconf:cat=deprecation:i",
     "-language:existentials",
     "-Wunused:imports",
