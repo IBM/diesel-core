@@ -44,6 +44,14 @@ class JsModelDslPredictionTest extends FunSuite {
     )
   }
 
+  test("root with prefix") {
+    assertPredictions(
+      "ro",
+      2,
+      Seq("root :")
+    )
+  }
+
   test("root") {
     assertPredictions(
       "root",
