@@ -39,7 +39,7 @@ class JsModelDslPredictionTest extends FunSuite {
     offset: Int,
     expectedPredictions: Seq[String]
   ): Unit = {
-    val proposals = predict(JsModelDsl, text, offset, Some(JsModelDsl.completionConfiguration))
+    val proposals = predict(JsModelDsl, text, offset, None)
     assertEquals(proposals.map(_.text), expectedPredictions)
   }
 
