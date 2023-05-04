@@ -111,6 +111,14 @@ class PredictWithPrefixTest extends FunSuite {
     )
   }
 
+  test("go") {
+    assertPredictions(
+      "go",
+      2,
+      expectedAll
+    )
+  }
+
   test("good") {
     assertPredictions(
       "good ",
@@ -130,6 +138,14 @@ class PredictWithPrefixTest extends FunSuite {
   test("good 3") {
     assertPredictions(
       "good xxx",
+      7,
+      Seq("job", "day")
+    )
+  }
+
+  test("good 4") {
+    assertPredictions(
+      "good jo",
       7,
       Seq("job", "day")
     )

@@ -28,12 +28,19 @@ class JsModelDslPredictionTest extends FunSuite {
     expectedReplace: Option[Seq[Option[(Int, Int)]]] = None
   ): Unit = {
     val proposals = predict(JsModelDsl, text, offset, Some(JsModelDsl.completionConfiguration))
-    assert(
-      proposals.map(_.text) == expectedPredictions
-    )
+    assertEquals(proposals.map(_.text), expectedPredictions)
     expectedReplace.foreach { expectedReplace =>
       assertEquals(proposals.map(_.replace), expectedReplace)
     }
+  }
+
+  private def assertPredictionsNoCompletionConfig(
+    text: String,
+    offset: Int,
+    expectedPredictions: Seq[String]
+  ): Unit = {
+    val proposals = predict(JsModelDsl, text, offset, Some(JsModelDsl.completionConfiguration))
+    assertEquals(proposals.map(_.text), expectedPredictions)
   }
 
   test("empty") {
@@ -46,6 +53,14 @@ class JsModelDslPredictionTest extends FunSuite {
 
   test("root with prefix") {
     assertPredictions(
+      "ro",
+      2,
+      Seq("root :")
+    )
+  }
+
+  test("root with prefix no config") {
+    assertPredictionsNoCompletionConfig(
       "ro",
       2,
       Seq("root :")
