@@ -34,15 +34,6 @@ class JsModelDslPredictionTest extends FunSuite {
     }
   }
 
-  private def assertPredictionsNoCompletionConfig(
-    text: String,
-    offset: Int,
-    expectedPredictions: Seq[String]
-  ): Unit = {
-    val proposals = predict(JsModelDsl, text, offset, None)
-    assertEquals(proposals.map(_.text), expectedPredictions)
-  }
-
   test("empty") {
     assertPredictions(
       "",
@@ -59,15 +50,39 @@ class JsModelDslPredictionTest extends FunSuite {
     )
   }
 
-  test("root with prefix no config") {
-    assertPredictionsNoCompletionConfig(
-      "ro",
+  test("root with prefix 2") {
+    assertPredictions(
+      "root : number",
       2,
       Seq("root :")
     )
   }
 
-  test("root") {
+  test("root with prefix 3") {
+    assertPredictions(
+      "root : ",
+      2,
+      Seq("root :")
+    )
+  }
+
+  test("root with prefix 4") {
+    assertPredictions(
+      "roo",
+      2,
+      Seq("root :")
+    )
+  }
+
+  test("root with prefix 5") {
+    assertPredictions(
+      "ro :",
+      2,
+      Seq("root :")
+    )
+  }
+
+  test("root".only) {
     assertPredictions(
       "root",
       4,
