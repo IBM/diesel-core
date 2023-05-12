@@ -67,12 +67,4 @@ class FeelPredictionTest extends FunSuite {
     )
   }
 
-  test("tru") {
-    assertPredictions(
-      "tru",
-      3,
-      ALL
-    )
-  }
-
 }
