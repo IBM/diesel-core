@@ -67,6 +67,6 @@ describe('parse', () => {
     expect(res.error).to.be.undefined;
     expect(res.success).to.equal(true);
     expect(res.proposals.map(p => p.text)).to.eql(["Foo"]);
-    expect(res.proposals.map(p => p.documentation)).to.eql(['<h1>Foo</h1>\n'])
+    expect(res.proposals.map(p => p.documentation)).to.eql(['<b>Foo</b>\n'])
   });
 });
