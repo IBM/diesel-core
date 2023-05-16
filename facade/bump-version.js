@@ -22,7 +22,8 @@ withJsonFile("./ts-facade/package.json", j => {
 });
 
 withJsonFile("./ts-facade-tests/package.json", j => {
-    j.dependencies['@diesel-parser/ts-facade'] = '^' + VERSION;
     j.dependencies['@diesel-parser/samples'] = '^' + VERSION;
+    j.devDependencies['@diesel-parser/ts-facade'] = '^' + VERSION;
 });
+
 
