@@ -48,7 +48,7 @@ class DieselParserFacade(
 
   @JSExport
   def predict(request: PredictRequest): DieselPredictResult = {
-    DieselPredictResult(doParse(request), request.offset, config, userDataProvider)
+    DieselPredictResult(doParse(request), request.text, request.offset, config, userDataProvider)
   }
 
   // TODO borrowed from AstHelper
@@ -183,6 +183,7 @@ class DieselCompletionProposal(private val proposal: CompletionProposal) {
   @JSExport
   val documentation: js.UndefOr[String] = proposal.documentation.orUndefined
 
+  override def toString = s"DieselCompletionProposal($text, $replace)"
 }
 
 case class DieselPredictResult(private val res: Either[String, Seq[CompletionProposal]]) {
@@ -208,6 +209,7 @@ object DieselPredictResult {
 
   def apply(
     result: Result,
+    text: String,
     offset: Int,
     config: Option[CompletionConfiguration],
     userDataProvider: Option[UserDataProvider]
@@ -217,6 +219,7 @@ object DieselPredictResult {
       if (navigator.hasNext) {
         val proposals = new CompletionProcessor(
           result,
+          text,
           config,
           userDataProvider
         ).computeCompletionProposal(offset).distinctBy(
