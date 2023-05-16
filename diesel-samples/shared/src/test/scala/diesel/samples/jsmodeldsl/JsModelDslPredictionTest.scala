@@ -28,9 +28,7 @@ class JsModelDslPredictionTest extends FunSuite {
     expectedReplace: Option[Seq[Option[(Int, Int)]]] = None
   ): Unit = {
     val proposals = predict(JsModelDsl, text, offset, Some(JsModelDsl.completionConfiguration))
-    assert(
-      proposals.map(_.text) == expectedPredictions
-    )
+    assertEquals(proposals.map(_.text), expectedPredictions)
     expectedReplace.foreach { expectedReplace =>
       assertEquals(proposals.map(_.replace), expectedReplace)
     }
@@ -44,11 +42,51 @@ class JsModelDslPredictionTest extends FunSuite {
     )
   }
 
+  test("root with prefix") {
+    assertPredictions(
+      "ro",
+      2,
+      Seq("root :")
+    )
+  }
+
+  test("root with prefix 2") {
+    assertPredictions(
+      "root : number",
+      2,
+      Seq("root :")
+    )
+  }
+
+  test("root with prefix 3") {
+    assertPredictions(
+      "root : ",
+      2,
+      Seq("root :")
+    )
+  }
+
+  test("root with prefix 4") {
+    assertPredictions(
+      "roo",
+      2,
+      Seq("root :")
+    )
+  }
+
+  test("root with prefix 5") {
+    assertPredictions(
+      "ro :",
+      2,
+      Seq("root :")
+    )
+  }
+
   test("root") {
     assertPredictions(
       "root",
       4,
-      Seq(":")
+      Seq("root :")
     )
   }
 
@@ -71,10 +109,18 @@ class JsModelDslPredictionTest extends FunSuite {
     )
   }
 
-  test("array or class or domain") {
+  test("array or class or domain 1") {
     assertPredictions(
       "root: number",
       12,
+      Seq("string", "boolean", "number")
+    )
+  }
+
+  test("array or class or domain 2") {
+    assertPredictions(
+      "root: number ",
+      13,
       Seq("[]", "class", "domain")
     )
   }
@@ -103,7 +149,7 @@ class JsModelDslPredictionTest extends FunSuite {
         |class MyClass {
         |  foo
         |}""".stripMargin,
-      35,
+      36,
       Seq("?", ":")
     )
   }

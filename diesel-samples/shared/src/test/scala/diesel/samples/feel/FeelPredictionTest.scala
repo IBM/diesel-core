@@ -30,38 +30,40 @@ class FeelPredictionTest extends FunSuite {
     val config      = new CompletionConfiguration()
     val feel        = new Feel
     val predictions = predict(feel, text, offset, Some(config))
-    assert(predictions.map(_.text) == expectedPredictions)
+    assertEquals(predictions.map(_.text), expectedPredictions)
   }
+
+  private def ALL = List(
+    "-",
+    "not (",
+    "(",
+    "[",
+    "function (",
+    "{",
+    "for",
+    "if",
+    "-",
+    "[a-z]+",
+    "some",
+    "every",
+    "null",
+    ">=",
+    "<=",
+    ">",
+    "<",
+    "[",
+    "true",
+    "false",
+    "0",
+    "\"\"",
+    "@"
+  )
 
   test("empty text") {
     assertPredictions(
       "",
       0,
-      List(
-        "-",
-        "not (",
-        "(",
-        "[",
-        "function (",
-        "{",
-        "for",
-        "if",
-        "-",
-        "[a-z]+",
-        "some",
-        "every",
-        "null",
-        ">=",
-        "<=",
-        ">",
-        "<",
-        "[",
-        "true",
-        "false",
-        "0",
-        "\"\"",
-        "@"
-      )
+      ALL
     )
   }
 

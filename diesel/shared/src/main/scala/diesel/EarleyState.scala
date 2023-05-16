@@ -291,30 +291,12 @@ class Result(val axiom: Bnf.Axiom) {
     chart
   }
 
-  private def getTokenPrefix(offset: Int, token: Token): String = {
-    val diff = token.offset + token.length - offset
-    token.text.dropRight(diff)
-  }
-
-  private[diesel] def chartAndPrefixAtOffset(offset: Int): Option[(Chart, Option[String])] = {
-    val c = charts.find { chart =>
+  private[diesel] def chartAtOffset(offset: Int): Option[Chart] = {
+    charts.find { chart =>
       chart.isAtOffset(offset)
     }.orElse(charts.find { chart =>
       chart.isAfterOffset(offset)
     })
-
-    def tokenEndsAt(offset: Int) = {
-      t: Token => t.offset + t.length == offset
-    }
-
-    val prefix = errorTokens
-      .find(tokenEndsAt(offset))
-      .orElse(c.flatMap(_.token))
-      .map(getTokenPrefix(offset, _))
-      .filter(_.nonEmpty)
-//      .map(_.text)
-
-    c.map((_, prefix))
   }
 
   private[diesel] def chartAt(index: Int) = {

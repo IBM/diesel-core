@@ -61,16 +61,16 @@ class BmdDslPredictionTest extends FunSuite {
 
   test("start") {
     assertPredictions(
-      "start",
-      5,
+      "start ",
+      6,
       Seq("with")
     )
   }
 
   test("start with") {
     assertPredictions(
-      "start with",
-      10,
+      "start with ",
+      11,
       Seq("text", "numeric", "a")
     )
   }
@@ -81,7 +81,7 @@ class BmdDslPredictionTest extends FunSuite {
         |a Foo is a concept.
         |a Bar is a concept.
         |""".stripMargin,
-      12,
+      13,
       // TODO should be?
 //      Seq("Foo", "Bar")
       Seq("Bar")
@@ -101,7 +101,7 @@ class BmdDslPredictionTest extends FunSuite {
 
   test("is a concept") {
     assertPredictions(
-      "a shopping cart",
+      "a shopping cart ",
       16,
       Seq("has", "can be", "is a", "can be one of", ".")
     )
@@ -112,7 +112,7 @@ class BmdDslPredictionTest extends FunSuite {
       """a Foo is a concept.
         |a Foo has a bar (text)
         |""".stripMargin,
-      19 + 22 + 1,
+      19 + 23 + 1,
       Seq("[ optional ]", ".")
     )
   }

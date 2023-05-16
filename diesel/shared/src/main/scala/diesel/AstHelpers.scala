@@ -57,6 +57,7 @@ object AstHelpers {
     val a              = getBnfAxiomOrThrow(bnf, axiom)
     val res            = new CompletionProcessor(
       parser.parse(new Lexer.Input(text), a),
+      text,
       config,
       userDataProvider
     ).computeCompletionProposal(offset)
