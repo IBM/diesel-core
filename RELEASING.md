@@ -10,4 +10,7 @@
 
     git commit -am "bump facades to $VERSION"
 
-    git tag -m 'release $VERSION' "v$VERSION" 
+    git tag -m 'release $VERSION' "v$VERSION"
+    
+    git push origin "v$VERSION"
+    git push origin main
