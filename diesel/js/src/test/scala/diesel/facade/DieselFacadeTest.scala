@@ -74,14 +74,11 @@ class DieselFacadeTest extends FunSuite {
     val res    = facade.predict(createPredictRequest("1 + ", 4))
     assert(res.success)
     assert(res.error.isEmpty)
-
-    println(res.proposals)
-
     assertEquals(res.proposals.length, 5)
-    val p0 = res.proposals(0)
+    val p0     = res.proposals(0)
     assertEquals(p0.text, "0")
     assert(p0.replace.isEmpty)
-    val p1 = res.proposals(1)
+    val p1     = res.proposals(1)
     assertEquals(p1.text, "pi")
     assert(p1.replace.isEmpty)
   }

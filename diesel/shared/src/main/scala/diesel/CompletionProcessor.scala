@@ -54,7 +54,11 @@ object DefaultCompletionLookback extends CompletionLookback {
   override def isCompletionDelimiter(c: Char): Boolean = c.isWhitespace
 }
 
-case class SimpleCompletionLookback(chars: String) extends CompletionLookback {
+object SimpleCompletionLookback {
+  def apply(chars: String): SimpleCompletionLookback = SimpleCompletionLookback(chars.toSet)
+}
+
+case class SimpleCompletionLookback(chars: Set[Char]) extends CompletionLookback {
   override def isCompletionDelimiter(c: Char): Boolean =
     DefaultCompletionLookback.isCompletionDelimiter(c) || chars.contains(c)
 }
