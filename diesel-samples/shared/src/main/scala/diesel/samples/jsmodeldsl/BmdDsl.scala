@@ -203,6 +203,7 @@ case object BmdDsl extends Dsl with Identifiers with Comments { // with DynamicL
     val config = new CompletionConfiguration()
     config.setFilter(new BmdModelDslCompletionFilter())
     config.setProvider(DslSyntax(sSymbolRef), new BmdModelDslConceptRefProvider())
+    config.setLookback(SimpleCompletionLookback("()[].,"))
     config
   }
 
