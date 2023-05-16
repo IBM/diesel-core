@@ -180,6 +180,9 @@ class DieselCompletionProposal(private val proposal: CompletionProposal) {
     .map(new Replace(_))
     .orUndefined
 
+  @JSExport
+  val documentation: js.UndefOr[String] = proposal.documentation.orUndefined
+
   override def toString = s"DieselCompletionProposal($text, $replace)"
 }
 

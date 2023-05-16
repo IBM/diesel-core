@@ -201,4 +201,26 @@ class BmdDslPredictionTest extends FunSuite {
       assert(predictions.flatMap(_.replace) == Seq((13, 3), (13, 3)))
     }
   }
+
+  test("predict with documentation") {
+    assertPredictionsWith(
+      """start with a Foo.
+        |a Foo is a concept.
+        |a Gnu is a Foo.
+        |a Gnu has a bar (text) [optional].
+        |""".stripMargin,
+      15
+    ) { predictions =>
+      assertEquals(
+        predictions.flatMap(_.documentation),
+        Seq(
+          "<b>Foo</b>\n",
+          """|<b>Gnu</b><br/>
+             |extends Foo<br/>
+             |bar?: string
+             |""".stripMargin
+        )
+      )
+    }
+  }
 }

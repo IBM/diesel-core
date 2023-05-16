@@ -25,7 +25,8 @@ case class CompletionProposal(
   element: Option[DslElement],
   text: String,
   replace: Option[(Int, Int)] = None,
-  userData: Option[Any] = None
+  userData: Option[Any] = None,
+  documentation: Option[String] = None
 )
 
 trait CompletionFilter {
