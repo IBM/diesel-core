@@ -180,6 +180,9 @@ class DieselCompletionProposal(private val proposal: CompletionProposal) {
     .map(new Replace(_))
     .orUndefined
 
+  @JSExport
+  val documentation: js.UndefOr[String] = proposal.documentation.orUndefined
+
 }
 
 case class DieselPredictResult(private val res: Either[String, Seq[CompletionProposal]]) {

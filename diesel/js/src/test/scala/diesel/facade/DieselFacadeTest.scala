@@ -81,6 +81,7 @@ class DieselFacadeTest extends FunSuite {
     val p1     = res.proposals(1)
     assertEquals(p1.text, "pi")
     assert(p1.replace.isEmpty)
+    assert(p1.documentation.isEmpty)
   }
 
   object MyMarkerMessage extends MarkerMessage {

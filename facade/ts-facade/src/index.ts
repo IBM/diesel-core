@@ -50,6 +50,7 @@ export interface DieselParseResult extends HasSuccessAndError {
 export interface DieselCompletionProposal {
   readonly text: string;
   readonly replace?: HasRange;
+  readonly documentation?: string;
 }
 
 export interface DieselPredictResult extends HasSuccessAndError {
