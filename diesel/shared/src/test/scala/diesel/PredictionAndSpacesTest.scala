@@ -44,7 +44,9 @@ class PredictionAndSpacesTest extends FunSuite {
   private val expectedPredictions = Seq("foo", "bar")
 
   private def assertPredictions(text: String, offset: Int, expected: Seq[String]) = {
-    val proposals = predict(MyDsl, text, offset, None)
+    val config    = new CompletionConfiguration()
+    config.setLookback(SimpleCompletionLookback("{}"))
+    val proposals = predict(MyDsl, text, offset, Some(config))
     assertEquals(proposals.map(_.text), expected)
   }
 

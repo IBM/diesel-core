@@ -86,7 +86,7 @@ class JsModelDslPredictionTest extends FunSuite {
     assertPredictions(
       "root",
       4,
-      Seq(":")
+      Seq("root :")
     )
   }
 
@@ -109,10 +109,18 @@ class JsModelDslPredictionTest extends FunSuite {
     )
   }
 
-  test("array or class or domain") {
+  test("array or class or domain 1") {
     assertPredictions(
       "root: number",
       12,
+      Seq("string", "boolean", "number")
+    )
+  }
+
+  test("array or class or domain 2") {
+    assertPredictions(
+      "root: number ",
+      13,
       Seq("[]", "class", "domain")
     )
   }
@@ -141,7 +149,7 @@ class JsModelDslPredictionTest extends FunSuite {
         |class MyClass {
         |  foo
         |}""".stripMargin,
-      35,
+      36,
       Seq("?", ":")
     )
   }

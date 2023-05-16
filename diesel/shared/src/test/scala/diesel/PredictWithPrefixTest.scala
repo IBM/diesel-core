@@ -183,7 +183,10 @@ class PredictWithPrefixTest extends FunSuite {
 
   test("replace 4") {
     val proposals = AstHelpers.predict(MyDsl, "foo", 3)
-    assertEquals(proposals.size, 0)
+    assertEquals(proposals.size, 5)
+    proposals.foreach(p => {
+      assertEquals(p.replace, Some((0, 3)))
+    })
   }
 
   test("replace 5") {
@@ -204,6 +207,9 @@ class PredictWithPrefixTest extends FunSuite {
 
   test("replace 7") {
     val proposals = AstHelpers.predict(MyDsl, "good job", 8)
-    assertEquals(proposals.size, 0)
+    assertEquals(proposals.size, 2)
+    proposals.foreach(p => {
+      assertEquals(p.replace.get, (5, 3))
+    })
   }
 }
