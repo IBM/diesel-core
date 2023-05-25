@@ -15,13 +15,18 @@ benchmark/jmh:run
 benchmark/jmh:run -h
 ```
 
-Profiling hints:
-- Java Flight Recorder
+### Profiling hints:
+#### Java Flight Recorder
 ```
 benchmark/jmh:run -prof jfr:help 
 benchmark/jmh:run -i 2 -wi 2 -f1 -t1 -prof jfr
 ```
-- async-profiler (needs to be installed separately)
+
+This will write `profile.jfr` files under _jvm/_, 
+which can be analyzed using IntelliJ.
+
+
+#### async-profiler (needs to be installed separately)
 ```
 benchmark/jmh:run -prof async:help
 benchmark/jmh:run -i 2 -wi 2 -f1 -t1 -prof async
