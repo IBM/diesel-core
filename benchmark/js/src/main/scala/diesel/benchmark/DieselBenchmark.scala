@@ -19,19 +19,16 @@ package diesel.benchmark
 import japgolly.scalajs.benchmark._
 import japgolly.scalajs.benchmark.gui._
 
+import BenchmarkCases._
+
 object DieselBenchmark {
   val suite = GuiSuite(
-    Suite("Example Benchmarks")(
-      // Benchmark #1
-      Benchmark("foreach") {
-        var s = Set.empty[Int]
-        (1 to 100) foreach (s += _)
-        s
+    Suite("Diesel Benchmarks")(
+      Benchmark("Simple BMD") {
+        parseSimpleBmd
       },
-
-      // Benchmark #2
-      Benchmark("fold") {
-        (1 to 100).foldLeft(Set.empty[Int])(_ + _)
+      Benchmark("Some Glsl") {
+        parseSomeGlsl
       }
     )
   )

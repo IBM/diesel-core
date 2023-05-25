@@ -172,3 +172,4 @@ lazy val benchmark = crossProject(JSPlatform, JVMPlatform)
     scalaJSLinkerConfig ~= { _.withSourceMap(true) },
     packageJSDependencies / skip    := false
   )
+  .dependsOn(samples)
