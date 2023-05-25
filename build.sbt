@@ -161,8 +161,7 @@ lazy val benchmark = crossProject(JSPlatform, JVMPlatform)
   )
   .settings(sharedSettings_scalac)
   .settings(sharedSettings_lint)
-//  .jsSettings(sharedJsSettings)
-  .enablePlugins(JSDependenciesPlugin)
+  .enablePlugins(JSDependenciesPlugin, JmhPlugin)
   .jsSettings(
     libraryDependencies ++= Seq(
       "com.github.japgolly.scalajs-benchmark" %%% "benchmark"   % "0.10.0",
