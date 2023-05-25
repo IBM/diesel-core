@@ -124,4 +124,10 @@ object BenchmarkCases {
   private def parseSome(dsl: Dsl, axiom: Option[Dsl.Axiom[_]] = None)(text: String): Unit = {
     AstHelpers.parse(dsl, text, axiom)
   }
+
+  // use main with IntelliJ profiler
+  def main(args: Array[String]): Unit = {
+    parseSimpleBmd
+    parseSimpleBmd
+  }
 }
