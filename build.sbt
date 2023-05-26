@@ -1,7 +1,6 @@
 import sbt.{CrossVersion, ThisBuild}
 import sbtcrossproject.CrossPlugin.autoImport.crossProject
-
-import scala.sys.process._
+import org.scalajs.linker.interface.ModuleInitializer.mainMethod
 
 val scalaVersion2 = "2.13.10"
 // val scalaVersion3 = "3.2.1"
@@ -168,8 +167,9 @@ lazy val benchmark = crossProject(JSPlatform, JVMPlatform)
       "com.github.japgolly.scalajs-benchmark" %%% "benchmark"   % "0.10.0",
       "org.scala-js"                          %%% "scalajs-dom" % "2.5.0"
     ),
-    scalaJSUseMainModuleInitializer := true,
+    scalaJSUseMainModuleInitializer        := true,
+    Compile / scalaJSMainModuleInitializer := Some(mainMethod("diesel.benchmark.Main", "main")),
     scalaJSLinkerConfig ~= { _.withSourceMap(true) },
-    packageJSDependencies / skip    := false
+    packageJSDependencies / skip           := false
   )
   .dependsOn(samples)

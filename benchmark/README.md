@@ -2,7 +2,11 @@
 
 ## Scala JS
 
-Open in [index.html](./index.html) a browser. 
+Build in `sbt` using
+```
+benchmarkJS/fastOptJS
+```
+And open in [index.html](./index.html) a browser. 
 
 Use devtool profiling ...
 

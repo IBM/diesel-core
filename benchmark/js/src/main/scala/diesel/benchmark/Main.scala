@@ -21,7 +21,7 @@ import japgolly.scalajs.benchmark.gui.BenchmarkGUI
 
 object Main {
 
-  def main(args: Array[String]) = {
+  def main(): Unit = {
     val body = document getElementById "body"
     BenchmarkGUI.renderSuite(body)(DieselBenchmark.suite)
   }
