@@ -157,7 +157,8 @@ lazy val benchmark = crossProject(JSPlatform, JVMPlatform)
   .settings(copyrightSettings)
   .settings(
     name           := "diesel-core-benchmark",
-    publish / skip := true
+    publish / skip := true,
+    test           := {}
   )
   .settings(sharedSettings_scalac)
   .settings(sharedSettings_lint)
