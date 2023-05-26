@@ -1,7 +1,6 @@
 import sbt.{CrossVersion, ThisBuild}
 import sbtcrossproject.CrossPlugin.autoImport.crossProject
-
-import scala.sys.process._
+import org.scalajs.linker.interface.ModuleInitializer.mainMethod
 
 val scalaVersion2 = "2.13.10"
 // val scalaVersion3 = "3.2.1"
@@ -44,7 +43,15 @@ addCommandAlias("testJS", "all dieselJS/test samplesJS/test")
 
 lazy val root = project
   .in(file("."))
-  .aggregate(diesel.jvm, diesel.js, samples.jvm, samples.js, samplesBundle)
+  .aggregate(
+    diesel.jvm,
+    diesel.js,
+    samples.jvm,
+    samples.js,
+    samplesBundle,
+    benchmark.jvm,
+    benchmark.js
+  )
   .settings(commonSettings)
   .settings(sonatypeSettings)
   .settings(copyrightSettings)
@@ -142,3 +149,27 @@ lazy val samplesBundle = project
   .settings(commonSettings)
   .settings(copyrightSettings)
   .dependsOn(samples.js)
+
+lazy val benchmark = crossProject(JSPlatform, JVMPlatform)
+  .withoutSuffixFor(JVMPlatform)
+  .settings(commonSettings)
+  .settings(copyrightSettings)
+  .settings(
+    name           := "diesel-core-benchmark",
+    publish / skip := true,
+    test           := {}
+  )
+  .settings(sharedSettings_scalac)
+  .settings(sharedSettings_lint)
+  .enablePlugins(JSDependenciesPlugin, JmhPlugin)
+  .jsSettings(
+    libraryDependencies ++= Seq(
+      "com.github.japgolly.scalajs-benchmark" %%% "benchmark"   % "0.10.0",
+      "org.scala-js"                          %%% "scalajs-dom" % "2.5.0"
+    ),
+    scalaJSUseMainModuleInitializer        := true,
+    Compile / scalaJSMainModuleInitializer := Some(mainMethod("diesel.benchmark.Main", "main")),
+    scalaJSLinkerConfig ~= { _.withSourceMap(true) },
+    packageJSDependencies / skip           := false
+  )
+  .dependsOn(samples)
