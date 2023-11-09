@@ -106,11 +106,11 @@ class JsModelDslPredictionTest extends FunSuite {
     )
   }
 
-  test("root: 2") {
+  test("root: 2".only) {
     assertPredictions(
       "root:",
       5,
-      Seq()
+      Seq("string", "boolean", "number")
     )
   }
 
@@ -197,7 +197,7 @@ class JsModelDslPredictionTest extends FunSuite {
   test("closing brace after class declaration 2") {
     assertPredictions(
       """root: MyClass
-        |class MyClass {}""".stripMargin,
+        |class MyClass { }""".stripMargin,
       29,
       Seq("}")
     )

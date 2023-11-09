@@ -201,7 +201,7 @@ private[diesel] class Chart(
 
   private[diesel] def isAfterOffset(offset: Int): Boolean = {
     token
-      .map(offset < _.offset)
+      .map(offset <= _.offset)
       .getOrElse(false)
   }
 
