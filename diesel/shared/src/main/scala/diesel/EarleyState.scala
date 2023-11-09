@@ -194,7 +194,7 @@ private[diesel] class Chart(
   private[diesel] def isAtOffset(offset: Int): Boolean = {
     token
       .map(token =>
-        token.offset <= offset && (offset < token.offset + token.text.length || token.id == Eos)
+        token.offset <= offset && (offset <= token.offset + token.text.length || token.id == Eos)
       )
       .getOrElse(false)
   }
@@ -291,12 +291,41 @@ class Result(val axiom: Bnf.Axiom) {
     chart
   }
 
-  private[diesel] def chartAtOffset(offset: Int): Option[Chart] = {
-    charts.find { chart =>
-      chart.isAtOffset(offset)
-    }.orElse(charts.find { chart =>
-      chart.isAfterOffset(offset)
-    })
+  private def getTokenPrefix(offset: Int, token: Token): String = {
+    val diff = token.offset + token.length - offset
+    token.text.dropRight(diff)
+  }
+
+  private[diesel] def chartAndPrefixAtOffset(
+    offset: Int,
+    afterDelimiter: Boolean
+  ): Option[(Chart, Option[String])] = {
+
+    if (afterDelimiter) {
+      charts
+        .find(chart => chart.isAfterOffset(offset))
+        .map(chart => (chart, None))
+    } else {
+
+      val c = charts.find { chart =>
+        chart.isAtOffset(offset)
+      }.orElse(charts.find { chart =>
+        chart.isAfterOffset(offset)
+      })
+
+      def tokenEndsAt(offset: Int) = {
+        t: Token => t.offset + t.length == offset
+      }
+
+      val prefix = errorTokens
+        .find(tokenEndsAt(offset))
+        .orElse(c.flatMap(_.token))
+        .map(getTokenPrefix(offset, _))
+        .filter(_.nonEmpty)
+      //      .map(_.text)
+
+      c.map((_, prefix))
+    }
   }
 
   private[diesel] def chartAt(index: Int) = {

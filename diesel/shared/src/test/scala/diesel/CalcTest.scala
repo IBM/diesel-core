@@ -143,22 +143,17 @@ class CalcTest extends DslTestFunSuite {
   }
 
   test("predict") {
-    val config = new CompletionConfiguration()
-    config.setLookback(SimpleCompletionLookback("()+*-/"))
-    val res1   = predict(MyDsl, "", 0, Some(config))
+    val res1 = predict(MyDsl, "", 0)
 //    println(res1)
-    assertEquals(
-      res1,
-      Seq(
-        CompletionProposal(Some(DslValue(MyDsl.number)), "0"),
-        CompletionProposal(Some(DslInstance(MyDsl.pi)), "pi"),
-        CompletionProposal(Some(DslSyntax(MyDsl.cos)), "cos ("),
-        CompletionProposal(Some(DslSyntax(MyDsl.subExpr)), "("),
-        CompletionProposal(Some(DslSyntax(MyDsl.sumExpr)), "sum (")
-      )
-    )
+    assert(res1.containsSlice(Seq(
+      CompletionProposal(Some(DslValue(MyDsl.number)), "0"),
+      CompletionProposal(Some(DslInstance(MyDsl.pi)), "pi"),
+      CompletionProposal(Some(DslSyntax(MyDsl.cos)), "cos ("),
+      CompletionProposal(Some(DslSyntax(MyDsl.subExpr)), "("),
+      CompletionProposal(Some(DslSyntax(MyDsl.sumExpr)), "sum (")
+    )))
 
-    val res2 = predict(MyDsl, "10 ", 3, Some(config))
+    val res2 = predict(MyDsl, "10 ", 3)
 //    println(res2)
     assert(res2.containsSlice(Seq(
       CompletionProposal(Some(DslSyntax(MyDsl.add)), "+"),

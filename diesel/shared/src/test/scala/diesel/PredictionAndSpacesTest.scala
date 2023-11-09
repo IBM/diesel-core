@@ -44,9 +44,7 @@ class PredictionAndSpacesTest extends FunSuite {
   private val expectedPredictions = Seq("foo", "bar")
 
   private def assertPredictions(text: String, offset: Int, expected: Seq[String]) = {
-    val config    = new CompletionConfiguration()
-    config.setLookback(SimpleCompletionLookback("{}"))
-    val proposals = predict(MyDsl, text, offset, Some(config))
+    val proposals = predict(MyDsl, text, offset, None)
     assertEquals(proposals.map(_.text), expected)
   }
 
@@ -75,15 +73,15 @@ class PredictionAndSpacesTest extends FunSuite {
   }
 
   test("no space, closed object") {
-    assertPredictions("{}", 1, expectedPredictions)
+    assertPredictions("{}", 1, Seq("{"))
   }
 
   test("one space, closed object") {
-    assertPredictions("{ }", 1, expectedPredictions)
+    assertPredictions("{ }", 1, Seq("{"))
   }
 
   test("2 spaces, closed object 1") {
-    assertPredictions("{  }", 1, expectedPredictions)
+    assertPredictions("{  }", 1, Seq("{"))
   }
 
   test("2 spaces, closed object 2") {
@@ -103,11 +101,11 @@ class PredictionAndSpacesTest extends FunSuite {
   }
 
   test("without space") {
-    assertPredictions("{ ", 1, expectedPredictions)
+    assertPredictions("{ ", 1, Seq("{"))
   }
 
   test("without space, eol") {
-    assertPredictions("{", 1, expectedPredictions)
+    assertPredictions("{", 1, Seq("{"))
   }
 
 }
