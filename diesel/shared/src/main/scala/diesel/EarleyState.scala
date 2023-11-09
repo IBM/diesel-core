@@ -202,7 +202,7 @@ private[diesel] class Chart(
   private[diesel] def isAtOffsetExclusive(offset: Int): Boolean = {
     token
       .map(token =>
-        token.offset <= offset && (offset < token.offset + token.text.length || token.id == Eos)
+        token.offset <= offset && (offset < token.offset + token.text.length)
       )
       .getOrElse(false)
   }
@@ -314,20 +314,23 @@ class Result(val axiom: Bnf.Axiom) {
     }
 
     if (afterDelimiter) {
-      charts.find(_.isAtOffsetExclusive(offset)) match {
-        case Some(chart) =>
-          val prefix = errorTokens
-            .find(tokenEndsAt(offset))
-            .orElse(chart.token)
-            .map(getTokenPrefix(offset, _))
-            .filter(_.nonEmpty)
-          Some((chart, prefix))
-
-        case None =>
-          charts
-            .find(chart => chart.isAfterOffset(offset))
-            .map(chart => (chart, None))
-      }
+      charts
+        .find(chart => chart.isAfterOffset(offset))
+        .map(chart => (chart, None))
+//      charts.find(_.isAtOffsetExclusive(offset)) match {
+//        case Some(chart) =>
+//          val prefix = errorTokens
+//            .find(tokenEndsAt(offset))
+//            .orElse(chart.token)
+//            .map(getTokenPrefix(offset, _))
+//            .filter(_.nonEmpty)
+//          Some((chart, prefix))
+//
+//        case None =>
+//          charts
+//            .find(chart => chart.isAfterOffset(offset))
+//            .map(chart => (chart, None))
+//      }
     } else {
 
       val c      = charts.find { chart =>

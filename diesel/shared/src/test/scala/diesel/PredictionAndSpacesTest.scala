@@ -73,15 +73,15 @@ class PredictionAndSpacesTest extends FunSuite {
   }
 
   test("no space, closed object") {
-    assertPredictions("{}", 1, Seq("{"))
+    assertPredictions("{}", 1, expectedPredictions)
   }
 
   test("one space, closed object") {
-    assertPredictions("{ }", 1, Seq("{"))
+    assertPredictions("{ }", 1, expectedPredictions)
   }
 
   test("2 spaces, closed object 1") {
-    assertPredictions("{  }", 1, Seq("{"))
+    assertPredictions("{  }", 1, expectedPredictions)
   }
 
   test("2 spaces, closed object 2") {
@@ -101,11 +101,11 @@ class PredictionAndSpacesTest extends FunSuite {
   }
 
   test("without space") {
-    assertPredictions("{ ", 1, Seq("{"))
+    assertPredictions("{ ", 1, expectedPredictions)
   }
 
   test("without space, eol") {
-    assertPredictions("{", 1, Seq("{"))
+    assertPredictions("{", 1, expectedPredictions)
   }
 
 }
