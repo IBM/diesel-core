@@ -103,4 +103,16 @@ class PredictionQuotedVariablesTest extends FunSuite {
     assertPredictions("print( ", 7, allPreds)
   }
 
+  test("with error") {
+    assertPredictions("xxxx", 2, Seq("print ("))
+  }
+
+  test("with error 2") {
+    assertPredictions("print(xxxx", 6, allPreds)
+  }
+
+  test("with error 3") {
+    assertPredictions("print(xxxx", 10, allPreds)
+  }
+
 }
