@@ -36,8 +36,8 @@ class PredictionQuotedVariablesTest extends FunSuite {
     val iVar: Instance[String] = instance(cVar)("foo") map (_ => "foo")
 
     val sPrint: Syntax[String] = syntax(
-      "print" ~ cVar map {
-        case (_, (_, name)) =>
+      "print" ~ "(" ~ cVar ~ ")" map {
+        case (_, (_, _, name, _)) =>
           name.text
       }
     )
@@ -56,31 +56,51 @@ class PredictionQuotedVariablesTest extends FunSuite {
   }
 
   test("empty text, no spaces, eol") {
-    assertPredictions("", 0, Seq("print"))
+    assertPredictions("", 0, Seq("print ("))
   }
 
   test("predict after print") {
-    assertPredictions("print", 5, Seq("print"))
+    assertPredictions("print", 5, Seq("print ("))
   }
 
-  test("predict after print with space") {
-    assertPredictions("print ", 6, allPreds)
+  test("predict after print with paren") {
+    assertPredictions("print(", 6, allPreds)
   }
 
   test("predict inside variable") {
-    assertPredictions("print 'toto'", 9, allPreds)
+    assertPredictions("print('toto'", 9, allPreds)
   }
 
   test("predict inside variable with delimiter eos") {
-    assertPredictions("print 'toto' ", 13, Nil)
+    assertPredictions("print('toto')", 13, Nil)
   }
 
   test("predict inside variable with delimiter 1") {
-    assertPredictions("print 'to(to'", 10, allPreds)
+    assertPredictions("print('to(to')", 10, allPreds)
   }
 
   test("predict inside variable with delimiter 2") {
-    assertPredictions("print 'to(to'", 11, allPreds)
+    assertPredictions("print('to(to')", 11, allPreds)
+  }
+
+  test("predict inside variable with delimiter 3") {
+    assertPredictions("print(foo)", 8, allPreds)
+  }
+
+  test("predict begin variable with ws 1") {
+    assertPredictions("print( foo)", 7, allPreds)
+  }
+
+  test("predict begin variable with ws 2") {
+    assertPredictions("print(foo)", 6, allPreds)
+  }
+
+  test("predict begin variable with ws 3") {
+    assertPredictions("print(  foo)", 7, allPreds)
+  }
+
+  test("predict begin variable with ws 4") {
+    assertPredictions("print( ", 7, allPreds)
   }
 
 }
