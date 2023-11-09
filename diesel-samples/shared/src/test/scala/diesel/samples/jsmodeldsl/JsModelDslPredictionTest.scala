@@ -106,7 +106,7 @@ class JsModelDslPredictionTest extends FunSuite {
     )
   }
 
-  test("root: 2".only) {
+  test("root: 2") {
     assertPredictions(
       "root:",
       5,
