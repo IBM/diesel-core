@@ -46,10 +46,15 @@ trait CompletionProvider {
   ): Seq[CompletionProposal]
 }
 
+object CompletionConfiguration {
+  val defaultDelimiters: Set[Char] = ":(){}.,+-*/[];".toSet 
+}
+
 class CompletionConfiguration {
 
   private val providers: mutable.Map[DslElement, CompletionProvider] = mutable.Map()
   private var filter: Option[CompletionFilter]                       = None
+  private var delimiters: Set[Char] = CompletionConfiguration.defaultDelimiters
 
   def setProvider(dslElement: DslElement, p: CompletionProvider): Unit = {
     providers(dslElement) = p
@@ -63,6 +68,11 @@ class CompletionConfiguration {
 
   def getFilter: Option[CompletionFilter] = filter
 
+  def setDelimiters(delimiters: Set[Char]): Unit = {
+    this.delimiters = delimiters
+  }
+
+  def getDelimiters: Set[Char] = delimiters
 }
 
 class CompletionProcessor(
@@ -74,15 +84,7 @@ class CompletionProcessor(
 
   def computeCompletionProposal(offset: Int): Seq[CompletionProposal] = {
 
-//    val lookback = config
-//      .flatMap(_.getLookback)
-//      .getOrElse(DefaultCompletionLookback)
-//
-//    // adjust offset (prefix)
-//    val prefix = findPrefix(text, offset, lookback)
-//    println("prefix:" + prefix)
-
-    val delimiters = ":(){}.,+-[]".toSet
+    val delimiters = config.map(_.getDelimiters).getOrElse(CompletionConfiguration.defaultDelimiters)
 
     val c              =
       if (offset >= 1 && offset <= text.length)
