@@ -69,7 +69,7 @@ class DieselFacadeTest extends FunSuite {
     assertEquals(s2.name, "constant")
   }
 
-  test("facade should predict calc dsl".only) {
+  test("facade should predict calc dsl") {
     val facade = new DieselParserFacade(MyDsl)
     val res    = facade.predict(createPredictRequest("1 + ", 3))
     assert(res.success)
