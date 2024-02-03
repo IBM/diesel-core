@@ -82,7 +82,7 @@ class CompletionProcessor(
 //    val prefix = findPrefix(text, offset, lookback)
 //    println("prefix:" + prefix)
 
-    val delimiters = ":(){}.,+-".toSet
+    val delimiters = ":(){}.,+-[]".toSet
 
     val c              =
       if (offset >= 1 && offset <= text.length)
