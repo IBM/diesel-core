@@ -16,7 +16,7 @@
 
 package diesel
 
-import diesel.Analyzer.Ambiguity
+import diesel.Navigator.Ambiguity
 import diesel.Bnf.{DslElement, Production}
 import diesel.Errors.Ambiguous
 import diesel.Lexer.Token
@@ -30,8 +30,6 @@ private[diesel] class ParsingContext(
   val offset: Int,
   val length: Int,
   val ambiguity: Option[Ambiguity],
-  val markers: Seq[Marker],
-  val navigator: Navigator,
   val children: Seq[GenericNode]
 ) extends Context {
 
@@ -40,16 +38,16 @@ private[diesel] class ParsingContext(
   override def setUserData(key: Any, value: Any): Unit =
     userDataProvider.foreach(_.setUserData(key, value))
 
-  private var locals: Seq[Marker]              = Seq()
+  private var locals: Seq[Marker]              = Seq.empty
   private var style: Option[Style]             = None
-  private var tokenStyles: Seq[(Token, Style)] = Seq()
-  private var aborted: Boolean                 = false
+  private var tokenStyles: Seq[(Token, Style)] = Seq.empty
+  private var aborted: Boolean                 = children.exists(child => child.context.hasAborted)
+
+  override def markers: Seq[Marker] = locals
 
   override def addMarkers(marker: Marker, markers: Marker*): Unit = {
     locals = locals ++ Seq(marker) ++ markers
   }
-
-  def reportErrors(): Seq[Marker] = locals
 
   def setStyle(style: Style): Unit = {
     this.style = Some(style)
@@ -65,12 +63,8 @@ private[diesel] class ParsingContext(
 
   override def hasAborted: Boolean = aborted
 
-  override def abort(): Boolean = {
-    if (!aborted) {
-      ambiguity.foreach(_.abort())
-      aborted = true
-    }
-    aborted
+  override def abort(): Unit = {
+    aborted = true
   }
 }
 
@@ -142,7 +136,7 @@ case class GenericTree(
   override def toString: String = prettyPrint(this.root, 0).mkString("\n")
 
   private def nodeToStr(node: GenericNode): String =
-    (node.toString + (if (node.value == null) "" else " => " + node.value.toString))
+    node.toString + (if (node.value == null) "" else " => " + node.value.toString)
 
   private def prettyPrint(node: GenericNode, indent: Int): Seq[String] = {
     Seq(
@@ -153,7 +147,7 @@ case class GenericTree(
 }
 
 abstract class GenericNode(var parent: Option[GenericNode], val context: Context, val value: Any) {
-  private[diesel] def toString(buf: StringBuilder): Unit
+  private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder
 
   def offset: Int = context.offset
 
@@ -161,15 +155,21 @@ abstract class GenericNode(var parent: Option[GenericNode], val context: Context
 
   def valueAs[T]: T = value.asInstanceOf[T]
 
+  def localMarkers: Seq[Marker] = context.markers
+
+  def markers: Seq[Marker] = localMarkers
+
   def hasAmbiguity: Boolean = false
 
+  def wasAmbiguous: Boolean = false
+
   override def toString: String = {
-    val buf: StringBuilder = new StringBuilder
+    val buf = new mutable.StringBuilder
     toString(buf)
     buf.toString()
   }
 
-  def getChildren: Seq[GenericNode] = Seq()
+  def getChildren: Seq[GenericNode] = Seq.empty
 
   def toIterator(descendants: Boolean = false): Iterator[GenericNode] = {
     GenericTree.asIterator(getChildren, descendants)
@@ -200,7 +200,7 @@ abstract class GenericNode(var parent: Option[GenericNode], val context: Context
     context.begin == index
 
   def containsIndex(index: Int): Boolean =
-    (context.begin <= index && index <= context.end)
+    context.begin <= index && index <= context.end
 
   def isAtOffset(atOffset: Int): Boolean =
     (atOffset == offset && length == 0) || (atOffset >= offset && atOffset < offset + length)
@@ -235,30 +235,40 @@ abstract class GenericNode(var parent: Option[GenericNode], val context: Context
 
 class GenericNonTerminal(
   override val context: Context,
+  override val markers: Seq[Marker],
   val production: Production,
-  val children: Seq[GenericNode],
   override val value: Any
 ) extends GenericNode(None, context, value) {
 
-  children.foreach(child => child.parent = Some(this))
+  context.children.foreach(child => child.parent = Some(this))
 
-  override def getChildren: Seq[GenericNode] = children
+  override def getChildren: Seq[GenericNode] = context.children
 
   override def hasAmbiguity: Boolean =
-    getChildren.exists(child =>
-      child.context match {
-        case parsingCtx: ParsingContext => parsingCtx.ambiguity.isDefined
-        case _                          => false
-      }
-    )
+    context match {
+      case c: ParsingContext => c.ambiguity match {
+          case Some(a) => a.ambiguous
+          case None    => false
+        }
+      case _                 => false
+    }
 
-  private[diesel] def toString(buf: StringBuilder): Unit = {
+  override def wasAmbiguous: Boolean =
+    context match {
+      case c: ParsingContext => c.ambiguity match {
+          case Some(a) => a.branchCount > 1
+          case None    => false
+        }
+      case _                 => false
+    }
+
+  private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder = {
     // TODO useful for debugging?
 //    buf.append("[").append(production.element.getOrElse("?")).append("]")
     buf.append(production.rule.get.name).append("(")
     buf.append(context.offset).append(", ").append(context.length)
-    children.zipWithIndex.foreach {
-      case (child: GenericNode, index: Int) =>
+    context.children.zipWithIndex.foreach {
+      case (child: GenericNode, _: Int) =>
         buf.append(", ").append(child)
     }
     buf.append(")")
@@ -271,20 +281,8 @@ class GenericNonTerminal(
 class GenericTerminal(override val context: Context, val token: Token)
     extends GenericNode(None, context, token) {
 
-  private[diesel] def toString(buf: StringBuilder): Unit = {
+  private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder = {
     buf.append(token.id.name).append("(").append(token.text).append(")")
-  }
-}
-
-private object GenericSentinel
-    extends GenericNode(
-      None,
-      new ParsingContext(None, -1, -1, 0, -1, None, Seq(), null, Seq()),
-      None
-    ) {
-
-  private[diesel] def toString(buf: StringBuilder): Unit = {
-    buf.append("Sentinel()")
   }
 }
 
@@ -292,168 +290,305 @@ object Navigator {
 
   def apply(
     result: Result,
+    userDataProvider: Option[UserDataProvider]
+  ): Navigator =
+    new Navigator(result, Seq.empty, Seq(Reducer.noAbortAsMuchAsPossible), userDataProvider)
+
+  def apply(
+    result: Result,
     postProcessors: Seq[GenericTree => Seq[Marker]] = Seq.empty,
+    reducer: Seq[GenericNode => Reducer] = Seq(Reducer.noAbortAsMuchAsPossible),
     userDataProvider: Option[UserDataProvider] = None
   ): Navigator =
-    new Navigator(result, postProcessors, userDataProvider)
+    new Navigator(result, postProcessors, reducer, userDataProvider)
 
-  def select(navigator: Navigator): Option[GenericTree] = {
-    var asts: Seq[GenericTree] = Seq()
-    var errorCount: Int        = Int.MaxValue
-    while (navigator.hasNext) {
-      val candidate: GenericTree = navigator.next()
-      if (asts.isEmpty)
-        asts = Seq(candidate)
-      else {
-        val actualErrorCount = Marker.countErrors(candidate.markers)
-        if (errorCount > actualErrorCount)
-          asts = Seq(candidate)
-        else if (errorCount == 0 && actualErrorCount == 0)
-          asts = asts ++ Seq(candidate)
-      }
-      errorCount = Marker.countErrors(asts.head.markers)
-    }
-    if (errorCount == 0 && asts.size > 1) {
-      val ast                 = asts.head
-      var errors: Seq[Marker] = Seq()
-      ast.toSeq.foreach(node =>
-        if (node.hasAmbiguity)
-          errors = errors ++ Seq(Ambiguous.apply(node.offset, node.length))
-      )
-      if (errors.isEmpty)
-        errors = Seq(Ambiguous.apply(ast.offset, ast.length))
-      Some(GenericTree(ast.root, ast.value, ast.offset, ast.length, ast.markers ++ errors))
-    } else asts.headOption
+  def select(result: Result, userDataProvider: Option[UserDataProvider]): Option[GenericTree] = {
+    val navigator = apply(
+      result,
+      Seq.empty,
+      reducer =
+        Seq(Reducer.noAbortAsMuchAsPossible, /* Reducer.fewerErrorPossible, */ Reducer.selectOne),
+      userDataProvider
+    )
+    if (navigator.hasNext) {
+      val tree = Some(navigator.next())
+      if (navigator.hasNext)
+        throw new RuntimeException()
+      tree
+    } else None
   }
 
+//  def select(navigator: Navigator): Option[GenericTree] = {
+//    var asts: Seq[GenericTree] = Seq.empty
+//    var errorCount: Int        = Int.MaxValue
+//    while (navigator.hasNext) {
+//      val candidate: GenericTree = navigator.next()
+//      if (asts.isEmpty)
+//        asts = Seq(candidate)
+//      else {
+//        val actualErrorCount = Marker.countErrors(candidate.markers)
+//        if (errorCount > actualErrorCount)
+//          asts = Seq(candidate)
+//        else if (errorCount == 0 && actualErrorCount == 0)
+//          asts = asts ++ Seq(candidate)
+//      }
+//      errorCount = Marker.countErrors(asts.head.markers)
+//    }
+//    if (errorCount == 0 && asts.size > 1) {
+//      val ast                 = asts.head
+//      var errors: Seq[Marker] = Seq.empty
+//      ast.toSeq.foreach(node =>
+//        if (node.hasAmbiguity)
+//          errors = errors ++ Seq(Ambiguous.apply(node.offset, node.length))
+//      )
+//      if (errors.isEmpty)
+//        errors = Seq(Ambiguous.apply(ast.offset, ast.length))
+//      Some(GenericTree(ast.root, ast.value, ast.offset, ast.length, ast.markers ++ errors))
+//    } else asts.headOption
+//  }
+
+  private[diesel] class Ambiguity(val branchCount: Int) {
+
+    private var abortedBranchCount: Int = 0
+
+    private[diesel] def abort(): Unit = abort(1)
+
+    private[diesel] def abort(count: Int): Unit = abortedBranchCount += count
+
+    private[diesel] def ambiguous: Boolean =
+      branchCount - abortedBranchCount > 1
+  }
+
+  type Filter = Seq[GenericNode] => Seq[GenericNode]
+}
+
+trait Reducer {
+
+  def node: GenericNode
+
+  def compare(node: GenericNode): (Reducer.Kind.Kind, Reducer)
+}
+
+object Reducer {
+
+  object Kind extends Enumeration {
+    type Kind = Value
+    val Better, Same, Worse = Value
+  }
+
+  case class FewerErrorPossible(override val node: GenericNode) extends Reducer {
+
+    private val errorCount = Marker.countErrors(node.markers)
+
+    override def compare(node: GenericNode): (Reducer.Kind.Kind, Reducer) = {
+      val other = FewerErrorPossible(node)
+      if (other.errorCount < this.errorCount) {
+        (Reducer.Kind.Better, other)
+      } else if (other.errorCount > this.errorCount) {
+        (Reducer.Kind.Worse, this)
+      } else {
+        (Reducer.Kind.Same, this)
+      }
+    }
+  }
+
+  def fewerErrorPossible: GenericNode => Reducer =
+    (node: GenericNode) => FewerErrorPossible(node)
+
+  case class NoAbortAsMushAsPossible(override val node: GenericNode) extends Reducer {
+
+    override def compare(node: GenericNode): (Reducer.Kind.Kind, Reducer) = {
+      val other = NoAbortAsMushAsPossible(node)
+      if (this.node.context.hasAborted) {
+        (Reducer.Kind.Better, other)
+      } else if (other.node.context.hasAborted) {
+        (Reducer.Kind.Worse, this)
+      } else {
+        (Reducer.Kind.Same, other)
+      }
+    }
+  }
+
+  def noAbortAsMuchAsPossible: GenericNode => Reducer =
+    (node: GenericNode) => NoAbortAsMushAsPossible(node)
+
+  case class SelectOne(override val node: GenericNode, ambiguous: Boolean = false) extends Reducer {
+
+    private val errorCount = Marker.countErrors(node.markers)
+
+    override def compare(node: GenericNode): (Reducer.Kind.Kind, Reducer) = {
+      val other = SelectOne(node)
+      if (this.errorCount > 0) {
+        if (other.errorCount < this.errorCount) {
+          (Reducer.Kind.Better, other)
+        } else {
+          (Reducer.Kind.Worse, this)
+        }
+      } else {
+        if (other.errorCount == 0) {
+          node.context.addMarkers(Ambiguous.apply(
+            node.offset,
+            node.length
+          )) // Not so good, find a way to copy node and context
+          (
+            Reducer.Kind.Worse,
+            SelectOne(node, ambiguous = true)
+          )
+        } else
+          (Reducer.Kind.Worse, this)
+      }
+    }
+  }
+
+  def selectOne: GenericNode => Reducer =
+    (node: GenericNode) => SelectOne(node)
 }
 
 class Navigator(
   val result: Result,
-  postProcessors: Seq[GenericTree => Seq[Marker]],
+  val postProcessors: Seq[GenericTree => Seq[Marker]],
+  val reducers: Seq[GenericNode => Reducer],
   private val userDataProvider: Option[UserDataProvider]
 ) {
 
-  import Analyzer._
+  private val root: Iterator[Seq[Parsing]] = nonTerminal(result.successState)
 
-  private var choices: Seq[Choice]        = Seq()
-  private[diesel] var stack: Seq[Parsing] = Seq()
-  private var root: Root                  = _
-  private var proc: Process               = _
-  private var current: Parsing            = _
+  def hasNext: Boolean = root.hasNext
 
-  private object Sentinel
-
-  moveToFirst
-
-  private[diesel] def choice(statement: Statement, state: State): Process = {
-    if (state.production.length == 0) {
-      pushSentinel()
-      statement.next()
-    } else {
-      val choice = new Choice(this, statement, state)
-      choices = Seq[Choice](choice) ++ choices
-      choice
-    }
-  }
-
-  private[diesel] def unary(
-    statement: Statement,
-    item: Item,
-    ambiguity: Option[Ambiguity]
-  ): Statement = {
-    new Unary(this, statement, item, ambiguity)
-  }
-
-  private[diesel] def push(item: Item, ambiguity: Option[Ambiguity]): Boolean = {
-    item match {
-      case terminal: TerminalItem =>
-        def value: Parsing = applyToken(terminal)
-        stack = Seq(value) ++ stack
-        true
-
-      case state: State =>
-        reduce(state, ambiguity)
-    }
-  }
-
-  private[diesel] def tree(state: State): Boolean = {
-    push(state, None)
-    val top       = stack.head
-    val candidate =
-      Parsing(top.node, top.value, top.offset, top.length, top.markers ++ result.reportErrors())
-    current = candidate
-    true
-  }
-
-  private[diesel] def pushSentinel(): Unit = {
-    stack = Seq(Parsing(GenericSentinel, Sentinel, -1, 0, Seq())) ++ stack
-  }
-
-  private[diesel] def reduce(state: State, ambiguity: Option[Ambiguity]): Boolean = {
-    var children: Seq[GenericNode]  = IndexedSeq()
-    var args: IndexedSeq[Any]       = IndexedSeq()
-    var i                           = state.production.length
-    var styles: Seq[(Token, Style)] = Seq()
-    var errors: Seq[Marker]         = Seq()
-    while (i > 0) {
-      val value = stack.head
-      value.value match {
-        case InsertedTokenValue(_, _, _) => /* Ignore */
-        case item: TerminalItem          =>
-          children = value.node +: children
-          args = item.token +: args
-          item.style.foreach(s => styles = (item.token, s) +: styles)
-          i -= 1
-        case _                           =>
-          children = value.node +: children
-          args = value.value +: args
-          i -= 1
-      }
-      errors = value.markers ++ errors
-      stack = stack.tail
-    }
-    errors = popSentinel(errors)
-    val offset                      = result.tokenAt(state.begin).map(_.offset).getOrElse(-1)
-    val length                      =
-      if (state.begin == state.end) {
-        0
-      } else {
-        result.tokenAt(state.end - 1).map(tk => tk.offset + tk.text.length).getOrElse(-1) - offset
-      }
-    val parsingCtx                  =
-      applyRule(
-        state.production,
-        children,
-        args,
-        state.begin,
-        state.end,
-        offset,
-        length,
-        ambiguity,
-        styles,
-        errors
+  def next(): GenericTree = {
+    val current = root.next().head
+    var tree    =
+      GenericTree(
+        current.node,
+        current.value,
+        current.offset,
+        current.length,
+        current.markers ++ result.reportErrors()
       )
-    stack = Seq(parsingCtx) ++ stack
-    !parsingCtx.node.context.hasAborted
+    if (postProcessors.nonEmpty) {
+      var markers: Seq[Marker] = Seq.empty
+      postProcessors.foreach(pp => markers = markers ++ pp(tree))
+      tree = GenericTree(tree.root, tree.value, tree.offset, tree.length, tree.markers ++ markers)
+    }
+    tree
   }
 
-  private def popSentinel(errors: Seq[Marker]): Seq[Marker] = {
-    var res = errors
-    // Pop all remaining inserted token values
-    while (stack.head.value != Sentinel) {
-      val value = stack.head
-      value.value match {
-        case InsertedTokenValue(_, _, _) =>
-          res = value.markers ++ res
+  def toIterator: Iterator[GenericTree] with Object {} = {
+    val nav: Navigator = this
+    new Iterator[GenericTree] {
+      override def hasNext: Boolean = nav.hasNext
 
-        case _ =>
-          throw new RuntimeException()
-      }
-      stack = stack.tail
+      override def next(): GenericTree = nav.next()
     }
-    stack = stack.tail // Pop sentinel
-    res
+  }
+
+  private def backPtrsOf(state: State): Seq[BackPtr] =
+    result.contextOf(state).fold[Seq[BackPtr]](Seq.empty)(ctx => ctx.backPtrs.toSeq)
+
+  private def sentinel(): Iterator[Seq[Parsing]] = Seq(Seq.empty).iterator
+
+  private def terminal(item: TerminalItem): Iterator[Seq[Parsing]] =
+    singleton(applyToken(item))
+
+  private def singleton(value: Parsing): Iterator[Seq[Parsing]] =
+    Seq(Seq(value)).iterator
+
+  private def alternative(
+    causal: Iterator[Seq[Parsing]],
+    predecessor: State
+  ): Iterator[Seq[Parsing]] =
+    new BackPtrIterator(causal, predecessor)
+
+  private def nonTerminal(state: State): Iterator[Seq[Parsing]] = {
+    val backPtrs: Seq[BackPtr] = backPtrsOf(state)
+    if (backPtrs.isEmpty) {
+      if (state.isCompleted) singleton(reduceState(state, Seq.empty, None))
+      else sentinel()
+    } else {
+      val subtrees = backPtrs.map(backPtr =>
+        alternative(
+          backPtr.causal match {
+            case item: TerminalItem => terminal(item)
+            case state: State       => nonTerminal(state)
+          },
+          backPtr.predecessor
+        )
+      ).reduce(_ ++ _)
+      if (state.isCompleted) {
+        val candidates = subtrees.toSeq
+        if (candidates.size > 1 && state.production.isDslElement) {
+          val ambiguity = Some(new Ambiguity(candidates.size))
+          filterSubtrees(
+            candidates.map(s => Seq(reduceState(state, s, ambiguity))),
+            ambiguity
+          ).iterator
+        } else
+          candidates.map(s => Seq(reduceState(state, s, None))).iterator
+      } else
+        subtrees
+    }
+  }
+
+  private def filterSubtrees(
+    candidates: Seq[Seq[Parsing]],
+    ambiguity: Option[Ambiguity]
+  ): Seq[Seq[Parsing]] = {
+    var subtrees: Seq[Seq[Parsing]] = candidates
+    if (subtrees.nonEmpty) {
+      val branchCount = subtrees.size
+      subtrees = reducers.foldLeft(subtrees)((acc, r) => reduceSubtrees(acc, r))
+      if (subtrees.size < branchCount) {
+        ambiguity match {
+          case Some(value) =>
+            value.abort(branchCount - subtrees.size)
+          case None        =>
+        }
+      }
+    }
+    subtrees
+  }
+
+  private def reduceSubtrees(
+    subtrees: Seq[Seq[Parsing]],
+    reducer: GenericNode => Reducer
+  ): Seq[Seq[Parsing]] = {
+    var reduced: Seq[Seq[Parsing]] = Seq(subtrees.head)
+    var ctx                        = reducer(reduced.head.head.node)
+    subtrees.tail.foreach(subtree => {
+      val (kind, newCtx) = ctx.compare(subtree.head.node)
+      kind match {
+        case Reducer.Kind.Better =>
+          reduced = Seq(subtree)
+        case Reducer.Kind.Same   =>
+          reduced = reduced :+ subtree
+        case Reducer.Kind.Worse  =>
+      }
+      ctx = newCtx
+    })
+    reduced
+  }
+
+  private def applyToken(terminal: TerminalItem): Parsing = {
+    val errors = terminal.reportErrors()
+    val token  = terminal.token
+    val node   = new GenericTerminal(
+      new ParsingContext(
+        userDataProvider,
+        terminal.begin,
+        terminal.end,
+        token.offset,
+        token.text.length,
+        None,
+        Seq.empty
+      ),
+      token
+    )
+    terminal match {
+      case InsertedTokenValue(_, _, _) =>
+        Parsing(node, terminal, token.offset, 0, errors)
+      case _                           =>
+        Parsing(node, terminal, token.offset, token.text.length, errors)
+    }
   }
 
   private def applyRule(
@@ -475,273 +610,99 @@ class Navigator(
       offset,
       length,
       ambiguity,
-      errors,
-      this,
       children
     )
     val value   = production.action(context, args)
     styles.foreach(pair => context.setTokenStyle(pair._1, pair._2))
+    val markers = errors ++ context.markers
     Parsing(
-      new GenericNonTerminal(context, production, children, value),
+      new GenericNonTerminal(context, markers, production, value),
       value,
       offset,
       length,
-      errors ++ context.reportErrors()
+      markers
     )
   }
 
-  private def applyToken(terminal: TerminalItem): Parsing = {
-    val errors = terminal.reportErrors()
-    val token  = terminal.token
-    val node   = new GenericTerminal(
-      new ParsingContext(
-        userDataProvider,
-        terminal.begin,
-        terminal.end,
-        token.offset,
-        token.text.length,
-        None,
-        terminal.reportErrors(),
-        this,
-        Seq()
-      ),
-      token
-    )
-    terminal match {
-      case InsertedTokenValue(_, _, _) =>
-        Parsing(node, terminal, token.offset, 0, errors)
-
-      case _ =>
-        Parsing(node, terminal, token.offset, token.text.length, terminal.reportErrors())
-    }
-  }
-
-  private def moveToFirst: Boolean = moveToFirst(result.successState)
-
-  private def moveToFirst(state: State): Boolean = {
-    stack = Seq()
-    root = new Root(this, state)
-    proc = root
-    moveToNext
-  }
-
-  private def moveToNext: Boolean = {
-    while (!proc.done) {
-      proc = proc.step()
-      if (proc.pause)
-        return true
-      if (proc.stop || (proc.cut && canRetry))
-        proc = back()
-    }
-    current = null
-    root.succeeded
-  }
-
-  def hasNext: Boolean = current != null
-
-  def next(): GenericTree = {
-    var tree =
-      GenericTree(current.node, current.value, current.offset, current.length, current.markers)
-    if (postProcessors.nonEmpty) {
-      var markers: Seq[Marker] = Seq()
-      postProcessors.foreach(pp => markers = markers ++ pp(tree))
-      tree = GenericTree(tree.root, tree.value, tree.offset, tree.length, tree.markers ++ markers)
-    }
-    moveToNext
-    tree
-  }
-
-  def toIterator: Iterator[GenericTree] with Object {} = {
-    val nav: Navigator = this
-    new Iterator[GenericTree] {
-      override def hasNext: Boolean = nav.hasNext
-
-      override def next(): GenericTree = nav.next()
-    }
-  }
-
-  private def back(): Process = {
-    while (choices.nonEmpty) {
-      val choice = choices.head
-      if (choice.retry) {
-        stack = choice.base
-        return choice
-      }
-      choices = choices.tail
-    }
-    new Stop(this)
-  }
-
-  private def canRetry: Boolean = {
-    if (choices.nonEmpty) choices.exists(_.retry) else false
-  }
-}
-
-object Analyzer {
-
-  private[diesel] trait Process {
-    def navigator: Navigator
-
-    def step(): Process
-
-    def pause: Boolean = false
-
-    def stop: Boolean = false
-
-    def cut: Boolean = false
-
-    def done: Boolean = stop || cut
-  }
-
-  private[diesel] abstract class Statement(val navigator: Navigator, val parent: Statement)
-      extends Process {
-
-    def next(): Statement = parent.next()
-  }
-
-  private[diesel] class Unary(
-    override val navigator: Navigator,
-    override val parent: Statement,
-    val item: Item,
-    val ambiguity: Option[Ambiguity]
-  ) extends Statement(navigator, parent) {
-
-    override def step(): Process = {
-      item match {
-        case _: TerminalItem =>
-          next()
-
-        case state: State =>
-          navigator.choice(this, state)
-      }
-    }
-
-    override def next(): Statement = {
-      if (!navigator.push(item, ambiguity)) {
-        return new Cut(navigator)
-      }
-      super.next();
-    }
-  }
-
-  private[diesel] class Sequence(
-    override val navigator: Navigator,
-    override val parent: Statement,
-    val state: State,
-    val backPtr: BackPtr,
-    val ambiguity: Option[Ambiguity]
-  ) extends Statement(navigator, parent) {
-
-    override def step(): Process = {
-      if (
-        backPtr.predecessor.dot == 0 && navigator.result.contextOf(backPtr.predecessor).forall(
-          ctx => ctx.backPtrs.isEmpty
-        )
-      ) {
-        navigator.pushSentinel()
-        next()
+  private def reduceState(
+    state: State,
+    stack: Seq[Parsing],
+    ambiguity: Option[Ambiguity]
+  ): Parsing = {
+    var children: Seq[GenericNode]  = IndexedSeq.empty
+    var args: IndexedSeq[Any]       = IndexedSeq.empty
+    var i                           = state.production.length
+    var styles: Seq[(Token, Style)] = Seq.empty
+    var errors: Seq[Marker]         = Seq.empty
+    stack.foreach(arg => {
+      if (i > 0) {
+        arg.value match {
+          case InsertedTokenValue(_, _, _) => /* Ignore */
+          case item: TerminalItem          =>
+            children = arg.node +: children
+            args = item.token +: args
+            item.style.foreach(s => styles = (item.token, s) +: styles)
+            i -= 1
+          case _                           =>
+            children = arg.node +: children
+            args = arg.value +: args
+            i -= 1
+        }
+        errors = arg.markers ++ errors
       } else {
-        navigator.choice(this, backPtr.predecessor)
+        arg.value match {
+          case InsertedTokenValue(_, _, _) =>
+            errors = arg.markers ++ errors
+          case _                           =>
+            throw new RuntimeException()
+        }
       }
-    }
-
-    override def next(): Statement = {
-      navigator.unary(parent, backPtr.causal, ambiguity)
-    }
-  }
-
-  private[diesel] class Ambiguity(val branchCount: Int) {
-
-    private var abortedBranchCount: Int = 0
-
-    private[diesel] def abort(): Unit = abortedBranchCount += 1
-
-    private[diesel] def ambiguous: Boolean = branchCount - abortedBranchCount > 1
-  }
-
-  private[diesel] class Choice(val navigator: Navigator, val parent: Statement, val state: State)
-      extends Process {
-
-    private val backPtrs: Seq[BackPtr]       =
-      navigator.result.contextOf(state).fold[Seq[BackPtr]](Seq())(ctx => ctx.backPtrs.toSeq)
-    private[diesel] val base: Seq[Parsing]   = navigator.stack
-    private var index: Seq[BackPtr]          = backPtrs
-    private val ambiguity: Option[Ambiguity] =
-      if (backPtrs.size > 1) Some(new Ambiguity(backPtrs.size)) else None
-
-    override def step(): Process = {
-      if (index.nonEmpty) {
-        val backPtr = index.head
-        index = index.tail
-        return new Sequence(navigator, parent, state, backPtr, ambiguity)
+    })
+    val offset                      = result.tokenAt(state.begin).map(_.offset).getOrElse(-1)
+    val length                      =
+      if (state.begin == state.end) {
+        0
+      } else {
+        result.tokenAt(state.end - 1).map(tk => tk.offset + tk.text.length).getOrElse(-1) - offset
       }
-      new Stop(navigator)
-    }
-
-    def retry: Boolean = index.nonEmpty
+    applyRule(
+      state.production,
+      children,
+      args,
+      state.begin,
+      state.end,
+      offset,
+      length,
+      ambiguity,
+      styles,
+      errors
+    )
   }
 
-  private[diesel] class Tree(override val navigator: Navigator, val root: Root)
-      extends Statement(navigator, root) {
+  private class BackPtrIterator(
+    causal: Iterator[Seq[Parsing]],
+    predecessor: State
+  ) extends Iterator[Seq[Parsing]] {
 
-    override def step(): Process = navigator.choice(this, root.state)
+    private var current      = if (causal.hasNext) causal.next() else Seq.empty
+    private var predIterator = nonTerminal(predecessor)
+    private var finished     = false
 
-    override def next(): Statement = {
-      if (navigator.tree(root.state))
-        new Pause(navigator, root)
-      else
-        super.next()
+    override def next(): Seq[Parsing] = {
+      if (finished) {
+        throw new NoSuchElementException()
+      }
+      val result = current ++ predIterator.next()
+      if (!predIterator.hasNext) {
+        if (causal.hasNext) {
+          current = causal.next()
+          predIterator = nonTerminal(predecessor)
+        } else
+          finished = true
+      }
+      result
     }
+
+    override def hasNext: Boolean = predIterator.hasNext || causal.hasNext
   }
-
-  private[diesel] class Root(override val navigator: Navigator, val state: State)
-      extends Statement(navigator, new Stop(navigator)) {
-
-    private var succeed = false
-
-    override def step(): Process = new Tree(navigator, this)
-
-    override def next(): Statement = {
-      succeed = true
-      new Stop(navigator)
-    }
-
-    def succeeded: Boolean = succeed
-  }
-
-  private[diesel] class Pause(override val navigator: Navigator, override val parent: Statement)
-      extends Statement(navigator, parent) {
-
-    override def step(): Process = next()
-
-    override def pause: Boolean = true
-  }
-
-  private[diesel] class Stop(override val navigator: Navigator) extends Statement(navigator, null) {
-
-    override def step(): Process = {
-      throw new NotImplementedError()
-    }
-
-    override def next(): Statement = {
-      throw new NotImplementedError()
-    }
-
-    override def stop: Boolean = true
-  }
-
-  private[diesel] class Cut(override val navigator: Navigator) extends Statement(navigator, null) {
-
-    override def step(): Process = {
-      throw new NotImplementedError()
-    }
-
-    override def next(): Statement = {
-      throw new NotImplementedError()
-    }
-
-    override def cut: Boolean = true
-  }
-
-  //  case class StyleRange[S](val offset: )
 }

@@ -104,12 +104,11 @@ object AstHelpers {
 
   def selectAst(
     dsl: Dsl,
-    axiom: Option[Axiom[_]] = None,
-    navigatorFactory: Result => Navigator = Navigator(_)
+    axiom: Option[Axiom[_]] = None
   )(s: String)(f: GenericTree => Unit): Unit = {
     val result    = parse(dsl, s, axiom)
     assert(result.success)
-    val astOption = Navigator.select(navigatorFactory(result))
+    val astOption = Navigator.select(result, None)
     assert(astOption.nonEmpty)
     f(astOption.get)
   }

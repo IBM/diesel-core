@@ -139,6 +139,8 @@ object Bnf {
 
   sealed trait DslElement
 
+  case class DslAxiom[T](axiom: Dsl.Axiom[T]) extends DslElement
+
   case class DslValue[T](concept: Concept[T]) extends DslElement
 
   case class DslTarget[T](concept: Concept[T]) extends DslElement
@@ -146,6 +148,8 @@ object Bnf {
   case class DslInstance[T](instance: Instance[T]) extends DslElement
 
   case class DslSyntax[T](syntax: Syntax[T]) extends DslElement
+
+  case class DslBody(element: DslElement) extends DslElement
 
   class Production(
     var rule: Option[NonTerminal] = None,
@@ -156,6 +160,27 @@ object Bnf {
   ) {
     val symbols: Array[Symbol] = symbols0.toArray
     val length: Int            = symbols.length
+    def isEmpty: Boolean       = length == 0
+
+    def getElement: Option[DslElement] = {
+      element match {
+        case Some(value) => value match {
+            case Bnf.DslBody(element) => Some(element)
+            case _                    => element
+          }
+        case None        => None
+      }
+    }
+
+    def isDslElement: Boolean = {
+      element match {
+        case Some(value) => value match {
+            case Bnf.DslBody(_) => false
+            case _              => true
+          }
+        case None        => false
+      }
+    }
   }
 
   trait NonTerminal extends Symbol {
@@ -859,7 +884,15 @@ object Bnf {
         case SPMapped(p, _) =>
           val mapRule = getOrCreateRule(owner.name, "map." + counter)
           counter += 1
-          mapAction(mapRule, p, mapSyntaxProduction(mapRule, p, ctx, None, first), element)
+          mapAction(
+            mapRule,
+            p,
+            mapSyntaxProduction(mapRule, p, ctx, None, first),
+            element match {
+              case Some(value) => Some(DslBody(value))
+              case None        => None
+            }
+          )
           Partial(Seq(mapRule))
 
         case SPAssoc(p, associativity, level) =>
@@ -961,13 +994,18 @@ object Bnf {
 
     def generateAxioms(): Unit = {
       dsl.getAxioms.foreach {
-        case Dsl.Axiom(name, production) =>
+        case a: Dsl.Axiom[_] =>
           val ctx   = GrammarContext(None, None, None, None, None)
-          val rule  = getOrCreateRuleWithContext(name, ctx)
-          mapAction(rule, production, mapSyntaxProduction(rule, production, ctx))
+          val rule  = getOrCreateRuleWithContext(a.name, ctx)
+          mapAction(
+            rule,
+            a.production,
+            mapSyntaxProduction(rule, a.production, ctx),
+            Some(DslAxiom(a))
+          )
           val axiom = Axiom(rule)
           rules += axiom.name -> axiom
-        case _                           =>
+        case _               =>
       }
     }
 
