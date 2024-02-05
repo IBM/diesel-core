@@ -76,6 +76,14 @@ class JsModelDslPredictionTest extends FunSuite {
 
   test("root with prefix 5") {
     assertPredictions(
+      "roo",
+      3,
+      Seq("root :")
+    )
+  }
+
+  test("root with prefix 6") {
+    assertPredictions(
       "ro :",
       2,
       Seq("root :")
@@ -90,7 +98,15 @@ class JsModelDslPredictionTest extends FunSuite {
     )
   }
 
-  test("root:") {
+  test("root: 1") {
+    assertPredictions(
+      "root:",
+      4,
+      Seq("root :")
+    )
+  }
+
+  test("root: 2") {
     assertPredictions(
       "root:",
       5,
@@ -98,7 +114,42 @@ class JsModelDslPredictionTest extends FunSuite {
     )
   }
 
-  test("declared classes show up in predictions") {
+  test("root non existing class") {
+    assertPredictions(
+      "root: MyClass",
+      6,
+      Seq("string", "boolean", "number")
+    )
+  }
+
+  test("root non existing class") {
+    assertPredictions(
+      "root: MyClass",
+      13,
+      Seq("string", "boolean", "number")
+    )
+  }
+
+  test("root non existing class") {
+    assertPredictions(
+      "root: MyClass",
+      13,
+      Seq("string", "boolean", "number")
+    )
+  }
+
+  test("declared classes show up in predictions 1") {
+    assertPredictions(
+      """root:
+        |class Foo { }
+        |class Bar { }
+        |""".stripMargin,
+      4,
+      Seq("root :")
+    )
+  }
+
+  test("declared classes show up in predictions 2") {
     assertPredictions(
       """root:
         |class Foo { }
@@ -109,7 +160,7 @@ class JsModelDslPredictionTest extends FunSuite {
     )
   }
 
-  test("array or class or domain 1") {
+  test("array or class or domain") {
     assertPredictions(
       "root: number",
       12,
@@ -134,7 +185,7 @@ class JsModelDslPredictionTest extends FunSuite {
     )
   }
 
-  test("closing brace after class declaration") {
+  test("closing brace after class declaration 1") {
     assertPredictions(
       """root: MyClass
         |class MyClass {""".stripMargin,
@@ -143,7 +194,36 @@ class JsModelDslPredictionTest extends FunSuite {
     )
   }
 
-  test("optionals") {
+  test("closing brace after class declaration 2") {
+    assertPredictions(
+      """root: MyClass
+        |class MyClass { }""".stripMargin,
+      29,
+      Seq("}")
+    )
+  }
+
+  test("closing brace after class declaration 3") {
+    assertPredictions(
+      """root: MyClass
+        |class MyClass { }""".stripMargin,
+      29,
+      Seq("}")
+    )
+  }
+
+  test("optionals 1") {
+    assertPredictions(
+      """root: MyClass
+        |class MyClass {
+        |  foo
+        |}""".stripMargin,
+      35,
+      Seq("}")
+    )
+  }
+
+  test("optionals 2") {
     assertPredictions(
       """root: MyClass
         |class MyClass {

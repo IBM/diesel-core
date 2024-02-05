@@ -153,7 +153,6 @@ case object JsModelDsl extends Dsl with Identifiers with Comments with DynamicLe
   def completionConfiguration: CompletionConfiguration = {
     val config = new CompletionConfiguration()
     config.setFilter(MyFilter)
-    config.setLookback(SimpleCompletionLookback(":{}[],"))
     config
   }
 
