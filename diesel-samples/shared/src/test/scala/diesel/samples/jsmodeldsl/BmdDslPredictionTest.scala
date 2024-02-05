@@ -28,9 +28,7 @@ class BmdDslPredictionTest extends FunSuite {
     expectedPredictions: Seq[String]
   ): Unit = {
     assertPredictionsWith(text, offset) { proposals =>
-      assert(
-        proposals.map(_.text) == expectedPredictions
-      )
+      assertEquals(proposals.map(_.text), expectedPredictions)
     }
   }
 
@@ -63,7 +61,7 @@ class BmdDslPredictionTest extends FunSuite {
     assertPredictions(
       "start",
       5,
-      Seq("with")
+      Seq("start with")
     )
   }
 
@@ -71,17 +69,37 @@ class BmdDslPredictionTest extends FunSuite {
     assertPredictions(
       "start with",
       10,
+      Seq("with")
+//      Seq("text", "numeric", "a")
+    )
+  }
+
+  test("start with 2") {
+    assertPredictions(
+      "start with ",
+      11,
       Seq("text", "numeric", "a")
     )
   }
 
-  test("declared classes show up in predictions on empty") {
+  test("declared classes show up in predictions on empty 1") {
+    assertPredictions(
+      """start with a
+        |a Foo is a concept.
+        |a Bar is a concept.
+        |""".stripMargin,
+      12,
+      Seq("text", "numeric", "a")
+    )
+  }
+
+  test("declared classes show up in predictions on empty 2") {
     assertPredictions(
       """start with a 
         |a Foo is a concept.
         |a Bar is a concept.
         |""".stripMargin,
-      12,
+      13,
       // TODO should be?
 //      Seq("Foo", "Bar")
       Seq("Bar")
@@ -102,17 +120,19 @@ class BmdDslPredictionTest extends FunSuite {
   test("is a concept") {
     assertPredictions(
       "a shopping cart",
-      16,
+      15,
       Seq("has", "can be", "is a", "can be one of", ".")
     )
   }
 
   test("optionals") {
-    assertPredictions(
+    val text =
       """a Foo is a concept.
-        |a Foo has a bar (text)
-        |""".stripMargin,
-      19 + 22 + 1,
+        |a Foo has a bar (text) 
+        |""".stripMargin
+    assertPredictions(
+      text,
+      20 + 23,
       Seq("[ optional ]", ".")
     )
   }
@@ -199,6 +219,28 @@ class BmdDslPredictionTest extends FunSuite {
     ) { predictions =>
       assert(predictions.map(_.text) == Seq("Foo", "Gnu"))
       assert(predictions.flatMap(_.replace) == Seq((13, 3), (13, 3)))
+    }
+  }
+
+  test("predict with documentation") {
+    assertPredictionsWith(
+      """start with a Foo.
+        |a Foo is a concept.
+        |a Gnu is a Foo.
+        |a Gnu has a bar (text) [optional].
+        |""".stripMargin,
+      15
+    ) { predictions =>
+      assertEquals(
+        predictions.flatMap(_.documentation),
+        Seq(
+          "<b>Foo</b>\n",
+          """|<b>Gnu</b><br/>
+             |extends Foo<br/>
+             |bar?: string
+             |""".stripMargin
+        )
+      )
     }
   }
 }

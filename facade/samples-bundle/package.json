@@ -1,6 +1,6 @@
 {
   "name": "@diesel-parser/samples",
-  "version": "0.16.2",
+  "version": "0.18.0",
   "description": "js-usable diesel samples",
   "author": "Rémi Van Keisbelck <remi@rvkb.com>",
   "license": "Apache-2.0",

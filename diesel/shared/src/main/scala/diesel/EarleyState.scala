@@ -191,17 +191,33 @@ private[diesel] class Chart(
 
   private[diesel] def offset: Int = token.map(_.offset).getOrElse(-1)
 
+  private[diesel] def endsAtOffset(offset: Int): Boolean = {
+    token
+      .map(token =>
+        token.offset + token.text.length == offset
+      )
+      .getOrElse(false)
+  }
+
   private[diesel] def isAtOffset(offset: Int): Boolean = {
     token
       .map(token =>
-        token.offset <= offset && (offset < token.offset + token.text.length || token.id == Eos)
+        token.offset <= offset && (offset <= token.offset + token.text.length || token.id == Eos)
+      )
+      .getOrElse(false)
+  }
+
+  private[diesel] def isAtOffsetExclusive(offset: Int): Boolean = {
+    token
+      .map(token =>
+        token.offset <= offset && (offset < token.offset + token.text.length)
       )
       .getOrElse(false)
   }
 
   private[diesel] def isAfterOffset(offset: Int): Boolean = {
     token
-      .map(offset < _.offset)
+      .map(offset <= _.offset)
       .getOrElse(false)
   }
 
@@ -296,25 +312,54 @@ class Result(val axiom: Bnf.Axiom) {
     token.text.dropRight(diff)
   }
 
-  private[diesel] def chartAndPrefixAtOffset(offset: Int): Option[(Chart, Option[String])] = {
-    val c = charts.find { chart =>
-      chart.isAtOffset(offset)
-    }.orElse(charts.find { chart =>
-      chart.isAfterOffset(offset)
-    })
+  private[diesel] def chartAndPrefixAtOffset(
+    offset: Int,
+    afterDelimiter: Boolean
+  ): Option[(Chart, Option[String])] = {
 
     def tokenEndsAt(offset: Int) = {
       t: Token => t.offset + t.length == offset
     }
 
-    val prefix = errorTokens
-      .find(tokenEndsAt(offset))
-      .orElse(c.flatMap(_.token))
-      .map(getTokenPrefix(offset, _))
-      .filter(_.nonEmpty)
-//      .map(_.text)
+    def useNextChart = charts
+      .find(chart => chart.isAfterOffset(offset))
+      .map(chart => (chart, None))
 
-    c.map((_, prefix))
+    if (afterDelimiter) {
+      // we are just after the delimiter, 2 cases :
+      // 1. we are at the end of a token : no lookback needed
+      // 2. we are in a token : look back to the token start
+      charts
+        .find(chart => chart.isAtOffset(offset))
+        .flatMap(chart => chart.token.map(t => (chart, t))) match {
+        case Some((chart, token)) =>
+          if (offset == token.offset + token.length) {
+            useNextChart
+          } else {
+            val text   = token.text
+            val prefix = text.dropRight(text.length - offset)
+            Some((chart, Some(prefix)))
+          }
+        case None                 =>
+          useNextChart
+      }
+
+    } else {
+
+      val c      = charts.find { chart =>
+        chart.isAtOffset(offset)
+      }.orElse(charts.find { chart =>
+        chart.isAfterOffset(offset)
+      })
+      val prefix = errorTokens
+        .find(tokenEndsAt(offset))
+        .orElse(c.flatMap(_.token))
+        .map(getTokenPrefix(offset, _))
+        .filter(_.nonEmpty)
+      //      .map(_.text)
+
+      c.map((_, prefix))
+    }
   }
 
   private[diesel] def chartAt(index: Int) = {

@@ -77,10 +77,8 @@ lazy val sharedSettings_test = Seq(
 )
 
 lazy val sharedSettings_lint = Seq(
-  addCompilerPlugin(scalafixSemanticdb),
-  ThisBuild / scalafixScalaBinaryVersion := CrossVersion.binaryScalaVersion(scalaVersion.value),
-  ThisBuild / semanticdbEnabled          := true,
-  ThisBuild / semanticdbVersion          := scalafixSemanticdb.revision
+  ThisBuild / semanticdbEnabled := true,
+  ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 )
 
 lazy val sharedJsSettings = Seq(

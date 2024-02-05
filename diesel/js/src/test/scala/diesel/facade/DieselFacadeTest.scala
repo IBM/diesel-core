@@ -74,6 +74,7 @@ class DieselFacadeTest extends FunSuite {
     val res    = facade.predict(createPredictRequest("1 + ", 3))
     assert(res.success)
     assert(res.error.isEmpty)
+    println(res.proposals)
     assertEquals(res.proposals.length, 5)
     val p0     = res.proposals(0)
     assertEquals(p0.text, "0")
@@ -81,6 +82,7 @@ class DieselFacadeTest extends FunSuite {
     val p1     = res.proposals(1)
     assertEquals(p1.text, "pi")
     assert(p1.replace.isEmpty)
+    assert(p1.documentation.isEmpty)
   }
 
   object MyMarkerMessage extends MarkerMessage {

@@ -111,6 +111,14 @@ class PredictWithPrefixTest extends FunSuite {
     )
   }
 
+  test("go") {
+    assertPredictions(
+      "go",
+      2,
+      expectedAll
+    )
+  }
+
   test("good") {
     assertPredictions(
       "good ",
@@ -132,6 +140,22 @@ class PredictWithPrefixTest extends FunSuite {
       "good xxx",
       7,
       Seq("job", "day")
+    )
+  }
+
+  test("good 4") {
+    assertPredictions(
+      "good jo",
+      7,
+      Seq("job", "day")
+    )
+  }
+
+  test("good 5") {
+    assertPredictions(
+      "good job",
+      4,
+      expectedAll
     )
   }
 
@@ -166,8 +190,9 @@ class PredictWithPrefixTest extends FunSuite {
   }
 
   test("replace 4") {
-    val proposals = AstHelpers.predict(MyDsl, "foo", 3)
-    assertEquals(proposals.size, 0)
+    assertPredictions("foo", 3, expectedAll)
+//    val proposals = AstHelpers.predict(MyDsl, "foo", 3)
+//    assertEquals(proposals.size, 0)
   }
 
   test("replace 5") {
@@ -188,6 +213,6 @@ class PredictWithPrefixTest extends FunSuite {
 
   test("replace 7") {
     val proposals = AstHelpers.predict(MyDsl, "good job", 8)
-    assertEquals(proposals.size, 0)
+    assertEquals(proposals.map(_.text), Seq("job", "day"))
   }
 }

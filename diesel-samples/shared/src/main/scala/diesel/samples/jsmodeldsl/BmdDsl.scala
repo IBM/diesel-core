@@ -241,11 +241,33 @@ case object BmdDsl extends Dsl with Identifiers with Comments { // with DynamicL
         val replaceThis     = thisRef.map(node => (node.offset, node.length))
         model
           .classes
-          .map(_.name)
-          .filterNot(isSelf)
-          .map(CompletionProposal(None, _, replaceThis))
+          .filterNot(c => isSelf(c.name))
+          .map(c => CompletionProposal(None, c.name, replaceThis, documentation = describe(c)))
       case _                  =>
         Seq.empty
+    }
+
+    private def describe(c: ClassDeclaration): Option[String] = {
+      val sb = new StringBuilder()
+      sb.append(s"<b>${c.name}</b>")
+      c.superClass.map(t => s"extends ${t.name}").foreach(line => sb.append("<br/>\n").append(line))
+      c.attributes.map(describe).foreach(line => sb.append("<br/>\n").append(line))
+      sb.append("\n")
+      Some(sb.toString)
+    }
+
+    private def describe(a: AttrDecl): String = {
+      s"${a.name}${if (a.optional) "?" else ""}: ${describe(a.declaredType)}"
+    }
+
+    private def describe(t: TypeRef): String = {
+      t match {
+        case StringType                 => "string"
+        case BoolType                   => "bool"
+        case NumType                    => "number"
+        case CustomType(_, name)        => name
+        case ArrayRefType(compoundType) => s"${describe(compoundType)}[]"
+      }
     }
   }
 

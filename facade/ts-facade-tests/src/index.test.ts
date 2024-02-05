@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-import {DieselParserFacade, ParseRequest, PredictRequest} from "@diesel-parser/ts-facade";
+import { DieselParserFacade, ParseRequest, PredictRequest } from "@diesel-parser/ts-facade";
 
 // @ts-ignore
 import { DieselSamples } from "@diesel-parser/samples";
-import {expect} from "chai";
+import { expect } from "chai";
 
 function getMyParser(): DieselParserFacade {
   // @ts-ignore
@@ -43,12 +43,30 @@ describe('parse', () => {
     expect(s0.name).to.equal("keyword");
   });
   it("parser should predict", () => {
-    const predictRequest: PredictRequest = { text: "", offset: 0} ;
+    const predictRequest: PredictRequest = { text: "", offset: 0 };
     const res = getMyParser().predict(predictRequest);
     expect(res.error).to.be.undefined;
     expect(res.success).to.equal(true);
     expect(res.proposals.length).to.equal(1);
     const p0 = res.proposals[0];
     expect(p0.text).to.equal("a");
+    expect(p0.documentation).to.be.undefined
+  });
+  it("parser should predict with documentation", () => {
+    const text = [
+      "start with a Foo.",
+      "a Foo is a concept.",
+      ""
+    ].join("\n")
+    const predictRequest: PredictRequest = {
+      text,
+      axiom: 'aCompileUnit',
+      offset: 13,
+    };
+    const res = getMyParser().predict(predictRequest);
+    expect(res.error).to.be.undefined;
+    expect(res.success).to.equal(true);
+    expect(res.proposals.map(p => p.text)).to.eql(["Foo"]);
+    expect(res.proposals.map(p => p.documentation)).to.eql(['<b>Foo</b>\n'])
   });
 });
