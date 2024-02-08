@@ -45,7 +45,7 @@ class AbortTest extends DslTestFunSuite {
       assert(!first.toSeq.exists(n => n.hasAmbiguity))
       assert(!nav.hasNext)
     }
-    withSelect("1 + 2 + 3") { tree =>
+    withTree("1 + 2 + 3") { tree =>
       assertNoMarkers(tree)
       assert(tree.value == Add(Add(Constant(1), Constant(2)), Constant(3)))
     }
@@ -62,7 +62,7 @@ class AbortTest extends DslTestFunSuite {
       assert(!first.toSeq.exists(n => n.hasAmbiguity))
       assert(!nav.hasNext)
     }
-    withSelect("1 + 2 * 3 + 4") { tree =>
+    withTree("1 + 2 * 3 + 4") { tree =>
       assertNoMarkers(tree)
       assert(tree.value == Add(
         Add(Constant(1.0), Mul(Constant(2.0), Constant(3.0))),

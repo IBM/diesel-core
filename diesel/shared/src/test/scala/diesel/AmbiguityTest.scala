@@ -37,8 +37,12 @@ class AmbiguityTest extends DslTestFunSuite {
     }
   }
 
+  private def emptyNav(r: Result): Navigator = {
+    Navigator(r)
+  }
+
   test("left assoc") {
-    withAsts("1 + 2 + 3") { nav: Navigator =>
+    withAsts("1 + 2 + 3", emptyNav) { nav: Navigator =>
       val first  = nav.next()
       assert(first.value == Add(Add(Constant(1), Constant(2)), Constant(3)))
       assert(first.toSeq.exists(n => n.hasAmbiguity))
@@ -50,7 +54,7 @@ class AmbiguityTest extends DslTestFunSuite {
       assert(second.markers.head.message == SimpleMarkerMessage("Invalid precedence"))
       assert(!nav.hasNext)
     }
-    withSelect("1 + 2 + 3") { tree =>
+    withTree("1 + 2 + 3") { tree =>
       assertNoMarkers(tree)
       assert(tree.toSeq.exists(n => n.wasAmbiguous))
       assert(tree.value == Add(Add(Constant(1), Constant(2)), Constant(3)))
@@ -96,7 +100,7 @@ class AmbiguityTest extends DslTestFunSuite {
       assert(fifth.toSeq.exists(n => n.hasAmbiguity))
       assert(!nav.hasNext)
     }
-    withSelect("1 + 2 * 3 + 4") { tree =>
+    withTree("1 + 2 * 3 + 4") { tree =>
       assertNoMarkers(tree)
       assert(tree.toSeq.exists(n => n.wasAmbiguous))
       assert(tree.value == Add(

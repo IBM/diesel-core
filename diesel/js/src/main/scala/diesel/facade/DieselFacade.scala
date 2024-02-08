@@ -48,7 +48,14 @@ class DieselParserFacade(
 
   @JSExport
   def predict(request: PredictRequest): DieselPredictResult = {
-    DieselPredictResult(doParse(request), request.text, request.offset, config, userDataProvider)
+    DieselPredictResult(
+      doParse(request),
+      request.text,
+      request.offset,
+      config,
+      userDataProvider,
+      navigatorFactory
+    )
   }
 
   // TODO borrowed from AstHelper
@@ -147,14 +154,13 @@ object DieselParseResult {
     navigatorFactory: Result => Navigator = Navigator(_)
   ): DieselParseResult = {
     if (result.success) {
-      Navigator.select(result, None) match {
-        case Some(ast) =>
-          new DieselParseResult(Right(ast), markerPostProcessor)
-        case None      =>
-          errorResult("AST not found")
-      }
+      val r = navigatorFactory(result).expectOneTree()
+        .swap
+        .map(x => x._1)
+        .swap
+      new DieselParseResult(r, markerPostProcessor)
     } else {
-      errorResult("parsing failure :/")
+      errorResult("parsing failure :/ ")
     }
   }
 }
@@ -211,10 +217,11 @@ object DieselPredictResult {
     text: String,
     offset: Int,
     config: Option[CompletionConfiguration],
-    userDataProvider: Option[UserDataProvider]
+    userDataProvider: Option[UserDataProvider],
+    navigatorFactory: Result => Navigator
   ): DieselPredictResult = {
     if (result.success) {
-      val navigator = Navigator(result)
+      val navigator = navigatorFactory(result)
       if (navigator.hasNext) {
         val proposals = new CompletionProcessor(
           result,

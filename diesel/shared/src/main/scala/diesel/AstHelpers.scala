@@ -76,20 +76,6 @@ object AstHelpers {
     f(navigator)
   }
 
-  def assertAst(
-    dsl: Dsl,
-    axiom: Option[Axiom[_]] = None,
-    navigatorFactory: Result => Navigator = Navigator(_)
-  )(s: String)(f: GenericTree => Unit): Unit = {
-    assertAsts(dsl, axiom, navigatorFactory)(s) { n: Navigator =>
-      assert(n.hasNext)
-      val a = n.next()
-      // println(a.root)
-      assert(!n.hasNext, s"more than 1 ast found : \n${a.root.value}\n${n.next().root.value}")
-      f(a)
-    }
-  }
-
   def withAst[T](
     dsl: Dsl,
     axiom: Option[Axiom[_]] = None,
@@ -104,13 +90,18 @@ object AstHelpers {
 
   def selectAst(
     dsl: Dsl,
-    axiom: Option[Axiom[_]] = None
+    axiom: Option[Axiom[_]] = None,
+    navigatorFactory: Result => Navigator = Navigator(_)
   )(s: String)(f: GenericTree => Unit): Unit = {
-    val result    = parse(dsl, s, axiom)
+    val result = parse(dsl, s, axiom)
     assert(result.success)
-    val astOption = Navigator.select(result, None)
-    assert(astOption.nonEmpty)
-    f(astOption.get)
+    val n      = navigatorFactory(result);
+    n.expectOneTree() match {
+      case Left(err)    =>
+        throw new RuntimeException(err._1)
+      case Right(value) =>
+        f(value)
+    }
   }
 
   def assertNoMarkers(p: GenericTree, assertNoAmbiguity: Boolean = true): Unit = {

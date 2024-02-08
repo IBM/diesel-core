@@ -54,7 +54,7 @@ class DslManyTokensTest extends FunSuite {
   }
 
   test("many tokens") {
-    AstHelpers.assertAst(MyDsl)(
+    AstHelpers.selectAst(MyDsl)(
       "this is a long phrase with many tokens before a string \"hello\""
     ) { tree =>
       assertEquals(tree.markers, Seq())
@@ -63,7 +63,7 @@ class DslManyTokensTest extends FunSuite {
   }
 
   test("less tokens") {
-    AstHelpers.assertAst(MyDsl)(
+    AstHelpers.selectAst(MyDsl)(
       "this is a string \"hello\""
     ) { tree =>
       assertEquals(tree.markers, Seq())

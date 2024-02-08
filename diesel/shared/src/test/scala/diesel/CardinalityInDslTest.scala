@@ -70,7 +70,7 @@ class CardinalityInDslTest extends FunSuite {
       """
         |length of firstK 10 , prime 123
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl)(text) { tree =>
+    AstHelpers.selectAst(MyDsl)(text) { tree =>
       assert(tree.markers.isEmpty)
       assert(
         tree.root.value == ALength(AFirstK(AInt(10), APrime(AInt(123))))

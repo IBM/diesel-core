@@ -49,20 +49,24 @@ abstract class DslTestFunSuite extends FunSuite {
     }
   }
 
-  protected def withAsts(text: String)(f: Navigator => Unit): Unit = {
-    AstHelpers.assertAsts(dsl, axiom = axiom)(text) { navigator =>
-      f(navigator)
-    }
-  }
+  val myNavigatorFactory = (r: Result) => Navigator(r, Seq.empty, Navigator.defaultReducer, None);
 
-  protected def withSelect(text: String)(f: GenericTree => Unit): Unit = {
-    AstHelpers.selectAst(dsl, axiom = axiom)(text) { tree =>
-      f(tree)
+  protected def withAsts(
+    text: String,
+    navigatorFactory: Result => Navigator = myNavigatorFactory
+  )(f: Navigator => Unit): Unit = {
+    AstHelpers.assertAsts(dsl, axiom = axiom, navigatorFactory = navigatorFactory)(text) {
+      navigator =>
+        f(navigator)
     }
   }
 
   protected def withTree(text: String)(f: GenericTree => Unit): Unit = {
-    AstHelpers.assertAst(dsl, axiom = axiom)(text) { tree =>
+    AstHelpers.selectAst(
+      dsl,
+      axiom = axiom,
+      navigatorFactory = myNavigatorFactory
+    )(text) { tree =>
       f(tree)
     }
   }

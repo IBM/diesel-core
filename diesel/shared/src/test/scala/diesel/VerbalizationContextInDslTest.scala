@@ -148,7 +148,7 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |definite the pi
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl)(text) { tree =>
+    AstHelpers.selectAst(MyDsl)(text) { tree =>
       assertEquals(tree.markers, Seq())
       assert(tree.root.value == ADefinite(Pi))
     }
@@ -159,7 +159,7 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |definite a pi
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl)(text) { tree =>
+    AstHelpers.selectAst(MyDsl)(text) { tree =>
       assert(tree.markers.length == 1)
       assert(
         tree.markers.head.message.format("en") == "The word 'the' is expected in place of 'a'."
@@ -172,7 +172,7 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |indefinite a pi
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl)(text) { tree =>
+    AstHelpers.selectAst(MyDsl)(text) { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == AInDefinite(Pi))
     }
@@ -183,7 +183,7 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |indefinite 123
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl)(text) { tree =>
+    AstHelpers.selectAst(MyDsl)(text) { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == AInDefinite(ANumberValue(123)))
     }
@@ -194,7 +194,7 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |print min(the max(the pi, pi), pi)
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl)(text) { tree =>
+    AstHelpers.selectAst(MyDsl)(text) { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == Statement(APrint(AMin(AMax(Pi, Pi), Pi))))
     }
@@ -205,14 +205,14 @@ class VerbalizationContextInDslTest extends FunSuite {
       """
         |print max(the max(the pi, pi), pi)
         |""".stripMargin
-    AstHelpers.assertAst(MyDsl)(text) { tree =>
+    AstHelpers.selectAst(MyDsl)(text) { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == Statement(APrint(AMax(AMax(Pi, Pi), Pi))))
     }
   }
 
   test("print") {
-    AstHelpers.assertAst(MyDsl)("print pi") { tree =>
+    AstHelpers.selectAst(MyDsl)("print pi") { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == Statement(APrint(Pi)))
     }
