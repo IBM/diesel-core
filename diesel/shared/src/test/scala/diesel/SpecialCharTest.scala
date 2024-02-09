@@ -35,13 +35,13 @@ class SpecialCharTest extends FunSuite {
   }
 
   test("no special char") {
-    AstHelpers.assertAst(MyDsl)("yalla") { tree =>
+    AstHelpers.selectAst(MyDsl)("yalla") { tree =>
       assertEquals(tree.value, "yalla")
     }
   }
 
   test("special char") {
-    AstHelpers.assertAst(MyDsl)("yalla€") { tree =>
+    AstHelpers.selectAst(MyDsl)("yalla€") { tree =>
       assertEquals(
         tree.markers,
         List(

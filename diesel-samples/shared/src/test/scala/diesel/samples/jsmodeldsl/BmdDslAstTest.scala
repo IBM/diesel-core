@@ -28,7 +28,7 @@ import munit.FunSuite
 class BmdDslAstTest extends FunSuite {
 
   private def doTest(text: String, ast: Any): Unit = {
-    AstHelpers.assertAst(BmdDsl, axiom = Some(BmdDsl.aCompileUnit))(text) { tree =>
+    AstHelpers.selectAst(BmdDsl, axiom = Some(BmdDsl.aCompileUnit))(text) { tree =>
       AstHelpers.assertNoMarkers(tree, false)
       assert(tree.root.value == ast)
     }

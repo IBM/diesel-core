@@ -154,7 +154,7 @@ class NestedRepTest extends FunSuite {
   }
 
   test("expr") {
-    AstHelpers.assertAst(
+    AstHelpers.selectAst(
       NestedDsl,
       Some(NestedDsl.aExpression)
     )("123") { tree =>
@@ -190,7 +190,7 @@ class NestedRepTest extends FunSuite {
   }
 
   test("NOT expr") {
-    AstHelpers.assertAst(
+    AstHelpers.selectAst(
       NestedDsl,
       Some(NestedDsl.aExpression)
     )("NOT 123") { tree =>
@@ -235,7 +235,7 @@ class NestedRepTest extends FunSuite {
   }
 
   test("expr 2") {
-    AstHelpers.assertAst(
+    AstHelpers.selectAst(
       NestedDsl,
       Some(NestedDsl.aExpression)
     )("1 <= 2") { tree =>
@@ -289,7 +289,7 @@ class NestedRepTest extends FunSuite {
   }
 
   test("NOT expr 2") {
-    AstHelpers.assertAst(
+    AstHelpers.selectAst(
       NestedDsl,
       Some(NestedDsl.aExpression)
     )("NOT 1 <= 2") { tree =>
@@ -311,7 +311,7 @@ class NestedRepTest extends FunSuite {
   }
 
   test("expr 3") {
-    AstHelpers.assertAst(
+    AstHelpers.selectAst(
       NestedDsl,
       Some(NestedDsl.aExpression)
     )("1 OR 2") { tree =>

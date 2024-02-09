@@ -64,7 +64,7 @@ class CustomScannerTest extends FunSuite {
   }
 
   test("custom scanner works") {
-    AstHelpers.assertAst(MyDsl)("666:bar") { tree =>
+    AstHelpers.selectAst(MyDsl)("666:bar") { tree =>
       assert(tree.value == MyRoot(MyInt(666), MyString("bar")))
     }
   }

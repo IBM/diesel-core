@@ -94,7 +94,7 @@ class CompletionProcessor(
         None
     val afterDelimiter = c.exists(delimiters.contains(_))
 
-    val navigator = Navigator(result, userDataProvider)
+    val navigator = Navigator(result, userDataProvider = userDataProvider)
     navigator.toIterator
       .toSeq
       .foldLeft(Seq.empty[CompletionProposal]) { case (acc, tree) =>

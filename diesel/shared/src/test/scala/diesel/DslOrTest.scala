@@ -55,7 +55,7 @@ class DslOrTest extends FunSuite {
   }
 
   test("should parse ok") {
-    AstHelpers.assertAst(MyDsl)("@\"funk\"") { tree =>
+    AstHelpers.selectAst(MyDsl)("@\"funk\"") { tree =>
       assert(tree.markers.isEmpty)
       assert(tree.root.value == At("\"funk\""))
     }

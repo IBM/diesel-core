@@ -17,6 +17,7 @@
 package diesel
 
 import diesel.AstHelpers._
+import diesel.Reducer.{fewerErrorPossible, noAbortAsMuchAsPossible}
 import diesel.samples.Ambiguity
 import diesel.samples.Ambiguity._
 
@@ -31,14 +32,31 @@ class AmbiguityTest extends DslTestFunSuite {
     }
   }
 
+  private def navWithFewerErrors(r: Result): Navigator = {
+    Navigator(r, Seq.empty, Seq(noAbortAsMuchAsPossible, fewerErrorPossible))
+  }
+
+  test("variable") {
+    withAsts("pi", navWithFewerErrors) { nav: Navigator =>
+      val first = nav.next();
+      assert(first.value == Constant(3.14))
+      assert(first.toSeq.forall(n => !n.hasAmbiguity))
+      assert(!nav.hasNext)
+    }
+  }
+
   test("expression") {
     assertAst("1 + 2") {
       Add(Constant(1), Constant(2))
     }
   }
 
+  private def emptyNav(r: Result): Navigator = {
+    Navigator(r, Seq.empty, Seq(noAbortAsMuchAsPossible))
+  }
+
   test("left assoc") {
-    withAsts("1 + 2 + 3") { nav: Navigator =>
+    withAsts("1 + 2 + 3", emptyNav) { nav: Navigator =>
       val first  = nav.next()
       assert(first.value == Add(Add(Constant(1), Constant(2)), Constant(3)))
       assert(first.toSeq.exists(n => n.hasAmbiguity))
@@ -50,7 +68,7 @@ class AmbiguityTest extends DslTestFunSuite {
       assert(second.markers.head.message == SimpleMarkerMessage("Invalid precedence"))
       assert(!nav.hasNext)
     }
-    withSelect("1 + 2 + 3") { tree =>
+    withTree("1 + 2 + 3") { tree =>
       assertNoMarkers(tree)
       assert(tree.toSeq.exists(n => n.wasAmbiguous))
       assert(tree.value == Add(Add(Constant(1), Constant(2)), Constant(3)))
@@ -58,7 +76,7 @@ class AmbiguityTest extends DslTestFunSuite {
   }
 
   test("precedence") {
-    withAsts("1 + 2 * 3 + 4") { nav: Navigator =>
+    withAsts("1 + 2 * 3 + 4", emptyNav) { nav: Navigator =>
       val first  = nav.next()
       assert(first.value == Add(
         Mul(Add(Constant(1.0), Constant(2.0)), Constant(3.0)),
@@ -96,7 +114,7 @@ class AmbiguityTest extends DslTestFunSuite {
       assert(fifth.toSeq.exists(n => n.hasAmbiguity))
       assert(!nav.hasNext)
     }
-    withSelect("1 + 2 * 3 + 4") { tree =>
+    withTree("1 + 2 * 3 + 4") { tree =>
       assertNoMarkers(tree)
       assert(tree.toSeq.exists(n => n.wasAmbiguous))
       assert(tree.value == Add(

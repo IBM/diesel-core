@@ -22,7 +22,7 @@ import munit.FunSuite
 class NestedMappingTest extends FunSuite {
 
   private def assertAst[T](dsl: Dsl)(text: String, expected: T): Unit = {
-    AstHelpers.assertAst(dsl)(text) { t =>
+    AstHelpers.selectAst(dsl)(text) { t =>
       AstHelpers.assertNoMarkers(t)
       assert(expected == t.value)
     }

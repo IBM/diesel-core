@@ -288,64 +288,16 @@ class GenericTerminal(override val context: Context, val token: Token)
 
 object Navigator {
 
-  def apply(
-    result: Result,
-    userDataProvider: Option[UserDataProvider]
-  ): Navigator =
-    new Navigator(result, Seq.empty, Seq(Reducer.noAbortAsMuchAsPossible), userDataProvider)
+  val defaultReducer: Seq[GenericNode => Reducer] =
+    Seq(Reducer.noAbortAsMuchAsPossible, Reducer.selectOne)
 
   def apply(
     result: Result,
     postProcessors: Seq[GenericTree => Seq[Marker]] = Seq.empty,
-    reducer: Seq[GenericNode => Reducer] = Seq(Reducer.noAbortAsMuchAsPossible),
+    reducer: Seq[GenericNode => Reducer] = defaultReducer,
     userDataProvider: Option[UserDataProvider] = None
   ): Navigator =
     new Navigator(result, postProcessors, reducer, userDataProvider)
-
-  def select(result: Result, userDataProvider: Option[UserDataProvider]): Option[GenericTree] = {
-    val navigator = apply(
-      result,
-      Seq.empty,
-      reducer =
-        Seq(Reducer.noAbortAsMuchAsPossible, /* Reducer.fewerErrorPossible, */ Reducer.selectOne),
-      userDataProvider
-    )
-    if (navigator.hasNext) {
-      val tree = Some(navigator.next())
-      if (navigator.hasNext)
-        throw new RuntimeException()
-      tree
-    } else None
-  }
-
-//  def select(navigator: Navigator): Option[GenericTree] = {
-//    var asts: Seq[GenericTree] = Seq.empty
-//    var errorCount: Int        = Int.MaxValue
-//    while (navigator.hasNext) {
-//      val candidate: GenericTree = navigator.next()
-//      if (asts.isEmpty)
-//        asts = Seq(candidate)
-//      else {
-//        val actualErrorCount = Marker.countErrors(candidate.markers)
-//        if (errorCount > actualErrorCount)
-//          asts = Seq(candidate)
-//        else if (errorCount == 0 && actualErrorCount == 0)
-//          asts = asts ++ Seq(candidate)
-//      }
-//      errorCount = Marker.countErrors(asts.head.markers)
-//    }
-//    if (errorCount == 0 && asts.size > 1) {
-//      val ast                 = asts.head
-//      var errors: Seq[Marker] = Seq.empty
-//      ast.toSeq.foreach(node =>
-//        if (node.hasAmbiguity)
-//          errors = errors ++ Seq(Ambiguous.apply(node.offset, node.length))
-//      )
-//      if (errors.isEmpty)
-//        errors = Seq(Ambiguous.apply(ast.offset, ast.length))
-//      Some(GenericTree(ast.root, ast.value, ast.offset, ast.length, ast.markers ++ errors))
-//    } else asts.headOption
-//  }
 
   private[diesel] class Ambiguity(val branchCount: Int) {
 
@@ -386,8 +338,10 @@ object Reducer {
         (Reducer.Kind.Better, other)
       } else if (other.errorCount > this.errorCount) {
         (Reducer.Kind.Worse, this)
-      } else {
+      } else if (this.errorCount == 0) {
         (Reducer.Kind.Same, this)
+      } else {
+        (Reducer.Kind.Worse, this)
       }
     }
   }
@@ -442,16 +396,18 @@ object Reducer {
 
   def selectOne: GenericNode => Reducer =
     (node: GenericNode) => SelectOne(node)
+
+  type MarkerPostProcessor = GenericTree => Seq[Marker]
 }
 
 class Navigator(
   val result: Result,
-  val postProcessors: Seq[GenericTree => Seq[Marker]],
+  val postProcessors: Seq[Reducer.MarkerPostProcessor],
   val reducers: Seq[GenericNode => Reducer],
   private val userDataProvider: Option[UserDataProvider]
 ) {
 
-  private val root: Iterator[Seq[Parsing]] = nonTerminal(result.successState)
+  private val root: Iterator[Seq[Parsing]] = nonTerminal(result.successState, successState = true)
 
   def hasNext: Boolean = root.hasNext
 
@@ -499,7 +455,7 @@ class Navigator(
   ): Iterator[Seq[Parsing]] =
     new BackPtrIterator(causal, predecessor)
 
-  private def nonTerminal(state: State): Iterator[Seq[Parsing]] = {
+  private def nonTerminal(state: State, successState: Boolean = false): Iterator[Seq[Parsing]] = {
     val backPtrs: Seq[BackPtr] = backPtrsOf(state)
     if (backPtrs.isEmpty) {
       if (state.isCompleted) singleton(reduceState(state, Seq.empty, None))
@@ -516,7 +472,7 @@ class Navigator(
       ).reduce(_ ++ _)
       if (state.isCompleted) {
         val candidates = subtrees.toSeq
-        if (candidates.size > 1 && state.production.isDslElement) {
+        if (candidates.size > 1 && (successState || state.production.isDslElement)) {
           val ambiguity = Some(new Ambiguity(candidates.size))
           filterSubtrees(
             candidates.map(s => Seq(reduceState(state, s, ambiguity))),
@@ -704,5 +660,18 @@ class Navigator(
     }
 
     override def hasNext: Boolean = predIterator.hasNext || causal.hasNext
+  }
+
+  def expectOneTree(): Either[(String, Seq[GenericTree]), GenericTree] = {
+    toIterator.toSeq match {
+      case Nil          =>
+        Left("No ASTs found !" -> Seq.empty)
+      case head :: tail =>
+        if (tail.isEmpty) {
+          Right(head)
+        } else {
+          Left("Multiple ASTs found" -> (head +: tail))
+        }
+    }
   }
 }
