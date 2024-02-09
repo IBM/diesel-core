@@ -16,16 +16,21 @@
 
 package diesel.samples
 
-import diesel.{Context, Dsl, Errors, Marker, SimpleMarkerMessage}
-import diesel.Dsl.{Axiom, Concept, Instance, Syntax}
+import diesel.{Context, Dsl, Errors, Lexer, Marker, SimpleMarkerMessage}
+import diesel.Dsl.{Axiom, Concept, Identifiers, Instance, Syntax}
 import diesel.Lexer.Token
 
 object Ambiguity {
 
   sealed trait Expr
-  case class Constant(value: Double)      extends Expr {
+  case class Constant(value: Double) extends Expr {
     override def toString: String = s"${System.identityHashCode(this)}($value)"
   }
+
+  case class Variable(name: String) extends Expr {
+    override def toString: String = s"${System.identityHashCode(this)}($name)"
+  }
+
   case class Add(left: Expr, right: Expr) extends Expr {
     override def toString: String = s"${System.identityHashCode(this)}($left, $right)"
   }
@@ -38,11 +43,19 @@ object Ambiguity {
     override def toString: String = s"${System.identityHashCode(this)}($e)"
   }
 
-  object MyDsl extends Dsl {
+  object MyDsl extends Dsl with Identifiers {
+
+    override def identScanner: Lexer.Scanner = "[a-zA-Z]+".r
 
     object InvalidPrecedence {
       def apply(offset: Int, len: Int): Marker = {
         Marker(Errors.SemanticError, offset, len, SimpleMarkerMessage(s"Invalid precedence"))
+      }
+    }
+
+    object UnknownVariable {
+      def apply(name: String, offset: Int, len: Int): Marker = {
+        Marker(Errors.SemanticError, offset, len, SimpleMarkerMessage(s"Unknown variable: $name"))
       }
     }
 
@@ -52,6 +65,18 @@ object Ambiguity {
     val pi: Instance[Expr] = instance(number)("pi") map { c =>
       Constant(3.14)
     }
+
+    val variable: Syntax[Expr] = syntax(number)(
+      idOrKeyword map {
+        case (ctx, name) =>
+          ctx.addMarkers(UnknownVariable(
+            name.text,
+            ctx.offset,
+            ctx.length
+          )) // Just add error for now
+          Variable(name.text)
+      }
+    )
 
     val add: Syntax[Expr] = syntax(number)(
       number ~ "+" ~ number map {

@@ -407,7 +407,7 @@ class Navigator(
   private val userDataProvider: Option[UserDataProvider]
 ) {
 
-  private val root: Iterator[Seq[Parsing]] = nonTerminal(result.successState)
+  private val root: Iterator[Seq[Parsing]] = nonTerminal(result.successState, successState = true)
 
   def hasNext: Boolean = root.hasNext
 
@@ -455,7 +455,7 @@ class Navigator(
   ): Iterator[Seq[Parsing]] =
     new BackPtrIterator(causal, predecessor)
 
-  private def nonTerminal(state: State): Iterator[Seq[Parsing]] = {
+  private def nonTerminal(state: State, successState: Boolean = false): Iterator[Seq[Parsing]] = {
     val backPtrs: Seq[BackPtr] = backPtrsOf(state)
     if (backPtrs.isEmpty) {
       if (state.isCompleted) singleton(reduceState(state, Seq.empty, None))
@@ -472,7 +472,7 @@ class Navigator(
       ).reduce(_ ++ _)
       if (state.isCompleted) {
         val candidates = subtrees.toSeq
-        if (candidates.size > 1 && state.production.isDslElement) {
+        if (candidates.size > 1 && (successState || state.production.isDslElement)) {
           val ambiguity = Some(new Ambiguity(candidates.size))
           filterSubtrees(
             candidates.map(s => Seq(reduceState(state, s, ambiguity))),

@@ -17,7 +17,7 @@
 package diesel
 
 import diesel.AstHelpers._
-import diesel.Reducer.noAbortAsMuchAsPossible
+import diesel.Reducer.{fewerErrorPossible, noAbortAsMuchAsPossible}
 import diesel.samples.Ambiguity
 import diesel.samples.Ambiguity._
 
@@ -29,6 +29,19 @@ class AmbiguityTest extends DslTestFunSuite {
   test("constant") {
     assertAst("12") {
       Constant(12)
+    }
+  }
+
+  private def navWithFewerErrors(r: Result): Navigator = {
+    Navigator(r, Seq.empty, Seq(noAbortAsMuchAsPossible, fewerErrorPossible))
+  }
+
+  test("variable") {
+    withAsts("pi", navWithFewerErrors) { nav: Navigator =>
+      val first = nav.next();
+      assert(first.value == Constant(3.14))
+      assert(first.toSeq.forall(n => !n.hasAmbiguity))
+      assert(!nav.hasNext)
     }
   }
 
