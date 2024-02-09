@@ -289,7 +289,7 @@ class GenericTerminal(override val context: Context, val token: Token)
 object Navigator {
 
   val defaultReducer: Seq[GenericNode => Reducer] =
-    Seq(Reducer.noAbortAsMuchAsPossible, Reducer.fewerErrorPossible)
+    Seq(Reducer.noAbortAsMuchAsPossible, Reducer.selectOne)
 
   def apply(
     result: Result,

@@ -49,11 +49,12 @@ abstract class DslTestFunSuite extends FunSuite {
     }
   }
 
-  val myNavigatorFactory = (r: Result) => Navigator(r, Seq.empty, Navigator.defaultReducer, None);
+  private val defaultNavigatorFactory =
+    (r: Result) => Navigator(r, Seq.empty, Navigator.defaultReducer, None);
 
   protected def withAsts(
     text: String,
-    navigatorFactory: Result => Navigator = myNavigatorFactory
+    navigatorFactory: Result => Navigator = defaultNavigatorFactory
   )(f: Navigator => Unit): Unit = {
     AstHelpers.assertAsts(dsl, axiom = axiom, navigatorFactory = navigatorFactory)(text) {
       navigator =>
@@ -65,7 +66,7 @@ abstract class DslTestFunSuite extends FunSuite {
     AstHelpers.selectAst(
       dsl,
       axiom = axiom,
-      navigatorFactory = myNavigatorFactory
+      navigatorFactory = defaultNavigatorFactory
     )(text) { tree =>
       f(tree)
     }
