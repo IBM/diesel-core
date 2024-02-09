@@ -29,9 +29,9 @@ trait MarkerPostProcessor {
 class DieselParserFacade(
   val dsl: Dsl,
   val config: Option[CompletionConfiguration] = None,
-  val userDataProvider: Option[UserDataProvider] = None,
   val markerPostProcessor: Option[MarkerPostProcessor] = None,
-  val navigatorFactory: Result => Navigator = Navigator(_)
+  val navigatorFactory: Result => Navigator = Navigator(_),
+  val userDataProviderFactory: Option[PredictRequest => Option[UserDataProvider]] = None
 ) {
 
   val bnf: Bnf       = Bnf(dsl)
@@ -49,12 +49,11 @@ class DieselParserFacade(
   @JSExport
   def predict(request: PredictRequest): DieselPredictResult = {
     DieselPredictResult(
+      request,
       doParse(request),
-      request.text,
-      request.offset,
       config,
-      userDataProvider,
-      navigatorFactory
+      navigatorFactory,
+      userDataProviderFactory
     )
   }
 
@@ -75,8 +74,9 @@ class DieselParserFacade(
 
 @js.native
 trait ParseRequest extends js.Object {
-  var text: String              = js.native
-  var axiom: js.UndefOr[String] = js.native
+  var text: String                                        = js.native
+  var axiom: js.UndefOr[String]                           = js.native
+  var customParameters: js.UndefOr[js.Dictionary[String]] = js.native
 }
 
 @js.native
@@ -213,22 +213,21 @@ object DieselPredictResult {
   private def errorResult(reason: String): DieselPredictResult = DieselPredictResult(Left(reason))
 
   def apply(
+    request: PredictRequest,
     result: Result,
-    text: String,
-    offset: Int,
     config: Option[CompletionConfiguration],
-    userDataProvider: Option[UserDataProvider],
-    navigatorFactory: Result => Navigator
+    navigatorFactory: Result => Navigator,
+    userDataProviderFactory: Option[PredictRequest => Option[UserDataProvider]]
   ): DieselPredictResult = {
     if (result.success) {
       val navigator = navigatorFactory(result)
       if (navigator.hasNext) {
         val proposals = new CompletionProcessor(
           result,
-          text,
+          request.text,
           config,
-          userDataProvider
-        ).computeCompletionProposal(offset).distinctBy(
+          userDataProviderFactory.flatMap(udpf => udpf(request))
+        ).computeCompletionProposal(request.offset).distinctBy(
           _.text
         ) // not sure why but we have to dedup this
         new DieselPredictResult(Right(proposals))
