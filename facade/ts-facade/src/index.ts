@@ -17,6 +17,7 @@
 export interface ParseRequest {
   readonly text: string;
   readonly axiom?: string;
+  readonly customParameters?: { [id: string]: string };
 }
 
 export interface PredictRequest extends ParseRequest {
