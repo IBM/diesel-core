@@ -22,13 +22,21 @@ import diesel.samples.jsmodeldsl.BmdDsl
 import diesel.samples.sfeel.SFeel
 
 import scala.scalajs.js.annotation.{JSExport, JSExportTopLevel}
+import diesel.facade.PredictRequest
+import diesel.facade.PredictContext
 
 @JSExportTopLevel("DieselSamples")
 object DieselSamples {
 
   @JSExport
-  def createBmdParser(): DieselParserFacade =
-    new DieselParserFacade(BmdDsl, Some(BmdDsl.completionConfiguration))
+  def createBmdParser(): DieselParserFacade = {
+    val predictContextFactory = (r: PredictRequest) =>
+      PredictContext(config =
+        Some(BmdDsl.completionConfiguration)
+      )
+
+    new DieselParserFacade(BmdDsl, predictContextFactory = Some(predictContextFactory))
+  }
 
   @JSExport
   def createGlslParser(): DieselParserFacade = new DieselParserFacade(Glsl)

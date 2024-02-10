@@ -26,12 +26,22 @@ trait MarkerPostProcessor {
   def postProcessMarkers(tree: GenericTree): Seq[Marker]
 }
 
+case class ParseContext(
+  markerPostProcessor: Option[MarkerPostProcessor] = None,
+  navigatorFactory: Result => Navigator = Navigator(_)
+)
+
+case class PredictContext(
+  markerPostProcessor: Option[MarkerPostProcessor] = None,
+  navigatorFactory: Result => Navigator = Navigator(_),
+  config: Option[CompletionConfiguration] = None,
+  userDataProvider: Option[UserDataProvider] = None
+)
+
 class DieselParserFacade(
   val dsl: Dsl,
-  val config: Option[CompletionConfiguration] = None,
-  val markerPostProcessor: Option[MarkerPostProcessor] = None,
-  val navigatorFactory: Result => Navigator = Navigator(_),
-  val userDataProviderFactory: Option[PredictRequest => Option[UserDataProvider]] = None
+  val parseContextFactory: Option[ParseRequest => ParseContext] = None,
+  val predictContextFactory: Option[PredictRequest => PredictContext] = None
 ) {
 
   val bnf: Bnf       = Bnf(dsl)
@@ -43,17 +53,25 @@ class DieselParserFacade(
   }
 
   @JSExport
-  def parse(request: ParseRequest): DieselParseResult =
-    DieselParseResult(doParse(request), markerPostProcessor, navigatorFactory)
+  def parse(request: ParseRequest): DieselParseResult = {
+    val parseContext = parseContextFactory.map(_(request)).getOrElse(ParseContext())
+    DieselParseResult(
+      doParse(request),
+      parseContext.markerPostProcessor,
+      parseContext.navigatorFactory
+    )
+  }
 
   @JSExport
   def predict(request: PredictRequest): DieselPredictResult = {
+    val predictContext = predictContextFactory.map(_(request)).getOrElse(PredictContext())
     DieselPredictResult(
-      request,
       doParse(request),
-      config,
-      navigatorFactory,
-      userDataProviderFactory
+      request.text,
+      request.offset,
+      predictContext.config,
+      predictContext.navigatorFactory,
+      predictContext.userDataProvider
     )
   }
 
@@ -213,21 +231,22 @@ object DieselPredictResult {
   private def errorResult(reason: String): DieselPredictResult = DieselPredictResult(Left(reason))
 
   def apply(
-    request: PredictRequest,
     result: Result,
+    text: String,
+    offset: Int,
     config: Option[CompletionConfiguration],
     navigatorFactory: Result => Navigator,
-    userDataProviderFactory: Option[PredictRequest => Option[UserDataProvider]]
+    userDataProvider: Option[UserDataProvider]
   ): DieselPredictResult = {
     if (result.success) {
       val navigator = navigatorFactory(result)
       if (navigator.hasNext) {
         val proposals = new CompletionProcessor(
           result,
-          request.text,
+          text,
           config,
-          userDataProviderFactory.flatMap(udpf => udpf(request))
-        ).computeCompletionProposal(request.offset).distinctBy(
+          userDataProvider
+        ).computeCompletionProposal(offset).distinctBy(
           _.text
         ) // not sure why but we have to dedup this
         new DieselPredictResult(Right(proposals))
