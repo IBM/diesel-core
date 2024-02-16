@@ -1013,22 +1013,24 @@ object Bnf {
       ctx.multiple foreach { multiple =>
         if (!multiple) {
           ctx.concept foreach { concept =>
-            concept.data foreach { data =>
-              rule >> new Production(
-                Some(rule),
-                Seq(Bnf.Token(concept.name, ConceptId(concept), data.style)),
-                { (context, args) =>
-                  try {
-                    data.valueOf(context, args.head.asInstanceOf[Lexer.Token])
-                  } catch {
-                    case e: Throwable =>
-                      // TODO Provide a way to add an error on context
-                      e.printStackTrace()
-                      data.defaultValue
-                  }
-                },
-                Some(DslValue(concept))
-              )
+            if (dsl.acceptExpr(Expressions.Values, concept, multiple)) {
+              concept.data foreach { data =>
+                rule >> new Production(
+                  Some(rule),
+                  Seq(Bnf.Token(concept.name, ConceptId(concept), data.style)),
+                  { (context, args) =>
+                    try {
+                      data.valueOf(context, args.head.asInstanceOf[Lexer.Token])
+                    } catch {
+                      case e: Throwable =>
+                        // TODO Provide a way to add an error on context
+                        e.printStackTrace()
+                        data.defaultValue
+                    }
+                  },
+                  Some(DslValue(concept))
+                )
+              }
             }
             // Hierarchy
             dsl.subConceptsOf(concept) foreach {
@@ -1054,19 +1056,21 @@ object Bnf {
       ctx.multiple foreach { multiple =>
         if (!multiple) {
           ctx.concept foreach { concept =>
-            dsl.getInstances.foreach(instance =>
-              if (instance.concept == concept) {
-                instance match {
-                  case instance: Instance[_] =>
-                    addProduction(
-                      rule,
-                      mapInstanceProduction(rule, instance.production, instance.style),
-                      { (context, _) => instance.value(context) },
-                      Some(DslInstance(instance))
-                    )
+            if (dsl.acceptExpr(Expressions.Instances, concept, multiple)) {
+              dsl.getInstances.foreach(instance =>
+                if (instance.concept == concept) {
+                  instance match {
+                    case instance: Instance[_] =>
+                      addProduction(
+                        rule,
+                        mapInstanceProduction(rule, instance.production, instance.style),
+                        { (context, _) => instance.value(context) },
+                        Some(DslInstance(instance))
+                      )
+                  }
                 }
-              }
-            )
+              )
+            }
             // Hierarchy
             dsl.subConceptsOf(concept) foreach {
               case subConcept: Concept[_] =>
@@ -1114,11 +1118,13 @@ object Bnf {
                   concept
                 )
               ) {
-                addSyntax(syntax)
+                if (dsl.acceptExpr(Expressions.Syntaxes, syntax.concept, multiple = false))
+                  addSyntax(syntax)
               }
             case syntax: SyntaxMulti[_, _] =>
               if (multiple && dsl.isSubtypeOf(syntax.concept, concept)) {
-                addSyntax(syntax)
+                if (dsl.acceptExpr(Expressions.Syntaxes, syntax.concept, multiple = true))
+                  addSyntax(syntax)
               }
             case _                         =>
           }
@@ -1126,11 +1132,13 @@ object Bnf {
           dsl.getGenericSyntaxes.foreach {
             case genericSyntax: SyntaxGeneric[_]         =>
               if (!multiple) {
-                genericSyntax.apply(concept, exprTypes, dsl, addSyntax)
+                if (dsl.acceptExpr(Expressions.Syntaxes, concept, multiple = false))
+                  genericSyntax.apply(concept, exprTypes, dsl, addSyntax)
               }
             case genericSyntax: SyntaxGenericMulti[_, _] =>
               if (multiple) {
-                genericSyntax.apply(concept, exprTypes, dsl, addSyntax)
+                if (dsl.acceptExpr(Expressions.Syntaxes, concept, multiple = true))
+                  genericSyntax.apply(concept, exprTypes, dsl, addSyntax)
               }
           }
         }
@@ -1141,20 +1149,22 @@ object Bnf {
     def generateTarget(rule: Rule, ctx: GrammarContext): Boolean = {
       ctx.multiple foreach { multiple =>
         ctx.concept foreach { concept =>
-          val p = verbalizations(dsl).map { v =>
-            val verbCtx = VerbalizationContext(
-              article = ctx.article.getOrElse(NoArticle),
-              plural = ctx.plural.getOrElse(multiple),
-              partitive = ctx.partitive.getOrElse(false)
+          if (dsl.acceptExpr(Expressions.Targets, concept, multiple)) {
+            val p = verbalizations(dsl).map { v =>
+              val verbCtx = VerbalizationContext(
+                article = ctx.article.getOrElse(NoArticle),
+                plural = ctx.plural.getOrElse(multiple),
+                partitive = ctx.partitive.getOrElse(false)
+              )
+              splitText(v.verbalizer.verbalize(verbCtx, concept))
+            }.getOrElse(splitText(concept.name))
+            rule >> new Production(
+              Some(rule),
+              p.symbols,
+              { (_, _) => concept },
+              Some(DslTarget(concept))
             )
-            splitText(v.verbalizer.verbalize(verbCtx, concept))
-          }.getOrElse(splitText(concept.name))
-          rule >> new Production(
-            Some(rule),
-            p.symbols,
-            { (_, _) => concept },
-            Some(DslTarget(concept))
-          )
+          }
           // Hierarchy
           dsl.subConceptsOf(concept) foreach {
             case subConcept: Concept[_] =>

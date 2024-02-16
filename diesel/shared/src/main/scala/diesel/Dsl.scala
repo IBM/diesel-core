@@ -345,8 +345,8 @@ object Dsl {
 
     case object Values    extends Type
     case object Instances extends Type
-    case object Phrases   extends Type
     case object Syntaxes  extends Type
+    case object Targets   extends Type
 
     case class Custom(name: String) extends Type
 
@@ -723,7 +723,6 @@ trait Dsl {
   def defaultExprs: Set[Expressions.Type] = Set(
     Expressions.Values,
     Expressions.Instances,
-    Expressions.Phrases,
     Expressions.Syntaxes
   )
 
@@ -755,6 +754,9 @@ trait Dsl {
   def isSubtypeOf(c: ConceptBase, p: ConceptBase): Boolean = c == p || hasAncestor(c, p)
   def hasAncestor(c: ConceptBase, p: ConceptBase): Boolean =
     getParent(c).contains(p) || subConceptsOf(p).exists(d => hasAncestor(c, d))
+
+  def acceptExpr[T](exprType: Expressions.Type, concept: Concept[T], multiple: Boolean): Boolean =
+    true
 
   def concept[T: ClassTag](implicit name: DeclaringSourceName): Concept[T] = {
     val result = Concept[T](name = name.name, None)

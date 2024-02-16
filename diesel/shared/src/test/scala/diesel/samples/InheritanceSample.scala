@@ -17,31 +17,46 @@
 package diesel.samples
 
 import diesel.Dsl
-import diesel.Dsl.Concept
-import diesel.Dsl.Axiom
+import diesel.Dsl.{Axiom, Concept, Expressions, SPConceptRef, Syntax}
 
 object InheritanceSample {
 
   object Ast {
     sealed trait Value
+
     case class IntValue(i: Int) extends Value
+
+    case class TypeRef(identifier: String) extends Value
   }
 
   import Ast._
 
   object MyDsl extends Dsl {
 
-    val value: Concept[Value] = concept
+    override def acceptExpr[T](
+      exprType: Expressions.Type,
+      concept: Concept[T],
+      multiple: Boolean
+    ): Boolean = concept != hiddenValue
+
+    val value: Concept[Value] = concept[Value]
+
+    val hiddenValue: Concept[Value] = concept[Value, Value](value)
 
     val intValue: Concept[IntValue] =
-      concept(
+      concept[IntValue, Value](
         "\\d+".r,
         defaultValue = IntValue(0),
-        parent = Some(value)
+        parent = Some(hiddenValue)
       ) map {
         case (_, s) =>
-          IntValue(s.text.toInt)
+          IntValue(try { s.text.toInt }
+          catch { case _: Exception => 0 })
       }
+
+    val typeRef: Syntax[Value] = syntax(value)(
+      SPConceptRef(value, (_, c: Concept[Value]) => TypeRef(c.name))
+    )
 
     val axiom: Axiom[Value] = axiom(value)
   }
