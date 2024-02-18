@@ -136,8 +136,8 @@ case class DieselStyle(private val styledRange: StyledRange) {
 }
 
 class DieselParseResult(
-  private val res: Either[String, GenericTree],
-  private val markerPostProcessor: Option[MarkerPostProcessor]
+  val res: Either[String, GenericTree],
+  val markerPostProcessor: Option[MarkerPostProcessor]
 ) {
 
   @JSExport
