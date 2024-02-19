@@ -25,12 +25,40 @@ class InheritanceTest extends DslTestFunSuite {
   override def dsl = MyDsl
 
   test("concept inheritance") {
-    assert(MyDsl.getParent(MyDsl.intValue).contains(MyDsl.value))
+    assert(MyDsl.getParent(MyDsl.intValue).contains(MyDsl.hiddenValue))
+    assert(MyDsl.getParent(MyDsl.hiddenValue).contains(MyDsl.value))
   }
 
   test("123") {
     assertAst("123") {
       IntValue(123)
+    }
+  }
+
+  test("value type ref") {
+    assertAst("value") {
+      TypeRef("value")
+    }
+  }
+
+  test("intValue type ref") {
+    assertAst("intValue") {
+      TypeRef("intValue")
+    }
+  }
+
+  test("hiddenValue type ref") {
+    withTree("hiddenValue") { tree =>
+      assert(tree.markers.length == 2)
+      assertEquals(
+        tree.markers.head.message.format("en"),
+        "The word 'IntValue(0)' is missing."
+      )
+      assertEquals(
+        tree.markers.tail.head.message.format("en"),
+        "The word 'hiddenValue' is unknown."
+      )
+      assert(tree.value == IntValue(0))
     }
   }
 }
