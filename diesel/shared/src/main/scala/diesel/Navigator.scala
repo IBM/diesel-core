@@ -449,8 +449,10 @@ class Navigator(
   private def singleton(value: Parsing): Iterator[Seq[Parsing]] =
     Seq(Seq(value)).iterator
 
+  type AlternativeSupplier = () => Iterator[Seq[Parsing]]
+
   private def alternative(
-    causal: Iterator[Seq[Parsing]],
+    causal: AlternativeSupplier,
     predecessor: State
   ): Iterator[Seq[Parsing]] =
     new BackPtrIterator(causal, predecessor)
@@ -464,8 +466,8 @@ class Navigator(
       val subtrees = backPtrs.map(backPtr =>
         alternative(
           backPtr.causal match {
-            case item: TerminalItem => terminal(item)
-            case state: State       => nonTerminal(state)
+            case item: TerminalItem => () => terminal(item)
+            case state: State       => () => nonTerminal(state)
           },
           backPtr.predecessor
         )
@@ -636,12 +638,13 @@ class Navigator(
   }
 
   private class BackPtrIterator(
-    causal: Iterator[Seq[Parsing]],
-    predecessor: State
+    val causalSupplier: AlternativeSupplier,
+    val predecessor: State
   ) extends Iterator[Seq[Parsing]] {
 
-    private var current      = if (causal.hasNext) causal.next() else Seq.empty
     private var predIterator = nonTerminal(predecessor)
+    private val causal       = causalSupplier.apply()
+    private var current      = if (causal.hasNext) causal.next() else Seq.empty
     private var finished     = false
 
     override def next(): Seq[Parsing] = {

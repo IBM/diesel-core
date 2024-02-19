@@ -29,9 +29,22 @@ class SpecialCharTest extends FunSuite {
 
     val c: Concept[String] = concept
 
-    val s: Syntax[String] = syntax(c)(id map { case (_, t) => t.text })
+    val s1: Syntax[String] = syntax(c)(id map { case (_, t) => t.text })
+
+    val s2: Syntax[String] = syntax(c)(id map { case (_, t) => t.text })
+
+    val t: Syntax[String] = syntax(c)(s1 ~ "+" ~ s2 map {
+      case (_, (t1, _, t2)) =>
+        t1.text.concat(t2.text)
+    })
 
     val a: Axiom[String] = axiom(c)
+  }
+
+  test("concat".only) {
+    AstHelpers.selectAst(MyDsl)("yal + la") { tree =>
+      assertEquals(tree.value, "yalla")
+    }
   }
 
   test("no special char") {
