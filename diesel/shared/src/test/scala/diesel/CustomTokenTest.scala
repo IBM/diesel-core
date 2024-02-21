@@ -16,8 +16,8 @@
 
 package diesel
 
-import diesel.Dsl.{Axiom, CustomTokens, Identifiers, Syntax}
-import diesel.Lexer.{IdentifiedToken, RegexScanner}
+import diesel.Dsl.{Axiom, CustomToken, CustomTokens, Identifiers, Syntax}
+import diesel.Lexer.{IdentifierOrKeywordToken, IdentifierToken}
 import munit.FunSuite
 
 class CustomTokenTest extends FunSuite {
@@ -26,20 +26,16 @@ class CustomTokenTest extends FunSuite {
 
     override def identScanner: Lexer.Scanner = "[a-zA-Z_][a-zA-Z0-9_]*".r
 
-    val hashTagScanner: RegexScanner = RegexScanner("""#[a-zA-Z0-9]+""".r)
+    def placeHolders: CustomToken = CustomToken("<[^\"\n\r>]+>".r, Set("<foo>", "<bar>"))
 
-    override def tokenRules: Seq[Lexer.CustomRule] = {
-      Seq(
-        Lexer.CustomRule("<[^\"\n\r>]+>".r, Set("<foo>", "<bar>")),
-        Lexer.CustomRule(
-          hashTagScanner,
-          Set("#One", "#Two", "#Three"),
-          IdentifiedToken(hashTagScanner.name)
-        )
-      )
+    def hashTags: CustomToken =
+      CustomToken("""#[a-zA-Z0-9]+""".r, Set("#One", "#Two", "#Three"), strict = false)
+
+    override def customTokens: Seq[CustomToken] = {
+      Seq(placeHolders, hashTags)
     }
 
-    val s: Syntax[String] = syntax("#One" ~ "<foo>" ~ id ~ "<bar>" ~ hashTagScanner.name map {
+    val s: Syntax[String] = syntax("#One" ~ "<foo>" ~ id ~ "<bar>" ~ hashTags.token map {
       case (_, (o, f, i, b, x)) =>
         o.text.substring(1) + " " + f.text.substring(
           1,
@@ -51,6 +47,17 @@ class CustomTokenTest extends FunSuite {
     })
 
     val a: Axiom[String] = axiom(s)
+  }
+
+  test("BNF") {
+    def dsl    = MyDsl
+    def bnf    = Bnf(dsl)
+    def tokens = bnf.lexer.tokenRules
+    assertEquals(4, tokens.size)
+    assert(tokens.contains(IdentifierToken(dsl.identScanner.name)))
+    assert(tokens.contains(IdentifierOrKeywordToken(dsl.identScanner.name)))
+    assert(tokens.contains(dsl.hashTags.tokenId))
+    assert(tokens.contains(dsl.placeHolders.tokenId))
   }
 
   test("default") {

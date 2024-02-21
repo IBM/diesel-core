@@ -178,7 +178,9 @@ object Lexer {
     }
 
     val customRules: Seq[CustomRule] = dsl match {
-      case r: CustomTokens => r.tokenRules
+      case r: CustomTokens => r.customTokens.map(t =>
+          CustomRule(t.scanner, t.tokens, if (t.strict) Error else t.tokenId, t.styles, t.priority)
+        )
       case _               => Seq()
     }
 
