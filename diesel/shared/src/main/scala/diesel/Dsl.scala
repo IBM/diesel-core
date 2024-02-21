@@ -16,7 +16,7 @@
 
 package diesel
 
-import diesel.Lexer.{RegexScanner, Scanner, Token}
+import diesel.Lexer.{IdentifiedToken, RegexScanner, Scanner, Token}
 import diesel.i18n.DeclaringSourceName
 
 import scala.language.implicitConversions
@@ -693,12 +693,34 @@ object Dsl {
   }
 
   /*
-    Comments
+    Whitespaces
    */
 
   trait Whitespaces {
 
     def whitespacesScanner: Scanner
+  }
+
+  /*
+  Custom tokens
+   */
+
+  case class CustomToken(
+    scanner: Scanner,
+    tokens: Set[String],
+    strict: Boolean = true,
+    styles: Seq[Style] = Seq(),
+    priority: Int = 0
+  ) {
+    def tokenId: IdentifiedToken[String] =
+      IdentifiedToken(scanner.name)
+
+    def token: SPStr = SPStr(scanner.name)
+  }
+
+  trait CustomTokens {
+
+    def customTokens: Seq[CustomToken]
   }
 
   trait DynamicLexer {}
