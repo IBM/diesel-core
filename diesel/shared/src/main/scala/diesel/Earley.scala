@@ -209,7 +209,7 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
     tokenValue: Lexer.Token,
     context: Result
   ): Boolean = {
-    if (token.accept(tokenValue.id, lexer.identifiers)) {
+    if (lexer.accept(token, tokenValue)) {
       context.addState(
         State(state.production, state.begin, state.end + 1, state.dot + 1),
         StateKind.Kernel,

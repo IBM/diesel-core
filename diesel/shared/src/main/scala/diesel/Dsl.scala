@@ -693,12 +693,17 @@ object Dsl {
   }
 
   /*
-    Comments
+    Whitespaces
    */
 
   trait Whitespaces {
 
     def whitespacesScanner: Scanner
+  }
+
+  trait CustomTokens {
+
+    def tokenRules: Seq[Lexer.CustomRule]
   }
 
   trait DynamicLexer {}
