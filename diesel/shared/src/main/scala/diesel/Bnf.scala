@@ -862,9 +862,9 @@ object Bnf {
 
         case SPRuleRef(syntax) =>
           val newCtx = syntax match {
-            case SyntaxTyped(_, concept, _, _, _) => ctx.derive(concept, multiple = false)
-            case SyntaxMulti(_, concept, _, _)    => ctx.derive(concept, multiple = true)
-            case _                                => ctx
+            case SyntaxTyped(_, concept, _, _, _, _) => ctx.derive(concept, multiple = false)
+            case SyntaxMulti(_, concept, _, _, _)    => ctx.derive(concept, multiple = true)
+            case _                                   => ctx
           }
           val item   = getOrCreateRuleWithContext("syntax", newCtx, syntax.name)
           forwardGeneration(item, () => generateSyntax(syntax, item, newCtx))
@@ -873,9 +873,9 @@ object Bnf {
         case SPLazyRuleRef(_, r) =>
           val syntax = r()
           val newCtx = syntax match {
-            case SyntaxTyped(_, concept, _, _, _) => ctx.derive(concept, multiple = false)
-            case SyntaxMulti(_, concept, _, _)    => ctx.derive(concept, multiple = true)
-            case _                                => ctx
+            case SyntaxTyped(_, concept, _, _, _, _) => ctx.derive(concept, multiple = false)
+            case SyntaxMulti(_, concept, _, _, _)    => ctx.derive(concept, multiple = true)
+            case _                                   => ctx
           }
           val item   = getOrCreateRuleWithContext("syntax", newCtx, syntax.name)
           forwardGeneration(item, () => generateSyntax(syntax, item, newCtx))
@@ -1108,26 +1108,68 @@ object Bnf {
         )
       }
 
+      def addSyntaxInHierarchy(syntax: Syntax[_], ctx: GrammarContext): Rule = {
+        val syntaxRule = getOrCreateRuleWithContext("syntaxes", ctx, syntax.name)
+        forwardGeneration(syntaxRule, () => generateSyntaxes(syntaxRule, exprTypes, ctx))
+        rule >> new Production(
+          Some(rule),
+          Seq(syntaxRule),
+          { (_, args) => args.head },
+          None,
+          Propagate(0)
+        )
+      }
+
+      def canGenerateSyntax(
+        concept: Concept[_],
+        multiple: Boolean,
+        syntax: SyntaxTyped[_]
+      ): Boolean = {
+        val res = if (!multiple && syntax.expression)
+          if (syntax.hierarchical)
+            syntax.concept == concept
+          else
+            dsl.isSubtypeOf(syntax.concept, concept)
+        else
+          false
+        if (res)
+          dsl.acceptExpr(Expressions.Syntaxes, syntax.concept, multiple = false)
+        else
+          false
+      }
+
+      def canGenerateMultiSyntax(
+        concept: Concept[_],
+        multiple: Boolean,
+        syntax: SyntaxMulti[_, _]
+      ): Boolean = {
+        val res = if (multiple)
+          if (syntax.hierarchical)
+            syntax.concept == concept
+          else
+            dsl.isSubtypeOf(syntax.concept, concept)
+        else
+          false
+        if (res)
+          dsl.acceptExpr(Expressions.Syntaxes, syntax.concept, multiple = true)
+        else
+          false
+      }
+
       ctx.multiple foreach { multiple =>
         ctx.concept foreach { concept =>
           dsl.getSyntaxes.foreach {
             case syntax: SyntaxTyped[_]    =>
-              if (
-                !multiple && syntax.expression && dsl.isSubtypeOf(
-                  syntax.concept,
-                  concept
-                )
-              ) {
-                if (dsl.acceptExpr(Expressions.Syntaxes, syntax.concept, multiple = false))
-                  addSyntax(syntax)
+              if (canGenerateSyntax(concept, multiple, syntax)) {
+                addSyntax(syntax)
               }
             case syntax: SyntaxMulti[_, _] =>
-              if (multiple && dsl.isSubtypeOf(syntax.concept, concept)) {
-                if (dsl.acceptExpr(Expressions.Syntaxes, syntax.concept, multiple = true))
-                  addSyntax(syntax)
+              if (canGenerateMultiSyntax(concept, multiple, syntax)) {
+                addSyntax(syntax)
               }
             case _                         =>
           }
+
           // Generic syntaxes
           dsl.getGenericSyntaxes.foreach {
             case genericSyntax: SyntaxGeneric[_]         =>
@@ -1139,6 +1181,24 @@ object Bnf {
               if (multiple) {
                 if (dsl.acceptExpr(Expressions.Syntaxes, concept, multiple = true))
                   genericSyntax.apply(concept, exprTypes, dsl, addSyntax)
+              }
+          }
+
+          // Hierarchy
+          dsl.subConceptsOf(concept) foreach {
+            case subConcept: Concept[_] =>
+              dsl.getSyntaxes.foreach {
+                case syntax: SyntaxTyped[_]    =>
+                  val newCtx = ctx.derive(subConcept, multiple = false)
+                  if (canGenerateSyntax(subConcept, multiple, syntax)) {
+                    addSyntaxInHierarchy(syntax, newCtx)
+                  }
+                case syntax: SyntaxMulti[_, _] =>
+                  val newCtx = ctx.derive(subConcept, multiple = true)
+                  if (canGenerateMultiSyntax(subConcept, multiple, syntax)) {
+                    addSyntaxInHierarchy(syntax, newCtx)
+                  }
+                case _                         =>
               }
           }
         }

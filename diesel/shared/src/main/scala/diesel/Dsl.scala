@@ -126,6 +126,7 @@ object Dsl {
     name: String,
     concept: Concept[T],
     expression: Boolean,
+    hierarchical: Boolean,
     production: SyntaxProduction[_ <: T],
     userData: Option[Any] = None
   ) extends Syntax[T]
@@ -136,6 +137,7 @@ object Dsl {
   case class SyntaxMulti[T, T2](
     name: String,
     concept: Concept[T],
+    hierarchical: Boolean,
     production: SyntaxProduction[_ <: T2],
     userData: Option[Any] = None
   ) extends Syntax[T2]
@@ -891,11 +893,12 @@ trait Dsl {
 
   def syntax[T](
     concept: Concept[T],
-    expression: Boolean = true
+    expression: Boolean = true,
+    hierarchical: Boolean = false
   )(production: SyntaxProduction[T], userData: Option[Any] = None)(implicit
     name: DeclaringSourceName
   ): SyntaxTyped[T] =
-    addSyntax(SyntaxTyped(name.name, concept, expression, production, userData))
+    addSyntax(SyntaxTyped(name.name, concept, expression, hierarchical, production, userData))
 
   case class RootSyntaxBuilder(name: String) {
 
@@ -916,13 +919,14 @@ trait Dsl {
     name: String,
     concept: Concept[T],
     expression: Boolean = true,
+    hierarchical: Boolean = false,
     userData: Option[Any] = None,
     private val _doNotAdd: Boolean = false
   ) {
     private[Dsl] def doNotAdd(): TypedSyntaxBuilder[T] = copy(_doNotAdd = true)
 
     def apply(production: SyntaxProduction[T]): SyntaxTyped[T] = {
-      val syntax = SyntaxTyped(name, concept, expression, production, userData)
+      val syntax = SyntaxTyped(name, concept, expression, hierarchical, production, userData)
       if (_doNotAdd) syntax else addSyntax(syntax)
     }
 
@@ -939,6 +943,7 @@ trait Dsl {
     name: String,
     _userData: Option[Any],
     concept: Concept[T],
+    hierarchical: Boolean = false,
     private val _doNotAdd: Boolean = false
   ) {
     private[Dsl] def doNotAdd(): SyntaxMultipleBuilder[T, T2] = copy(_doNotAdd = true)
@@ -946,7 +951,7 @@ trait Dsl {
     def userData(x: Any): SyntaxMultipleBuilder[T, T2] = copy(_userData = Some(x))
 
     def apply(production: SyntaxProduction[T2]): SyntaxMulti[T, T2] = {
-      val syntax = SyntaxMulti(name, concept, production, _userData)
+      val syntax = SyntaxMulti(name, concept, hierarchical, production, _userData)
       if (_doNotAdd) syntax else addSyntax(syntax)
     }
 
