@@ -24,11 +24,19 @@ object HierarchicalSyntaxSample {
   object Ast {
     sealed trait Value
 
-    case class IntValue(i: Int) extends Value
+    trait Discrete extends Value
+
+    case class IntValue(i: Int) extends Discrete
 
     case class FloatValue(f: Double) extends Value
 
     case class Add(left: Value, right: Value) extends Value
+
+    case class Sub(left: Value, right: Value) extends Value
+
+    case class Round(value: Value) extends Discrete
+
+    case class SubExpr(value: Value) extends Value
   }
 
   import Ast._
@@ -39,8 +47,10 @@ object HierarchicalSyntaxSample {
 
     val numberConcept: Concept[Value] = concept[Value, Value](objectConcept)
 
+    val discreteConcept: Concept[Discrete] = concept[Discrete, Value](numberConcept)
+
     val intConcept: Concept[IntValue] =
-      concept("\\d+".r, IntValue(0), parent = Some(numberConcept)) map {
+      concept("\\d+".r, IntValue(0), parent = Some(discreteConcept)) map {
         case (_, s) =>
           IntValue(s.text.toInt)
       }
@@ -55,6 +65,27 @@ object HierarchicalSyntaxSample {
       numberConcept ~ "+".leftAssoc(10) ~ numberConcept map {
         case (_, (n1, _, n2)) =>
           Add(n1, n2)
+      }
+    )
+
+    val sub: Syntax[Value] = syntax(numberConcept, true, true)(
+      numberConcept ~ "-".leftAssoc(10) ~ numberConcept map {
+        case (_, (n1, _, n2)) =>
+          Sub(n1, n2)
+      }
+    )
+
+    val round: Syntax[Discrete] = syntax(discreteConcept, true, true)(
+      "round" ~ "(" ~ numberConcept ~ ")" map {
+        case (_, (_, _, n, _)) =>
+          Round(n)
+      }
+    )
+
+    val subExpr: Syntax[Value] = syntax(numberConcept, true, hierarchical = false)(
+      "(" ~ numberConcept ~ ")" map {
+        case (_, (_, n, _)) =>
+          SubExpr(n)
       }
     )
 

@@ -17,7 +17,7 @@
 package diesel
 
 import diesel.samples.HierarchicalSyntaxSample
-import diesel.samples.HierarchicalSyntaxSample.Ast.{Add, FloatValue, IntValue}
+import diesel.samples.HierarchicalSyntaxSample.Ast.{Add, FloatValue, IntValue, Round, Sub, SubExpr}
 import diesel.samples.HierarchicalSyntaxSample.{Ast, MyDsl}
 
 class HierarchicalSyntaxTest extends DslTestFunSuite {
@@ -38,9 +38,33 @@ class HierarchicalSyntaxTest extends DslTestFunSuite {
   }
 
   test("add") {
-    // System.setProperty("diesel.dumpbnf.html", "dump.html")
     assertAst("12 + 12.34") {
       Add(IntValue(12), FloatValue(12.34))
+    }
+  }
+
+  test("add sub") {
+    assertAst("12 + 12.34 - 2") {
+      Sub(Add(IntValue(12), FloatValue(12.34)), IntValue(2))
+    }
+  }
+
+  test("round") {
+    assertAst("round(12 + 12.34)") {
+      Round(Add(IntValue(12), FloatValue(12.34)))
+    }
+  }
+
+  test("sub expression") {
+    assertAst("(12 + 12.34)") {
+      SubExpr(Add(IntValue(12), FloatValue(12.34)))
+    }
+  }
+
+  test("sub expression bis") {
+    // System.setProperty("diesel.dumpbnf.html", "dump.html")
+    assertAst("1 + (12 + 12.34)") {
+      Add(IntValue(1), SubExpr(Add(IntValue(12), FloatValue(12.34))))
     }
   }
 }
