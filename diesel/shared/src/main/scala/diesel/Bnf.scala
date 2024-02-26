@@ -862,9 +862,9 @@ object Bnf {
 
         case SPRuleRef(syntax) =>
           val newCtx = syntax match {
-            case SyntaxTyped(_, concept, _, _, _) => ctx.derive(concept, multiple = false)
-            case SyntaxMulti(_, concept, _, _)    => ctx.derive(concept, multiple = true)
-            case _                                => ctx
+            case SyntaxTyped(_, concept, _, _, _, _) => ctx.derive(concept, multiple = false)
+            case SyntaxMulti(_, concept, _, _, _)    => ctx.derive(concept, multiple = true)
+            case _                                   => ctx
           }
           val item   = getOrCreateRuleWithContext("syntax", newCtx, syntax.name)
           forwardGeneration(item, () => generateSyntax(syntax, item, newCtx))
@@ -873,9 +873,9 @@ object Bnf {
         case SPLazyRuleRef(_, r) =>
           val syntax = r()
           val newCtx = syntax match {
-            case SyntaxTyped(_, concept, _, _, _) => ctx.derive(concept, multiple = false)
-            case SyntaxMulti(_, concept, _, _)    => ctx.derive(concept, multiple = true)
-            case _                                => ctx
+            case SyntaxTyped(_, concept, _, _, _, _) => ctx.derive(concept, multiple = false)
+            case SyntaxMulti(_, concept, _, _, _)    => ctx.derive(concept, multiple = true)
+            case _                                   => ctx
           }
           val item   = getOrCreateRuleWithContext("syntax", newCtx, syntax.name)
           forwardGeneration(item, () => generateSyntax(syntax, item, newCtx))
@@ -1091,6 +1091,93 @@ object Bnf {
       rule.productions.nonEmpty
     }
 
+    def generateHierarchicalSyntaxes(
+      rule: Bnf.Rule,
+      exprTypes: Expressions.Types,
+      ctx: GrammarContext
+    ): Boolean = {
+
+      def addSyntax(syntax: Syntax[_]): Rule = {
+        val syntaxRule = getOrCreateRuleWithContext("syntax", ctx, syntax.name + ".hierarchical")
+        forwardGeneration(syntaxRule, () => generateSyntax(syntax, syntaxRule, ctx))
+        rule >> new Production(
+          Some(rule),
+          Seq(syntaxRule),
+          { (_, args) => args.head },
+          None,
+          Propagate(0)
+        )
+      }
+
+      ctx.multiple foreach { multiple =>
+        ctx.concept foreach { concept =>
+          if (!multiple) {
+            dsl.getSyntaxes.collect { case s: SyntaxTyped[_] => s }.filter(s =>
+              s.expression && s.hierarchical
+            ) foreach {
+              syntax =>
+                if (syntax.concept == concept) {
+                  if (dsl.acceptExpr(Expressions.Syntaxes, syntax.concept, multiple = false))
+                    addSyntax(syntax)
+                }
+            }
+          } else {
+            dsl.getSyntaxes.collect { case s: SyntaxMulti[_, _] => s }.filter(s =>
+              s.hierarchical
+            ) foreach {
+              syntax =>
+                if (syntax.concept == concept) {
+                  if (dsl.acceptExpr(Expressions.Syntaxes, syntax.concept, multiple = true))
+                    addSyntax(syntax)
+                }
+            }
+          }
+
+          // Generic syntaxes
+          if (!multiple) {
+            dsl.getGenericSyntaxes.collect { case s: SyntaxGeneric[_] => s }.filter(s =>
+              s.hierarchical
+            ) foreach {
+              syntax =>
+                // if (syntax.concept == concept) {
+                if (dsl.acceptExpr(Expressions.Syntaxes, concept, multiple = false))
+                  syntax.apply(concept, exprTypes, dsl, addSyntax)
+                // }
+            }
+          } else {
+            dsl.getGenericSyntaxes.collect { case s: SyntaxGenericMulti[_, _] => s }.filter(s =>
+              s.hierarchical
+            ) foreach {
+              syntax =>
+                // if (syntax.concept == concept) {
+                if (dsl.acceptExpr(Expressions.Syntaxes, concept, multiple = true))
+                  syntax.apply(concept, exprTypes, dsl, addSyntax)
+                // }
+            }
+          }
+
+          // Hierarchy
+          dsl.subConceptsOf(concept) foreach {
+            case subConcept: Concept[_] =>
+              val newCtx   = ctx.derive(subConcept, multiple)
+              val syntaxes = getOrCreateRuleWithContext("syntaxes", newCtx, "hierarchical")
+              forwardGeneration(
+                syntaxes,
+                () => generateHierarchicalSyntaxes(syntaxes, exprTypes, newCtx)
+              )
+              rule >> new Production(
+                Some(rule),
+                Seq(syntaxes),
+                { (_, args) => args.head },
+                None,
+                Propagate(0)
+              )
+          }
+        }
+      }
+      rule.productions.nonEmpty
+    }
+
     def generateSyntaxes(
       rule: Bnf.Rule,
       exprTypes: Expressions.Types,
@@ -1110,33 +1197,37 @@ object Bnf {
 
       ctx.multiple foreach { multiple =>
         ctx.concept foreach { concept =>
-          dsl.getSyntaxes.foreach {
-            case syntax: SyntaxTyped[_]    =>
-              if (
-                !multiple && syntax.expression && dsl.isSubtypeOf(
-                  syntax.concept,
-                  concept
-                )
-              ) {
-                if (dsl.acceptExpr(Expressions.Syntaxes, syntax.concept, multiple = false))
-                  addSyntax(syntax)
-              }
-            case syntax: SyntaxMulti[_, _] =>
-              if (multiple && dsl.isSubtypeOf(syntax.concept, concept)) {
-                if (dsl.acceptExpr(Expressions.Syntaxes, syntax.concept, multiple = true))
-                  addSyntax(syntax)
-              }
-            case _                         =>
+          if (!multiple) {
+            dsl.getSyntaxes.collect { case s: SyntaxTyped[_] => s }.filter(s =>
+              s.expression && !s.hierarchical
+            ) foreach {
+              syntax =>
+                if (dsl.isSubtypeOf(syntax.concept, concept)) {
+                  if (dsl.acceptExpr(Expressions.Syntaxes, syntax.concept, multiple = false))
+                    addSyntax(syntax)
+                }
+            }
+          } else {
+            dsl.getSyntaxes.collect { case s: SyntaxMulti[_, _] => s }.filter(s =>
+              !s.hierarchical
+            ) foreach {
+              syntax =>
+                if (dsl.isSubtypeOf(syntax.concept, concept)) {
+                  if (dsl.acceptExpr(Expressions.Syntaxes, syntax.concept, multiple = true))
+                    addSyntax(syntax)
+                }
+            }
           }
+
           // Generic syntaxes
           dsl.getGenericSyntaxes.foreach {
             case genericSyntax: SyntaxGeneric[_]         =>
-              if (!multiple) {
+              if (!multiple && !genericSyntax.hierarchical) {
                 if (dsl.acceptExpr(Expressions.Syntaxes, concept, multiple = false))
                   genericSyntax.apply(concept, exprTypes, dsl, addSyntax)
               }
             case genericSyntax: SyntaxGenericMulti[_, _] =>
-              if (multiple) {
+              if (multiple && !genericSyntax.hierarchical) {
                 if (dsl.acceptExpr(Expressions.Syntaxes, concept, multiple = true))
                   genericSyntax.apply(concept, exprTypes, dsl, addSyntax)
               }
@@ -1217,6 +1308,21 @@ object Bnf {
           if (exprTypes.has(Expressions.Syntaxes)) {
             val syntaxes = getOrCreateRuleWithContext("syntaxes", ctx)
             forwardGeneration(syntaxes, () => generateSyntaxes(syntaxes, exprTypes, ctx))
+            rule >> new Production(
+              Some(rule),
+              Seq(syntaxes),
+              { (_, args) => args.head },
+              None,
+              Propagate(0)
+            )
+          }
+          // Hierarchical Syntaxes
+          if (exprTypes.has(Expressions.Syntaxes)) {
+            val syntaxes = getOrCreateRuleWithContext("syntaxes", ctx, suffix = "hierarchical")
+            forwardGeneration(
+              syntaxes,
+              () => generateHierarchicalSyntaxes(syntaxes, exprTypes, ctx)
+            )
             rule >> new Production(
               Some(rule),
               Seq(syntaxes),

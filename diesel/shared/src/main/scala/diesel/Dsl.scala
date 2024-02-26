@@ -126,6 +126,7 @@ object Dsl {
     name: String,
     concept: Concept[T],
     expression: Boolean,
+    hierarchical: Boolean,
     production: SyntaxProduction[_ <: T],
     userData: Option[Any] = None
   ) extends Syntax[T]
@@ -136,6 +137,7 @@ object Dsl {
   case class SyntaxMulti[T, T2](
     name: String,
     concept: Concept[T],
+    hierarchical: Boolean,
     production: SyntaxProduction[_ <: T2],
     userData: Option[Any] = None
   ) extends Syntax[T2]
@@ -145,6 +147,7 @@ object Dsl {
 
   case class SyntaxGeneric[T](
     override val name: String,
+    hierarchical: Boolean,
     accept: Option[(Concept[T], Expressions.Types, Dsl) => Boolean],
     syntaxOf: Concept[T] => SyntaxTyped[T]
   )(implicit tag: ClassTag[T])
@@ -155,7 +158,7 @@ object Dsl {
       dsl: Dsl,
       consumer: SyntaxTyped[T] => Unit
     ): Unit = {
-      if (concept.typeOf == tag) {
+      if (tag.runtimeClass.isAssignableFrom(concept.typeOf.runtimeClass)) {
         val c = concept.asInstanceOf[Concept[T]]
         if (accept.forall(_.apply(c, exprTypes, dsl)))
           consumer(syntaxOf(c))
@@ -165,6 +168,7 @@ object Dsl {
 
   case class SyntaxGenericMulti[T, T2](
     override val name: String,
+    hierarchical: Boolean,
     accept: Option[(Concept[T], Expressions.Types, Dsl) => Boolean],
     syntaxOf: Concept[T] => SyntaxMulti[T, T2],
     userData: Option[Any] = None
@@ -176,7 +180,7 @@ object Dsl {
       dsl: Dsl,
       consumer: (SyntaxMulti[T, T2]) => Unit
     ): Unit =
-      if (concept.typeOf == tag) {
+      if (tag.runtimeClass.isAssignableFrom(concept.typeOf.runtimeClass)) {
         val c = concept.asInstanceOf[Concept[T]]
         if (accept.forall(_.apply(c, exprTypes, dsl)))
           consumer(syntaxOf(c))
@@ -891,11 +895,12 @@ trait Dsl {
 
   def syntax[T](
     concept: Concept[T],
-    expression: Boolean = true
+    expression: Boolean = true,
+    hierarchical: Boolean = false
   )(production: SyntaxProduction[T], userData: Option[Any] = None)(implicit
     name: DeclaringSourceName
   ): SyntaxTyped[T] =
-    addSyntax(SyntaxTyped(name.name, concept, expression, production, userData))
+    addSyntax(SyntaxTyped(name.name, concept, expression, hierarchical, production, userData))
 
   case class RootSyntaxBuilder(name: String) {
 
@@ -916,13 +921,14 @@ trait Dsl {
     name: String,
     concept: Concept[T],
     expression: Boolean = true,
+    hierarchical: Boolean = false,
     userData: Option[Any] = None,
     private val _doNotAdd: Boolean = false
   ) {
     private[Dsl] def doNotAdd(): TypedSyntaxBuilder[T] = copy(_doNotAdd = true)
 
     def apply(production: SyntaxProduction[T]): SyntaxTyped[T] = {
-      val syntax = SyntaxTyped(name, concept, expression, production, userData)
+      val syntax = SyntaxTyped(name, concept, expression, hierarchical, production, userData)
       if (_doNotAdd) syntax else addSyntax(syntax)
     }
 
@@ -931,7 +937,7 @@ trait Dsl {
     def userData(x: Any): TypedSyntaxBuilder[T] = copy(userData = Some(x))
 
     def multi[T2]: SyntaxMultipleBuilder[T, T2] =
-      SyntaxMultipleBuilder(name, userData, concept, _doNotAdd)
+      SyntaxMultipleBuilder(name, userData, concept, hierarchical, _doNotAdd)
 
   }
 
@@ -939,6 +945,7 @@ trait Dsl {
     name: String,
     _userData: Option[Any],
     concept: Concept[T],
+    hierarchical: Boolean,
     private val _doNotAdd: Boolean = false
   ) {
     private[Dsl] def doNotAdd(): SyntaxMultipleBuilder[T, T2] = copy(_doNotAdd = true)
@@ -946,7 +953,7 @@ trait Dsl {
     def userData(x: Any): SyntaxMultipleBuilder[T, T2] = copy(_userData = Some(x))
 
     def apply(production: SyntaxProduction[T2]): SyntaxMulti[T, T2] = {
-      val syntax = SyntaxMulti(name, concept, production, _userData)
+      val syntax = SyntaxMulti(name, concept, hierarchical, production, _userData)
       if (_doNotAdd) syntax else addSyntax(syntax)
     }
 
@@ -954,6 +961,7 @@ trait Dsl {
 
   case class SyntaxGenericBuilder[T: ClassTag](
     name: String,
+    hierarchical: Boolean,
     accept: Option[(Concept[T], Expressions.Types, Dsl) => Boolean] = None
   ) {
     def accept(f: (Concept[T], Expressions.Types, Dsl) => Boolean): SyntaxGenericBuilder[T] =
@@ -963,12 +971,17 @@ trait Dsl {
       Some((concept: Concept[T], _: Expressions.Types, dsl: Dsl) => dsl.isSubtypeOf(concept, base))
     )
 
-    def multi[T3]: SyntaxGenericMultiBuilder[T, T3] = SyntaxGenericMultiBuilder(name, accept)
+    def asHierarchical(): SyntaxGenericBuilder[T] =
+      SyntaxGenericBuilder(name, hierarchical = true, accept)
+
+    def multi[T3]: SyntaxGenericMultiBuilder[T, T3] =
+      SyntaxGenericMultiBuilder(name, hierarchical, accept)
 
     def apply(toSyntax: TypedSyntaxBuilder[T] => SyntaxTyped[T]): SyntaxGeneric[T] = {
       var cache: Map[Concept[T], SyntaxTyped[T]] = Map()
       addGenericSyntax(SyntaxGeneric[T](
         name,
+        hierarchical,
         accept,
         concept => {
           cache.getOrElse(
@@ -987,6 +1000,7 @@ trait Dsl {
 
   case class SyntaxGenericMultiBuilder[T: ClassTag, T2](
     name: String,
+    hierarchical: Boolean,
     accept: Option[(Concept[T], Expressions.Types, Dsl) => Boolean] = None
   ) {
     def apply(toSyntax: SyntaxMultipleBuilder[T, T2] => SyntaxMulti[T, T2])
@@ -994,6 +1008,7 @@ trait Dsl {
       var cache: Map[Concept[T], SyntaxMulti[T, T2]] = Map()
       addGenericSyntax(SyntaxGenericMulti[T, T2](
         name,
+        hierarchical,
         accept,
         concept => {
           cache.getOrElse(
@@ -1011,7 +1026,7 @@ trait Dsl {
   }
 
   def syntaxGeneric[T: ClassTag](implicit name: DeclaringSourceName): SyntaxGenericBuilder[T] =
-    SyntaxGenericBuilder(name.name)
+    SyntaxGenericBuilder(name.name, hierarchical = false)
 
   private def addGenericSyntax[X <: SyntaxBase](syntax: X): X = {
     genericSyntaxes ++= Seq(syntax)
