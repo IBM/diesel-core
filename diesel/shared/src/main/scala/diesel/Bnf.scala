@@ -1133,6 +1133,29 @@ object Bnf {
             }
           }
 
+          // Generic syntaxes
+          if (!multiple) {
+            dsl.getGenericSyntaxes.collect { case s: SyntaxGeneric[_] => s }.filter(s =>
+              s.hierarchical
+            ) foreach {
+              syntax =>
+                // if (syntax.concept == concept) {
+                if (dsl.acceptExpr(Expressions.Syntaxes, concept, multiple = false))
+                  syntax.apply(concept, exprTypes, dsl, addSyntax)
+                // }
+            }
+          } else {
+            dsl.getGenericSyntaxes.collect { case s: SyntaxGenericMulti[_, _] => s }.filter(s =>
+              s.hierarchical
+            ) foreach {
+              syntax =>
+                // if (syntax.concept == concept) {
+                if (dsl.acceptExpr(Expressions.Syntaxes, concept, multiple = true))
+                  syntax.apply(concept, exprTypes, dsl, addSyntax)
+                // }
+            }
+          }
+
           // Hierarchy
           dsl.subConceptsOf(concept) foreach {
             case subConcept: Concept[_] =>
@@ -1199,12 +1222,12 @@ object Bnf {
           // Generic syntaxes
           dsl.getGenericSyntaxes.foreach {
             case genericSyntax: SyntaxGeneric[_]         =>
-              if (!multiple) {
+              if (!multiple && !genericSyntax.hierarchical) {
                 if (dsl.acceptExpr(Expressions.Syntaxes, concept, multiple = false))
                   genericSyntax.apply(concept, exprTypes, dsl, addSyntax)
               }
             case genericSyntax: SyntaxGenericMulti[_, _] =>
-              if (multiple) {
+              if (multiple && !genericSyntax.hierarchical) {
                 if (dsl.acceptExpr(Expressions.Syntaxes, concept, multiple = true))
                   genericSyntax.apply(concept, exprTypes, dsl, addSyntax)
               }
