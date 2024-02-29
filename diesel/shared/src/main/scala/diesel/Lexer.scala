@@ -99,8 +99,9 @@ object Lexer {
   abstract class Rule(val scanner: Scanner, val priority: Int = 0) {
     def tokenId(text: String): TokenId
     def stylesOf(text: String): Seq[Style]
-    def findPrefixOf(source: CharSequence): Option[String] = scanner.findPrefixOf(source)
-    def isSkip: Boolean                                    = false
+    def findPrefixOf(source: CharSequence): Option[String]      = scanner.findPrefixOf(source)
+    def isSkip: Boolean                                         = false
+    def accept(expectedId: TokenId, actualId: TokenId): Boolean = expectedId == actualId
   }
 
   case class SimpleRule(
@@ -127,6 +128,22 @@ object Lexer {
     override def tokenId(text: String): TokenId = keywords.getOrElse(text, identId)
 
     override def stylesOf(text: String): Seq[Style] = styles.getOrElse(text, Seq())
+  }
+
+  case class CustomRule(
+    override val scanner: Scanner,
+    tokens: Set[String],
+    defaultToken: TokenId = Error,
+    styles: Seq[Style] = Seq(),
+    override val priority: Int = 0
+  ) extends Rule(scanner, priority) {
+    override def tokenId(text: String): TokenId =
+      if (tokens.contains(text)) IdentifiedToken(text) else defaultToken
+
+    override def stylesOf(text: String): Seq[Style] = styles
+
+    override def accept(expectedId: TokenId, actualId: TokenId): Boolean =
+      expectedId == actualId || tokens.contains(actualId.name)
   }
 
   case class Token(offset: Int, text: String, id: TokenId) {
@@ -160,6 +177,13 @@ object Lexer {
       case _              => None
     }
 
+    val customRules: Seq[CustomRule] = dsl match {
+      case r: CustomTokens => r.customTokens.map(t =>
+          CustomRule(t.scanner, t.tokens, if (t.strict) Error else t.tokenId, t.styles, t.priority)
+        )
+      case _               => Seq()
+    }
+
     def computeStr(text: String, styleOpt: Option[Style]): Seq[Rule] = {
       var isKeyword = false
       identifiers.foreach { i =>
@@ -179,6 +203,15 @@ object Lexer {
             }
             isKeyword = true
           }
+        }
+      }
+      if (!isKeyword) {
+        if (
+          customRules.exists(r =>
+            r.findPrefixOf(text).contains(text) || r.scanner.name == text
+          )
+        ) {
+          isKeyword = true;
         }
       }
       if (!isKeyword) {
@@ -263,6 +296,12 @@ object Lexer {
       case _                  => ()
     }
 
+    // Custom rules
+    customRules.foreach { r =>
+      rules = rules ++ Seq(r)
+      tokens = tokens ++ Map(IdentifiedToken(r.scanner.name) -> r)
+    }
+
     (rules, tokens)
   }
 
@@ -299,6 +338,15 @@ case class Lexer(lexerRules: Seq[Rule], tokenRules: Map[TokenId, Rule]) {
 
   def skip(input: Input): Token = {
     next(input, skipRules, eatOnError = false)._1
+  }
+
+  def accept(token: Bnf.Token, tokenValue: Lexer.Token): Boolean = {
+    if (token.accept(tokenValue.id, identifiers)) true
+    else
+      tokenRules.get(token.tokenId) match {
+        case Some(rule) => rule.accept(token.tokenId, tokenValue.id)
+        case None       => false
+      }
   }
 
   @tailrec

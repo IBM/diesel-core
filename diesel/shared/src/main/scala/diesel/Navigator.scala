@@ -74,7 +74,15 @@ private[diesel] case class Parsing(
   offset: Int,
   length: Int,
   markers: Seq[Marker]
-)
+) {
+  def asAmbiguous(): Parsing = Parsing(
+    node,
+    value,
+    offset,
+    length,
+    markers ++ Seq(Ambiguous.apply(node.offset, node.length))
+  )
+}
 
 object GenericTree {
 
@@ -319,6 +327,8 @@ trait Reducer {
   def node: GenericNode
 
   def compare(node: GenericNode): (Reducer.Kind.Kind, Reducer)
+
+  def close(subtrees: Seq[Seq[Parsing]]): Seq[Seq[Parsing]] = subtrees
 }
 
 object Reducer {
@@ -380,18 +390,19 @@ object Reducer {
         }
       } else {
         if (other.errorCount == 0) {
-          node.context.addMarkers(Ambiguous.apply(
-            node.offset,
-            node.length
-          )) // Not so good, find a way to copy node and context
-          (
-            Reducer.Kind.Worse,
-            SelectOne(node, ambiguous = true)
-          )
+          (Reducer.Kind.Worse, SelectOne(this.node, ambiguous = true))
         } else
           (Reducer.Kind.Worse, this)
       }
     }
+
+    override def close(subtrees: Seq[Seq[Parsing]]): Seq[Seq[Parsing]] =
+      if (ambiguous) {
+        // In case of ambiguity, exactly only one subtree is available
+        val parsing = subtrees.head.head
+        Seq(Seq(parsing.asAmbiguous()))
+      } else
+        subtrees
   }
 
   def selectOne: GenericNode => Reducer =
@@ -523,6 +534,7 @@ class Navigator(
       }
       ctx = newCtx
     })
+    reduced = ctx.close(reduced)
     reduced
   }
 

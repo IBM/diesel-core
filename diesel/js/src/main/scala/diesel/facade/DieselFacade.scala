@@ -136,8 +136,8 @@ case class DieselStyle(private val styledRange: StyledRange) {
 }
 
 class DieselParseResult(
-  private val res: Either[String, GenericTree],
-  private val markerPostProcessor: Option[MarkerPostProcessor]
+  val res: Either[String, GenericTree],
+  val markerPostProcessor: Option[MarkerPostProcessor]
 ) {
 
   @JSExport
@@ -193,7 +193,7 @@ class Replace(private val r: (Int, Int)) {
 
 }
 
-class DieselCompletionProposal(private val proposal: CompletionProposal) {
+class DieselCompletionProposal(val proposal: CompletionProposal) {
 
   @JSExport
   val text: String = proposal.text
@@ -209,7 +209,7 @@ class DieselCompletionProposal(private val proposal: CompletionProposal) {
   override def toString = s"DieselCompletionProposal($text, $replace)"
 }
 
-case class DieselPredictResult(private val res: Either[String, Seq[CompletionProposal]]) {
+case class DieselPredictResult(val res: Either[String, Seq[CompletionProposal]]) {
 
   @JSExport
   val success: Boolean = res.isRight
