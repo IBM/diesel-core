@@ -1,6 +1,6 @@
 {
   "name": "@diesel-parser/ts-facade",
-  "version": "0.26.0",
+  "version": "0.27.0",
   "description": "Facade types for using diesel parsers in typescript",
   "author": "Rémi Van Keisbelck <remi@rvkb.com>",
   "license": "Apache-2.0",
