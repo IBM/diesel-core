@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 The Diesel Authors
+ * Copyright 2018 The Diesel Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -159,4 +159,17 @@ class LocalScopeTest extends DslTestFunSuite {
     }
   }
 
+  test("use after nested declare ") {
+    assertMarkers("{ { declare foo use foo } use foo }") {
+      Seq(Marker(
+        descriptor = Marker.Descriptor(
+          kind = Marker.Kind.Syntactic,
+          severity = Marker.Severity.Error
+        ),
+        offset = 30,
+        length = 3,
+        message = SimpleMarkerMessage("Unknown variable: foo")
+      ))
+    }
+  }
 }

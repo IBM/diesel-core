@@ -327,7 +327,7 @@ trait ContextualUserData {
 
   def setUserData(key: Any, value: Any): Unit
 
-  def toLocalUserData(): LocalUserData
+  def toLocalUserData: LocalUserData
 }
 
 case class GlobalUserData(userDataProvider: Option[UserDataProvider]) extends ContextualUserData {
@@ -337,7 +337,7 @@ case class GlobalUserData(userDataProvider: Option[UserDataProvider]) extends Co
   override def setUserData(key: Any, value: Any): Unit =
     userDataProvider.foreach(_.setUserData(key, value))
 
-  override def toLocalUserData(): LocalUserData = LocalUserData(userDataProvider)
+  override def toLocalUserData: LocalUserData = LocalUserData(userDataProvider)
 }
 
 case class LocalUserData(userDataProvider: Option[UserDataProvider]) extends ContextualUserData {
@@ -351,7 +351,7 @@ case class LocalUserData(userDataProvider: Option[UserDataProvider]) extends Con
     data = data + (key -> value)
   }
 
-  override def toLocalUserData(): LocalUserData = {
+  override def toLocalUserData: LocalUserData = {
     val res = LocalUserData(userDataProvider)
     this.data foreach { entry =>
       res.setUserData(entry._1, entry._2)
@@ -535,7 +535,7 @@ class Navigator(
         )
       else {
         if (isContextual(state)) {
-          Subtrees(sentinel(), userData.toLocalUserData())
+          Subtrees(sentinel(), userData.toLocalUserData)
         } else Subtrees(sentinel(), userData)
       }
     } else {
