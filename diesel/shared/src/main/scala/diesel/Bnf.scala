@@ -183,7 +183,7 @@ object Bnf {
     }
   }
 
-  trait NonTerminal extends Symbol {
+  sealed trait NonTerminal extends Symbol {
     def isAxiom: Boolean = false
   }
 

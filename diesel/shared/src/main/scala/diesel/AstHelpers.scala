@@ -31,7 +31,7 @@ object AstHelpers {
     parser.parse(new Lexer.Input(text), a)
   }
 
-  private def getBnfAxiomOrThrow(bnf: Bnf, axiom: Option[Axiom[_]]): Bnf.Axiom = {
+  def getBnfAxiomOrThrow(bnf: Bnf, axiom: Option[Axiom[_]]): Bnf.Axiom = {
     axiom match {
       case Some(x) =>
         bnf.axioms

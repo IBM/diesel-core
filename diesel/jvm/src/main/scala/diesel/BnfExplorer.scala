@@ -34,8 +34,12 @@ object BnfExplorer {
   def dumpToFile(bnf: Bnf, f: File): Unit = {
     println("writing to " + f.getAbsolutePath())
     val html: String = BnfHtml.dump(bnf)
-    Using(new BufferedWriter(new FileWriter(f))) { bufferedWriter =>
-      bufferedWriter.write(html)
+    writeToFile(f, html)
+  }
+
+  def writeToFile(file: File, text: String): Unit = {
+    Using(new BufferedWriter(new FileWriter(file))) { bufferedWriter =>
+      bufferedWriter.write(text)
     }
   }
 
