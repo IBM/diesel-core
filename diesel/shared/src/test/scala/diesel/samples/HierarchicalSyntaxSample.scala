@@ -61,28 +61,28 @@ object HierarchicalSyntaxSample {
           FloatValue(s.text.toDouble)
       }
 
-    val add: Syntax[Value] = syntax(numberConcept, true, true)(
+    val add: Syntax[Value] = syntax(numberConcept, hierarchical = true)(
       numberConcept ~ "+".leftAssoc(10) ~ numberConcept map {
         case (_, (n1, _, n2)) =>
           Add(n1, n2)
       }
     )
 
-    val sub: Syntax[Value] = syntax(numberConcept, true, true)(
+    val sub: Syntax[Value] = syntax(numberConcept, hierarchical = true)(
       numberConcept ~ "-".leftAssoc(10) ~ numberConcept map {
         case (_, (n1, _, n2)) =>
           Sub(n1, n2)
       }
     )
 
-    val round: Syntax[Discrete] = syntax(discreteConcept, true, true)(
+    val round: Syntax[Discrete] = syntax(discreteConcept, hierarchical = true)(
       "round" ~ "(" ~ numberConcept ~ ")" map {
         case (_, (_, _, n, _)) =>
           Round(n)
       }
     )
 
-    val subExpr: Syntax[Value] = syntax(numberConcept, true, hierarchical = false)(
+    val subExpr: Syntax[Value] = syntax(numberConcept)(
       "(" ~ numberConcept ~ ")" map {
         case (_, (_, n, _)) =>
           SubExpr(n)

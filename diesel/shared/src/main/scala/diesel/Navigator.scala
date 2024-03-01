@@ -24,7 +24,7 @@ import diesel.Lexer.Token
 import scala.collection.mutable
 
 private[diesel] class ParsingContext(
-  val userDataProvider: Option[UserDataProvider],
+  val userData: ContextualUserData,
   val begin: Int,
   val end: Int,
   val offset: Int,
@@ -33,10 +33,9 @@ private[diesel] class ParsingContext(
   val children: Seq[GenericNode]
 ) extends Context {
 
-  override def getUserData(key: Any): Option[Any] = userDataProvider.flatMap(_.getUserData(key))
+  override def getUserData(key: Any): Option[Any] = userData.getUserData(key)
 
-  override def setUserData(key: Any, value: Any): Unit =
-    userDataProvider.foreach(_.setUserData(key, value))
+  override def setUserData(key: Any, value: Any): Unit = userData.setUserData(key, value)
 
   private var locals: Seq[Marker]              = Seq.empty
   private var style: Option[Style]             = None
@@ -486,7 +485,7 @@ class Navigator(
     Seq(Subtree(Seq.empty, userData)).iterator
 
   private def terminal(item: TerminalItem, userData: ContextualUserData): Iterator[Subtree] =
-    singleton(applyToken(item), userData)
+    singleton(applyToken(item, userData), userData)
 
   private def singleton(value: Parsing, userData: ContextualUserData): Iterator[Subtree] =
     Seq(Subtree(Seq(value), userData)).iterator
@@ -500,6 +499,14 @@ class Navigator(
   ): Iterator[Subtree] =
     new BackPtrIterator(causal, predecessor, userData)
 
+  private def isContextual(state: State): Boolean = state.production.getElement match {
+    case Some(element) => element match {
+        case Bnf.DslSyntax(syntax) => syntax.contextual
+        case _                     => false
+      }
+    case None          => false
+  }
+
   private def nonTerminal(
     state: State,
     userData: ContextualUserData,
@@ -509,7 +516,10 @@ class Navigator(
     if (backPtrs.isEmpty) {
       if (state.isCompleted)
         singleton(reduceState(state, Subtree(Seq.empty, userData), None), userData)
-      else sentinel(userData) // New local user data if needed
+      else {
+        if (isContextual(state)) sentinel(LocalUserData(userData))
+        else sentinel(userData)
+      }
     } else {
       val subtrees = backPtrs.map(backPtr =>
         alternative(
@@ -575,12 +585,12 @@ class Navigator(
     reduced
   }
 
-  private def applyToken(terminal: TerminalItem): Parsing = {
+  private def applyToken(terminal: TerminalItem, userData: ContextualUserData): Parsing = {
     val errors = terminal.reportErrors()
     val token  = terminal.token
     val node   = new GenericTerminal(
       new ParsingContext(
-        userDataProvider,
+        userData,
         terminal.begin,
         terminal.end,
         token.offset,
@@ -606,12 +616,13 @@ class Navigator(
     end: Int,
     offset: Int,
     length: Int,
+    userData: ContextualUserData,
     ambiguity: Option[Ambiguity],
     styles: Seq[(Token, Style)],
     errors: Seq[Marker]
   ): Parsing = {
     val context = new ParsingContext(
-      userDataProvider,
+      userData,
       begin,
       end,
       offset,
@@ -680,6 +691,7 @@ class Navigator(
       state.end,
       offset,
       length,
+      subtree.userData,
       ambiguity,
       styles,
       errors
