@@ -231,6 +231,8 @@ private[diesel] class Chart(
 
     builder.toString
   }
+
+  def getStates: Seq[State] = states.toSeq
 }
 
 private[diesel] case class BackPtr(predecessor: State, causal: Item) {
@@ -427,4 +429,8 @@ class Result(val axiom: Bnf.Axiom) {
     charts.foreach(builder.append(_))
     builder.toString
   }
+
+  def getStates: Seq[State] = states.keys.toSeq
+
+  def getCharts: Seq[Chart] = charts.toSeq
 }

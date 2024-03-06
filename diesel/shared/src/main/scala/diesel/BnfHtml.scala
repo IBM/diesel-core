@@ -20,6 +20,8 @@ import diesel.Bnf.{Axiom, Rule}
 
 object BnfHtml {
 
+  def sanitizeName(name: String): String = name.replaceAll(",_", "")
+
   // def dump(bnf: Bnf, path: String): Unit = {
   //   Platform.consoleWithFile(path) {
   //     dump(bnf)
@@ -123,15 +125,15 @@ ${bnf.rules
 
   private def dumpAxiom(a: Axiom): String = {
     s"""<tr class="rule-row" data-rule-name="${a.name}"><td class="rule-name">${toAnchor(
-        a.name
+        sanitizeName(a.name)
       )}${a.name}</td><td>""" ++ dumpProduction(a.production) ++
       "</td></tr>"
   }
 
   private def dumpRule(r: Rule): String = {
     s"""<tr class="rule-row" data-rule-name="${r.name}"><td class="rule-name">${toAnchor(
-        r.name
-      )}${toLink(r.name)}</td><td>""" ++
+        sanitizeName(r.name)
+      )}${toLink(sanitizeName(r.name))}</td><td>""" ++
       r.productions.map(dumpProduction).mkString("") ++
       "</td></tr>"
   }
@@ -149,6 +151,6 @@ ${bnf.rules
     s"""<a name="$name"></a>"""
 
   private def toLink(name: String): String =
-    s"""<a href="#$name" class="link" data-name="$name">$name</a>"""
+    s"""<a href="#$name" class="link" data-name="$name">${sanitizeName(name)}</a>"""
 
 }
