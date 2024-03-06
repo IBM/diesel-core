@@ -2,14 +2,13 @@ package diesel
 
 import java.io.File
 import java.awt.Desktop
-import diesel.Lexer.Eos
 
 object DumpStates {
 
   val dotChar: String        = """<span class="dot">•</span>"""
   val eos: String            = """<span class="eof">ϵ</span>"""
-  val caretCollapsed: String = "›"
-  val caretExpanded: String  = "⌄"
+  val caretCollapsed: String = "[+]"
+  val caretExpanded: String  = "[-]"
 
   def dumpAndOpen(text: String, result: Result): Unit = {
     val f: File = File.createTempFile("diesel-result-", ".html")
@@ -20,13 +19,6 @@ object DumpStates {
   }
 
   def dumpResult(text: String, result: Result): String = {
-
-    val tokens: Map[Int, Lexer.Token] = result.getCharts
-      .flatMap { chart =>
-        chart.token.map(t => (chart.index, t))
-      }
-      .toMap
-
     s"""
 <html>
 <head>
@@ -55,9 +47,18 @@ object DumpStates {
       }
 
       button.expand-collapse {
-        width: 16px;
         border: none;
         background: none;
+        font-size: 1.2rem;
+        font-family: monospace;
+      }
+
+      .chart-row {
+        font-size: 1.2rem;
+      }
+
+      .chart-header-part {
+        font-family: monospace;
       }
 </style>
 </head>
@@ -67,28 +68,29 @@ object DumpStates {
 ${text}
 </code>
 <h2>Result</h1>
+<button id="expand-all">Expand all</button>
+<button id="collapse-all">Collapse all</button>
 <table cellspacing="0" cellpadding="4">
     <tbody>
       ${result.getCharts
-        .map(dumpChart(tokens, _))
+        .map(dumpChart(text, _))
         .mkString("")}
     </tbody>
 </table>
 </body>
 <script>
 
-function expandCollapse(chartIndex) {
+function expandCollapse(chartIndex, expand) {
   document.querySelectorAll("button.expand-collapse")
     .forEach(btn => {
       const chartId = btn.getAttribute('data-chart-id');
       if (chartId === chartIndex) {
-        const expanded = btn.classList.contains("expanded");
-        if (expanded) {
-          btn.classList.remove("expanded");
-        } else {
+        if (expand) {
           btn.classList.add("expanded");
+        } else {
+          btn.classList.remove("expanded");
         }
-        btn.innerHTML = expanded ? "$caretCollapsed" : "$caretExpanded"; 
+        btn.innerHTML = expand ? "$caretExpanded" : "$caretCollapsed"; 
       }
     });
 
@@ -96,8 +98,7 @@ function expandCollapse(chartIndex) {
     .forEach(stateRow => {
       const chartId = stateRow.getAttribute("data-chart-id");
       if (chartId === chartIndex) {
-        const collapsed = stateRow.classList.contains("collapsed");
-        if (collapsed) {
+        if (expand) {
           stateRow.classList.remove("collapsed");
         } else {
           stateRow.classList.add("collapsed");
@@ -110,9 +111,26 @@ document.querySelectorAll("button.expand-collapse")
   .forEach(btn => {
     btn.addEventListener('click', () => {
       const chartId = btn.getAttribute('data-chart-id');
-      expandCollapse(chartId);
+      const expanded = btn.classList.contains("expanded");
+      expandCollapse(chartId, !expanded);
     })
   });
+
+document.getElementById("expand-all").addEventListener('click', () => {
+  document.querySelectorAll("button.expand-collapse")
+  .forEach(btn => {
+    const chartId = btn.getAttribute('data-chart-id');
+    expandCollapse(chartId, true);
+  });
+});
+
+document.getElementById("collapse-all").addEventListener('click', () => {
+  document.querySelectorAll("button.expand-collapse")
+  .forEach(btn => {
+    const chartId = btn.getAttribute('data-chart-id');
+    expandCollapse(chartId, false);
+  });
+});
 
 </script>
 </html>
@@ -122,28 +140,21 @@ document.querySelectorAll("button.expand-collapse")
   private def wrapToken(s: String): String =
     s"""<span class="token">$s</span>"""
 
-  def dumpChart(tokens: Map[Int, Lexer.Token], chart: Chart): String = {
-    val tokensBefore = tokens
-      .toSeq
-      .filter { case (i, _) => i < chart.index }
-      .map(_._2.text)
-      .map(wrapToken)
-
-    val tokensAfter = tokens
-      .toSeq
-      .filter { case (i, _) => i >= chart.index }
-      .map { case (_, t) =>
-        t.id match {
-          case Eos =>
-            eos
-          case _   =>
-            wrapToken(t.text)
-        }
+  def dumpChart(text: String, chart: Chart): String = {
+    val chartHeader = chart.token
+      .map { token =>
+        val textBefore = text.substring(0, token.offset)
+        val textAfter  = text.substring(token.offset)
+        s"""
+<span class="chart-header-part">$textBefore</span>
+$dotChar
+<span class="chart-header-part">$textAfter}</span>
+        """
       }
-
-    val chartHeader = (
-      tokensBefore ++ Seq(dotChar) ++ tokensAfter
-    ).mkString("")
+      .getOrElse("No token !")
+    //    (
+    //   tokensBefore ++ Seq(dotChar) ++ tokensAfter
+    // ).mkString("")
 
     def expandCollapse(index: Int) = s"""
 <button class="expand-collapse" data-chart-id="$index">$caretCollapsed</button>

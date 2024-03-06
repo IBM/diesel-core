@@ -5,8 +5,8 @@ import diesel.DumpStates
 
 class DumpStatesTest extends FunSuite {
 
-  test("header".ignore) {
-    val text   = "1 + 2 + cos( 12 )"
+  test("dump and open".ignore) {
+    val text   = "1 + 2"
     val result = AstHelpers.parse(MyDsl, text)
     DumpStates.dumpAndOpen(text, result)
   }
