@@ -183,7 +183,7 @@ object Bnf {
     }
   }
 
-  trait NonTerminal extends Symbol {
+  sealed trait NonTerminal extends Symbol {
     def isAxiom: Boolean = false
   }
 
@@ -1439,11 +1439,7 @@ object Bnf {
 
   def apply[T](dsl: Dsl): Bnf = {
     val rules: Seq[NonTerminal] = computeRules(dsl)
-    val bnf                     = Bnf(Lexer(dsl, rules), rules)
-    Option(System.getProperty("diesel.dumpbnf.html")) foreach { path =>
-      BnfHtml.dump(bnf, path)
-    }
-    bnf
+    Bnf(Lexer(dsl, rules), rules)
   }
 
 }
