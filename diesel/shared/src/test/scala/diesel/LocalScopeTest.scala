@@ -52,11 +52,11 @@ object LocalScopeTestDsl {
     val sDeclare: Syntax[Expr] = syntax(cExpr)(
       "declare" ~ id map {
         case (ctx, (_, id)) =>
-          val variables = ctx.getUserData("variables") match {
+          val variables = ctx.contextualUserData.get("variables") match {
             case Some(value: Variables) => value
             case _                      => Variables()
           }
-          ctx.setUserData("scope", variables.setVar(id.text, 0))
+          ctx.contextualUserData.set("variables", variables.setVar(id.text, 0))
           Declare(id.text)
       }
     )
@@ -64,7 +64,7 @@ object LocalScopeTestDsl {
     val sUse: Syntax[Expr] = syntax(cExpr)(
       "use" ~ id map {
         case (ctx, (_, id)) =>
-          val exists = ctx.getUserData("scope") match {
+          val exists = ctx.contextualUserData.get("variables") match {
             case Some(value: Variables) =>
               value.getVar(id.text).isDefined
             case Some(_)                => false

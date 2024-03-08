@@ -36,6 +36,23 @@ private class DefaultUserDataProvider(private var data: Map[Any, Any]) extends U
   }
 }
 
+case class ContextualUserData(parent: Option[ContextualUserData]) {
+
+  private var data: Map[Any, Any] = Map()
+
+  def get(key: Any): Option[Any] = data.get(key) match {
+    case Some(value) => Some(value)
+    case None        => parent match {
+        case Some(value) => value.get(key)
+        case None        => None
+      }
+  }
+
+  def getLocal(key: Any): Option[Any] = data.get(key)
+
+  def set(key: Any, value: Any): Unit = data = data + (key -> value)
+}
+
 trait Context extends UserDataProvider {
 
   def begin: Int
@@ -63,4 +80,6 @@ trait Context extends UserDataProvider {
   def hasAborted: Boolean
 
   val children: Seq[GenericNode]
+
+  val contextualUserData: ContextualUserData
 }
