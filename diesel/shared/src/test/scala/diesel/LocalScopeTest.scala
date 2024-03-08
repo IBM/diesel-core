@@ -29,12 +29,12 @@ object LocalScopeTestDsl {
       }
     }
 
-    case class Scope(data: Map[String, Int] = Map()) {
+    case class Variables(data: Map[String, Int] = Map()) {
 
-      def getUserData(key: String): Option[Int] = data.get(key)
+      def getVar(key: String): Option[Int] = data.get(key)
 
-      def setUserData(key: String, value: Int): Scope = {
-        Scope(data + (key -> value))
+      def setVar(key: String, value: Int): Variables = {
+        Variables(data + (key -> value))
       }
     }
 
@@ -52,11 +52,11 @@ object LocalScopeTestDsl {
     val sDeclare: Syntax[Expr] = syntax(cExpr)(
       "declare" ~ id map {
         case (ctx, (_, id)) =>
-          val scope = ctx.getUserData("scope") match {
-            case Some(value: Scope) => value
-            case _                  => Scope()
+          val variables = ctx.getUserData("variables") match {
+            case Some(value: Variables) => value
+            case _                      => Variables()
           }
-          ctx.setUserData("scope", scope.setUserData(id.text, 0))
+          ctx.setUserData("scope", variables.setVar(id.text, 0))
           Declare(id.text)
       }
     )
@@ -65,10 +65,10 @@ object LocalScopeTestDsl {
       "use" ~ id map {
         case (ctx, (_, id)) =>
           val exists = ctx.getUserData("scope") match {
-            case Some(value: Scope) =>
-              value.getUserData(id.text).isDefined
-            case Some(_)            => false
-            case None               => false
+            case Some(value: Variables) =>
+              value.getVar(id.text).isDefined
+            case Some(_)                => false
+            case None                   => false
           }
           if (!exists) {
             ctx.addMarkers(UnknownId(id.text, id.offset, id.length))

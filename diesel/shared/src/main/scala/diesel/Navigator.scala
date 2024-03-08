@@ -24,7 +24,7 @@ import diesel.Lexer.Token
 import scala.collection.mutable
 
 private[diesel] class ParsingContext(
-  val userData: ContextualUserData,
+  val userDataProvider: Option[UserDataProvider],
   val begin: Int,
   val end: Int,
   val offset: Int,
@@ -33,9 +33,10 @@ private[diesel] class ParsingContext(
   val children: Seq[GenericNode]
 ) extends Context {
 
-  override def getUserData(key: Any): Option[Any] = userData.getUserData(key)
+  override def getUserData(key: Any): Option[Any] = userDataProvider.flatMap(_.getUserData(key))
 
-  override def setUserData(key: Any, value: Any): Unit = userData.setUserData(key, value)
+  override def setUserData(key: Any, value: Any): Unit =
+    userDataProvider.foreach(_.setUserData(key, value))
 
   private var locals: Seq[Marker]              = Seq.empty
   private var style: Option[Style]             = None
@@ -321,48 +322,24 @@ object Navigator {
   type Filter = Seq[GenericNode] => Seq[GenericNode]
 }
 
-trait ContextualUserData {
-
-  def getUserData(key: Any): Option[Any]
-
-  def setUserData(key: Any, value: Any): Unit
-
-  def toLocalUserData: LocalUserData
-}
-
-case class GlobalUserData(userDataProvider: Option[UserDataProvider]) extends ContextualUserData {
-
-  override def getUserData(key: Any): Option[Any] = userDataProvider.flatMap(_.getUserData(key))
-
-  override def setUserData(key: Any, value: Any): Unit =
-    userDataProvider.foreach(_.setUserData(key, value))
-
-  override def toLocalUserData: LocalUserData = LocalUserData(userDataProvider)
-}
-
-case class LocalUserData(userDataProvider: Option[UserDataProvider]) extends ContextualUserData {
+case class ContextualUserData(parent: Option[UserDataProvider]) extends UserDataProvider {
 
   private var data: Map[Any, Any] = Map()
 
-  override def getUserData(key: Any): Option[Any] =
-    if (data.contains(key)) data.get(key) else userDataProvider.flatMap(_.getUserData(key))
-
-  override def setUserData(key: Any, value: Any): Unit = {
-    data = data + (key -> value)
+  def getUserData(key: Any): Option[Any] = data.get(key) match {
+    case Some(value) => Some(value)
+    case None        => parent match {
+        case Some(value) => value.getUserData(key)
+        case None        => None
+      }
   }
 
-  override def toLocalUserData: LocalUserData = {
-    val res = LocalUserData(userDataProvider)
-    this.data foreach { entry =>
-      res.setUserData(entry._1, entry._2)
-    }
-    res
-  }
+  def setUserData(key: Any, value: Any): Unit = data = data + (key -> value)
 }
 
 case class Subtree(stack: Seq[Parsing])
 
-case class Subtrees(choices: Iterator[Subtree], userData: ContextualUserData)
+case class Subtrees(choices: Iterator[Subtree], userData: Option[UserDataProvider])
 
 trait Reducer {
 
@@ -461,7 +438,7 @@ class Navigator(
 ) {
 
   private val root: Subtrees =
-    nonTerminal(result.successState, GlobalUserData(userDataProvider), successState = true)
+    nonTerminal(result.successState, userDataProvider, successState = true)
 
   def hasNext: Boolean = root.choices.hasNext
 
@@ -498,18 +475,18 @@ class Navigator(
   private def sentinel(): Iterator[Subtree] =
     Seq(Subtree(Seq.empty)).iterator
 
-  private def terminal(item: TerminalItem, userData: ContextualUserData): Iterator[Subtree] =
+  private def terminal(item: TerminalItem, userData: Option[UserDataProvider]): Iterator[Subtree] =
     singleton(applyToken(item, userData))
 
   private def singleton(value: Parsing): Iterator[Subtree] =
     Seq(Subtree(Seq(value))).iterator
 
-  type AlternativeSupplier = ContextualUserData => Subtrees
+  type AlternativeSupplier = Option[UserDataProvider] => Subtrees
 
   private def alternative(
     causal: AlternativeSupplier,
     predecessor: State,
-    userData: ContextualUserData
+    userData: Option[UserDataProvider]
   ): Iterator[Subtree] =
     new BackPtrIterator(causal, predecessor, userData)
 
@@ -523,7 +500,7 @@ class Navigator(
 
   private def nonTerminal(
     state: State,
-    userData: ContextualUserData,
+    userData: Option[UserDataProvider],
     successState: Boolean = false
   ): Subtrees = {
     val backPtrs: Seq[BackPtr] = backPtrsOf(state)
@@ -535,7 +512,7 @@ class Navigator(
         )
       else {
         if (isContextual(state)) {
-          Subtrees(sentinel(), userData.toLocalUserData)
+          Subtrees(sentinel(), Some(ContextualUserData(userData)))
         } else Subtrees(sentinel(), userData)
       }
     } else {
@@ -606,7 +583,7 @@ class Navigator(
     reduced
   }
 
-  private def applyToken(terminal: TerminalItem, userData: ContextualUserData): Parsing = {
+  private def applyToken(terminal: TerminalItem, userData: Option[UserDataProvider]): Parsing = {
     val errors = terminal.reportErrors()
     val token  = terminal.token
     val node   = new GenericTerminal(
@@ -637,7 +614,7 @@ class Navigator(
     end: Int,
     offset: Int,
     length: Int,
-    userData: ContextualUserData,
+    userData: Option[UserDataProvider],
     ambiguity: Option[Ambiguity],
     styles: Seq[(Token, Style)],
     errors: Seq[Marker]
@@ -666,7 +643,7 @@ class Navigator(
   private def reduceState(
     state: State,
     subtree: Subtree,
-    userData: ContextualUserData,
+    userData: Option[UserDataProvider],
     ambiguity: Option[Ambiguity]
   ): Parsing = {
     var children: Seq[GenericNode]  = IndexedSeq.empty
@@ -723,7 +700,7 @@ class Navigator(
   private class BackPtrIterator(
     val causalSupplier: AlternativeSupplier,
     val predecessor: State,
-    val userData: ContextualUserData
+    val userData: Option[UserDataProvider]
   ) extends Iterator[Subtree] {
 
     private var predIterator = nonTerminal(predecessor, userData)
