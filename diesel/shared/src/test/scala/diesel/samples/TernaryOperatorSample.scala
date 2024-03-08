@@ -54,10 +54,8 @@ object TernaryOperatorSample {
       syntaxGeneric[Value]
         .accept(objectConcept) { builder =>
           builder.userData(13) {
-            booleanConcept ~ "?".leftAssoc(10) ~ builder.concept ~ ":".leftAssoc(
-              10
-            ) ~ builder.concept map {
-              case (_, (c, _, t, _, e)) =>
+            booleanConcept ~ ("?" ~ builder.concept ~ ":").leftAssoc(10) ~ builder.concept map {
+              case (_, (c, (_, t, _), e)) =>
                 Ternary(c, t, e)
             }
           }

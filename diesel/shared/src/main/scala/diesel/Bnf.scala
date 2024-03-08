@@ -897,8 +897,26 @@ object Bnf {
 
         case SPAssoc(p, associativity, level) =>
           val partial = mapSyntaxProduction(owner, p, ctx, None, first)
-          val to      = partial.symbols.length - 1
-          partial.merge(0, Constraints.Precedence(0, to, associativity, level))
+          if (partial.symbols.size > 1) {
+            val postfix   = "assoc." + counter
+            counter += 1
+            val assocRule = getOrCreateRule(owner.name, postfix)
+            val itemRule  =
+              mapAction(
+                getOrCreateRule(owner.name, postfix + ".item"),
+                p,
+                partial
+              )
+            addProduction(
+              assocRule,
+              Partial(Seq(itemRule), Propagate(0)),
+              { (_, args) => args.head }
+            )
+            Partial(Seq(assocRule), Constraints.Precedence(0, 0, associativity, level))
+          } else {
+            val to = partial.symbols.length - 1
+            partial.merge(0, Constraints.Precedence(0, to, associativity, level))
+          }
 
         case SPOpt(p) =>
           val postfix  = "opt." + counter

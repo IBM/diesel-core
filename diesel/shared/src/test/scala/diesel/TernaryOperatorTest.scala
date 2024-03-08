@@ -50,9 +50,9 @@ class TernaryOperatorTest extends DslTestFunSuite {
     }
   }
 
-  test("middle nested ternary".only) {
+  test("middle nested ternary") {
     assertAst("true ? false ? 1 : 2 : 3") {
-      Ternary(Ternary(BoolValue(true), BoolValue(false), BoolValue(true)), IntValue(1), IntValue(2))
+      Ternary(BoolValue(true), Ternary(BoolValue(false), IntValue(1), IntValue(2)), IntValue(3))
     }
   }
 }

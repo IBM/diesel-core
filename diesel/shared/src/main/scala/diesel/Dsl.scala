@@ -907,7 +907,6 @@ trait Dsl {
     def untyped: UntypedSyntaxBuilder = UntypedSyntaxBuilder(name)
 
     def typed[T](c: Concept[T]): TypedSyntaxBuilder[T] = TypedSyntaxBuilder(name, c)
-
   }
 
   case class UntypedSyntaxBuilder(name: String, userData: Option[Any] = None) {
