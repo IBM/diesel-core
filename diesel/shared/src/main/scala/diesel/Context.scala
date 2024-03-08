@@ -18,24 +18,6 @@ package diesel
 
 import diesel.Lexer.Token
 
-trait UserDataProvider {
-  def getUserData(key: Any): Option[Any]
-  def setUserData(key: Any, value: Any): Unit
-}
-
-object UserDataProvider {
-  def apply(data: Seq[(Any, Any)]): UserDataProvider =
-    new DefaultUserDataProvider(data.toMap)
-}
-
-private class DefaultUserDataProvider(private var data: Map[Any, Any]) extends UserDataProvider {
-  override def getUserData(key: Any): Option[Any] = data.get(key)
-
-  override def setUserData(key: Any, value: Any): Unit = {
-    data = data + (key -> value)
-  }
-}
-
 case class ContextualUserData(parent: Option[ContextualUserData]) {
 
   private var data: Map[Any, Any] = Map()
@@ -53,7 +35,16 @@ case class ContextualUserData(parent: Option[ContextualUserData]) {
   def set(key: Any, value: Any): Unit = data = data + (key -> value)
 }
 
-trait Context extends UserDataProvider {
+object ContextualUserData {
+  def root(userDataInit: Navigator.UserDataInit): ContextualUserData = {
+    val root = empty()
+    userDataInit(root)
+    root
+  }
+  def empty(): ContextualUserData                                    = ContextualUserData(None)
+}
+
+trait Context {
 
   def begin: Int
 

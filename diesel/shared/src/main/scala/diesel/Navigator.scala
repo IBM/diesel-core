@@ -24,7 +24,6 @@ import diesel.Lexer.Token
 import scala.collection.mutable
 
 private[diesel] class ParsingContext(
-  val userDataProvider: Option[UserDataProvider],
   val begin: Int,
   val end: Int,
   val offset: Int,
@@ -33,11 +32,6 @@ private[diesel] class ParsingContext(
   val children: Seq[GenericNode],
   val contextualUserData: ContextualUserData
 ) extends Context {
-
-  override def getUserData(key: Any): Option[Any] = userDataProvider.flatMap(_.getUserData(key))
-
-  override def setUserData(key: Any, value: Any): Unit =
-    userDataProvider.foreach(_.setUserData(key, value))
 
   private var locals: Seq[Marker]              = Seq.empty
   private var style: Option[Style]             = None
@@ -300,13 +294,15 @@ object Navigator {
   val defaultReducer: Seq[GenericNode => Reducer] =
     Seq(Reducer.noAbortAsMuchAsPossible, Reducer.selectOne)
 
+  type UserDataInit = ContextualUserData => Unit
+
   def apply(
     result: Result,
     postProcessors: Seq[GenericTree => Seq[Marker]] = Seq.empty,
     reducer: Seq[GenericNode => Reducer] = defaultReducer,
-    userDataProvider: Option[UserDataProvider] = None
+    userDataInit: Option[UserDataInit] = None
   ): Navigator =
-    new Navigator(result, postProcessors, reducer, userDataProvider)
+    new Navigator(result, postProcessors, reducer, userDataInit)
 
   private[diesel] class Ambiguity(val branchCount: Int) {
 
@@ -420,11 +416,15 @@ class Navigator(
   val result: Result,
   val postProcessors: Seq[Reducer.MarkerPostProcessor],
   val reducers: Seq[GenericNode => Reducer],
-  private val userDataProvider: Option[UserDataProvider]
+  val userDataInit: Option[Navigator.UserDataInit]
 ) {
 
   private val root: Subtrees =
-    nonTerminal(result.successState, ContextualUserData(None), successState = true)
+    nonTerminal(
+      result.successState,
+      userDataInit.map(ContextualUserData.root).getOrElse(ContextualUserData.empty()),
+      successState = true
+    )
 
   def hasNext: Boolean = root.choices.hasNext
 
@@ -574,7 +574,6 @@ class Navigator(
     val token  = terminal.token
     val node   = new GenericTerminal(
       new ParsingContext(
-        userDataProvider,
         terminal.begin,
         terminal.end,
         token.offset,
@@ -607,7 +606,6 @@ class Navigator(
     errors: Seq[Marker]
   ): Parsing = {
     val context = new ParsingContext(
-      userDataProvider,
       begin,
       end,
       offset,
