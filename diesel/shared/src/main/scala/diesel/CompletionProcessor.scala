@@ -78,8 +78,8 @@ class CompletionConfiguration {
 class CompletionProcessor(
   val result: Result,
   val text: String,
-  val config: Option[CompletionConfiguration] = None,
-  val userDataProvider: Option[UserDataProvider] = None
+  val navigatorFactory: Result => Navigator,
+  val config: Option[CompletionConfiguration] = None
 ) {
 
   def computeCompletionProposal(offset: Int): Seq[CompletionProposal] = {
@@ -94,7 +94,7 @@ class CompletionProcessor(
         None
     val afterDelimiter = c.exists(delimiters.contains(_))
 
-    val navigator = Navigator(result, userDataProvider = userDataProvider)
+    val navigator = navigatorFactory(result)
     navigator.toIterator
       .toSeq
       .foldLeft(Seq.empty[CompletionProposal]) { case (acc, tree) =>
