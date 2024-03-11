@@ -478,14 +478,19 @@ object Dsl {
     override def toString: String = s"lazyRuleRef($name)"
   }
 
-  case class SPAnd2[T1, T2](e1: SyntaxProduction[T1], e2: SyntaxProduction[T2])
-      extends SyntaxProduction[(T1, T2)]
+  case class SPAnd2[T1, T2](
+    e1: SyntaxProduction[T1],
+    e2: SyntaxProduction[T2],
+    grouped: Boolean = false
+  ) extends SyntaxProduction[(T1, T2)]
       with SPAssociable[(T1, T2)]
       with SPOptionalizable[(T1, T2)]
       with SPRepeatable[(T1, T2)]
       with SPOrable[(T1, T2)] {
 
     def ~[T3](o: SyntaxProduction[T3]): SPAnd3[T1, T2, T3] = SPAnd3(e1, e2, o)
+
+    def group: SPAnd2[T1, T2] = copy(grouped = true)
 
     override def applyDynamic(context: Context, args: Any): (T1, T2) = {
       val (v1, v2) = args.asInstanceOf[(T1, T2)]
@@ -496,13 +501,16 @@ object Dsl {
   case class SPAnd3[T1, T2, T3](
     e1: SyntaxProduction[T1],
     e2: SyntaxProduction[T2],
-    e3: SyntaxProduction[T3]
+    e3: SyntaxProduction[T3],
+    grouped: Boolean = false
   ) extends SyntaxProduction[(T1, T2, T3)]
       with SPAssociable[(T1, T2, T3)]
       with SPOptionalizable[(T1, T2, T3)]
       with SPRepeatable[(T1, T2, T3)] {
 
     def ~[T4](o: SyntaxProduction[T4]): SPAnd4[T1, T2, T3, T4] = SPAnd4(e1, e2, e3, o)
+
+    def group: SPAnd3[T1, T2, T3] = copy(grouped = true)
 
     override def applyDynamic(context: Context, args: Any): (T1, T2, T3) = {
       val (v1, v2, v3) = args.asInstanceOf[(T1, T2, T3)]
@@ -514,13 +522,16 @@ object Dsl {
     e1: SyntaxProduction[T1],
     e2: SyntaxProduction[T2],
     e3: SyntaxProduction[T3],
-    e4: SyntaxProduction[T4]
+    e4: SyntaxProduction[T4],
+    grouped: Boolean = false
   ) extends SyntaxProduction[(T1, T2, T3, T4)]
       with SPAssociable[(T1, T2, T3, T4)]
       with SPOptionalizable[(T1, T2, T3, T4)]
       with SPRepeatable[(T1, T2, T3, T4)] {
 
     def ~[T5](o: SyntaxProduction[T5]): SPAnd5[T1, T2, T3, T4, T5] = SPAnd5(e1, e2, e3, e4, o)
+
+    def group: SPAnd4[T1, T2, T3, T4] = copy(grouped = true)
 
     override def applyDynamic(context: Context, args: Any): (T1, T2, T3, T4) = {
       val (v1, v2, v3, v4) = args.asInstanceOf[(T1, T2, T3, T4)]
@@ -538,7 +549,8 @@ object Dsl {
     e2: SyntaxProduction[T2],
     e3: SyntaxProduction[T3],
     e4: SyntaxProduction[T4],
-    e5: SyntaxProduction[T5]
+    e5: SyntaxProduction[T5],
+    grouped: Boolean = false
   ) extends SyntaxProduction[(T1, T2, T3, T4, T5)]
       with SPAssociable[(T1, T2, T3, T4, T5)]
       with SPOptionalizable[(T1, T2, T3, T4, T5)]
@@ -546,6 +558,8 @@ object Dsl {
 
     def ~[T6](o: SyntaxProduction[T6]): SPAnd6[T1, T2, T3, T4, T5, T6] =
       SPAnd6(e1, e2, e3, e4, e5, o)
+
+    def group: SPAnd5[T1, T2, T3, T4, T5] = copy(grouped = true)
 
     override def applyDynamic(context: Context, args: Any): (T1, T2, T3, T4, T5) = {
       val (v1, v2, v3, v4, v5) = args.asInstanceOf[(T1, T2, T3, T4, T5)]
@@ -565,7 +579,8 @@ object Dsl {
     e3: SyntaxProduction[T3],
     e4: SyntaxProduction[T4],
     e5: SyntaxProduction[T5],
-    e6: SyntaxProduction[T6]
+    e6: SyntaxProduction[T6],
+    grouped: Boolean = false
   ) extends SyntaxProduction[(T1, T2, T3, T4, T5, T6)]
       with SPAssociable[(T1, T2, T3, T4, T5, T6)]
       with SPOptionalizable[(T1, T2, T3, T4, T5, T6)]
@@ -573,6 +588,8 @@ object Dsl {
 
     def ~[T7](o: SyntaxProduction[T7]): SPAnd7[T1, T2, T3, T4, T5, T6, T7] =
       SPAnd7(e1, e2, e3, e4, e5, e6, o)
+
+    def group: SPAnd6[T1, T2, T3, T4, T5, T6] = copy(grouped = true)
 
     override def applyDynamic(context: Context, args: Any): (T1, T2, T3, T4, T5, T6) = {
       val (v1, v2, v3, v4, v5, v6) = args.asInstanceOf[(T1, T2, T3, T4, T5, T6)]
@@ -594,7 +611,8 @@ object Dsl {
     e4: SyntaxProduction[T4],
     e5: SyntaxProduction[T5],
     e6: SyntaxProduction[T6],
-    e7: SyntaxProduction[T7]
+    e7: SyntaxProduction[T7],
+    grouped: Boolean = false
   ) extends SyntaxProduction[(T1, T2, T3, T4, T5, T6, T7)]
       with SPAssociable[(T1, T2, T3, T4, T5, T6, T7)]
       with SPOptionalizable[(T1, T2, T3, T4, T5, T6, T7)]
@@ -602,6 +620,8 @@ object Dsl {
 
     def ~[T8](o: SyntaxProduction[T8]): SPAnd8[T1, T2, T3, T4, T5, T6, T7, T8] =
       SPAnd8(e1, e2, e3, e4, e5, e6, e7, o)
+
+    def group: SPAnd7[T1, T2, T3, T4, T5, T6, T7] = copy(grouped = true)
 
     override def applyDynamic(context: Context, args: Any): (T1, T2, T3, T4, T5, T6, T7) = {
       val (v1, v2, v3, v4, v5, v6, v7) = args.asInstanceOf[(T1, T2, T3, T4, T5, T6, T7)]
@@ -625,11 +645,14 @@ object Dsl {
     e5: SyntaxProduction[T5],
     e6: SyntaxProduction[T6],
     e7: SyntaxProduction[T7],
-    e8: SyntaxProduction[T8]
+    e8: SyntaxProduction[T8],
+    grouped: Boolean = false
   ) extends SyntaxProduction[(T1, T2, T3, T4, T5, T6, T7, T8)]
       with SPAssociable[(T1, T2, T3, T4, T5, T6, T7, T8)]
       with SPOptionalizable[(T1, T2, T3, T4, T5, T6, T7, T8)]
       with SPRepeatable[(T1, T2, T3, T4, T5, T6, T7, T8)] {
+
+    def group: SPAnd8[T1, T2, T3, T4, T5, T6, T7, T8] = copy(grouped = true)
 
     override def applyDynamic(context: Context, args: Any): (T1, T2, T3, T4, T5, T6, T7, T8) = {
       val (v1, v2, v3, v4, v5, v6, v7, v8) = args.asInstanceOf[(T1, T2, T3, T4, T5, T6, T7, T8)]
@@ -907,7 +930,6 @@ trait Dsl {
     def untyped: UntypedSyntaxBuilder = UntypedSyntaxBuilder(name)
 
     def typed[T](c: Concept[T]): TypedSyntaxBuilder[T] = TypedSyntaxBuilder(name, c)
-
   }
 
   case class UntypedSyntaxBuilder(name: String, userData: Option[Any] = None) {
