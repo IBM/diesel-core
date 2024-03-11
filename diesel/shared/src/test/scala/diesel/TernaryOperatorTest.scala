@@ -17,7 +17,7 @@
 package diesel
 
 import diesel.samples.TernaryOperatorSample
-import diesel.samples.TernaryOperatorSample.Ast.{BoolValue, IntValue, Ternary}
+import diesel.samples.TernaryOperatorSample.Ast.{BoolValue, IntValue, List3, Ternary}
 import diesel.samples.TernaryOperatorSample.{Ast, MyDsl}
 
 class TernaryOperatorTest extends DslTestFunSuite {
@@ -53,6 +53,12 @@ class TernaryOperatorTest extends DslTestFunSuite {
   test("middle nested ternary") {
     assertAst("true ? false ? 1 : 2 : 3") {
       Ternary(BoolValue(true), Ternary(BoolValue(false), IntValue(1), IntValue(2)), IntValue(3))
+    }
+  }
+
+  test("list3") {
+    assertAst("{ 1, 2, 3 }") {
+      List3(IntValue(1), IntValue(2), IntValue(3))
     }
   }
 }

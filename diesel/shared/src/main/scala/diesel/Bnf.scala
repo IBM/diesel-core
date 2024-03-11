@@ -621,6 +621,30 @@ object Bnf {
       Partial(Seq(subjectRule))
     }
 
+    def groupIfNeeded[T](
+      owner: Rule,
+      production: Applicable[T],
+      grouped: Boolean,
+      result: Partial
+    ): Partial =
+      if (grouped) {
+        val postfix   = "group." + counter
+        counter += 1
+        val groupRule = getOrCreateRule(owner.name, postfix)
+        val itemRule  =
+          mapAction(
+            getOrCreateRule(owner.name, postfix + ".item"),
+            production,
+            result
+          )
+        addProduction(
+          groupRule,
+          Partial(Seq(itemRule), Propagate(0)),
+          { (_, args) => args.head }
+        )
+        Partial(Seq(groupRule))
+      } else result
+
     def mapSyntaxProduction[T](
       owner: Rule,
       production: SyntaxProduction[T],
@@ -650,181 +674,258 @@ object Bnf {
               splitText(str.text)
           }
 
-        case SPAnd2(i1, i2) =>
-          mapSyntaxProduction(owner, i1, ctx.propagate(first), None, first) ++ mapSyntaxProduction(
+        case p @ SPAnd2(i1, i2, grouped) =>
+          groupIfNeeded(
             owner,
-            i2,
-            ctx.propagate(false),
-            None,
-            first = false
+            p,
+            grouped,
+            mapSyntaxProduction(
+              owner,
+              i1,
+              ctx.propagate(first),
+              None,
+              first
+            ) ++ mapSyntaxProduction(
+              owner,
+              i2,
+              ctx.propagate(false),
+              None,
+              first = false
+            )
           )
 
-        case SPAnd3(i1, i2, i3) =>
-          mapSyntaxProduction(owner, i1, ctx.propagate(first), None, first) ++ mapSyntaxProduction(
+        case p @ SPAnd3(i1, i2, i3, grouped) =>
+          groupIfNeeded(
             owner,
-            i2,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i3,
-            ctx.propagate(false),
-            None,
-            first = false
+            p,
+            grouped,
+            mapSyntaxProduction(
+              owner,
+              i1,
+              ctx.propagate(first),
+              None,
+              first
+            ) ++ mapSyntaxProduction(
+              owner,
+              i2,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i3,
+              ctx.propagate(false),
+              None,
+              first = false
+            )
           )
 
-        case SPAnd4(i1, i2, i3, i4) =>
-          mapSyntaxProduction(owner, i1, ctx.propagate(first), None, first) ++ mapSyntaxProduction(
+        case p @ SPAnd4(i1, i2, i3, i4, grouped) =>
+          groupIfNeeded(
             owner,
-            i2,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i3,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(owner, i4, ctx.propagate(false), None, first = false)
-
-        case SPAnd5(i1, i2, i3, i4, i5) =>
-          mapSyntaxProduction(owner, i1, ctx.propagate(first), None, first) ++ mapSyntaxProduction(
-            owner,
-            i2,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i3,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i4,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i5,
-            ctx.propagate(false),
-            None,
-            first = false
+            p,
+            grouped,
+            mapSyntaxProduction(
+              owner,
+              i1,
+              ctx.propagate(first),
+              None,
+              first
+            ) ++ mapSyntaxProduction(
+              owner,
+              i2,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i3,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(owner, i4, ctx.propagate(false), None, first = false)
           )
 
-        case SPAnd6(i1, i2, i3, i4, i5, i6) =>
-          mapSyntaxProduction(owner, i1, ctx.propagate(first), None, first) ++ mapSyntaxProduction(
+        case p @ SPAnd5(i1, i2, i3, i4, i5, grouped) =>
+          groupIfNeeded(
             owner,
-            i2,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i3,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i4,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i5,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i6,
-            ctx.propagate(false),
-            None,
-            first = false
+            p,
+            grouped,
+            mapSyntaxProduction(
+              owner,
+              i1,
+              ctx.propagate(first),
+              None,
+              first
+            ) ++ mapSyntaxProduction(
+              owner,
+              i2,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i3,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i4,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i5,
+              ctx.propagate(false),
+              None,
+              first = false
+            )
           )
 
-        case SPAnd7(i1, i2, i3, i4, i5, i6, i7) =>
-          mapSyntaxProduction(owner, i1, ctx.propagate(first), None, first) ++ mapSyntaxProduction(
+        case p @ SPAnd6(i1, i2, i3, i4, i5, i6, grouped) =>
+          groupIfNeeded(
             owner,
-            i2,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i3,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i4,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i5,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i6,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(owner, i7, ctx.propagate(false), None, first = false)
+            p,
+            grouped,
+            mapSyntaxProduction(
+              owner,
+              i1,
+              ctx.propagate(first),
+              None,
+              first
+            ) ++ mapSyntaxProduction(
+              owner,
+              i2,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i3,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i4,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i5,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i6,
+              ctx.propagate(false),
+              None,
+              first = false
+            )
+          )
 
-        case SPAnd8(i1, i2, i3, i4, i5, i6, i7, i8) =>
-          mapSyntaxProduction(owner, i1, ctx.propagate(first), None, first) ++ mapSyntaxProduction(
+        case p @ SPAnd7(i1, i2, i3, i4, i5, i6, i7, grouped) =>
+          groupIfNeeded(
             owner,
-            i2,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
+            p,
+            grouped,
+            mapSyntaxProduction(
+              owner,
+              i1,
+              ctx.propagate(first),
+              None,
+              first
+            ) ++ mapSyntaxProduction(
+              owner,
+              i2,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i3,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i4,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i5,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i6,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(owner, i7, ctx.propagate(false), None, first = false)
+          )
+
+        case p @ SPAnd8(i1, i2, i3, i4, i5, i6, i7, i8, grouped) =>
+          groupIfNeeded(
             owner,
-            i3,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i4,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i5,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i6,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i7,
-            ctx.propagate(false),
-            None,
-            first = false
-          ) ++ mapSyntaxProduction(
-            owner,
-            i8,
-            ctx.propagate(false),
-            None,
-            first = false
+            p,
+            grouped,
+            mapSyntaxProduction(
+              owner,
+              i1,
+              ctx.propagate(first),
+              None,
+              first
+            ) ++ mapSyntaxProduction(
+              owner,
+              i2,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i3,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i4,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i5,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i6,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i7,
+              ctx.propagate(false),
+              None,
+              first = false
+            ) ++ mapSyntaxProduction(
+              owner,
+              i8,
+              ctx.propagate(false),
+              None,
+              first = false
+            )
           )
 
         case SPAndN(ps) =>

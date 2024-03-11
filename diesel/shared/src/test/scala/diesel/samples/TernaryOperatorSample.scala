@@ -28,6 +28,8 @@ object TernaryOperatorSample {
     case class BoolValue(b: Boolean) extends Value
 
     case class Ternary(c: Value, t: Value, e: Value) extends Value
+
+    case class List3(e1: Value, e2: Value, e3: Value) extends Value
   }
 
   import Ast._
@@ -57,6 +59,18 @@ object TernaryOperatorSample {
             booleanConcept ~ ("?" ~ builder.concept ~ ":").leftAssoc(10) ~ builder.concept map {
               case (_, (c, (_, t, _), e)) =>
                 Ternary(c, t, e)
+            }
+          }
+        }
+    }
+
+    val list3: Dsl.SyntaxGeneric[Value] = {
+      syntaxGeneric[Value]
+        .accept(objectConcept) { builder =>
+          builder.userData(13) {
+            "{" ~ (builder.concept ~ "," ~ builder.concept ~ "," ~ builder.concept).group ~ "}" map {
+              case (_, (_, (e1, _, e2, _, e3), _)) =>
+                List3(e1, e2, e3)
             }
           }
         }
