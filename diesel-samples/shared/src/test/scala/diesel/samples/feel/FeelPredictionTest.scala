@@ -28,8 +28,7 @@ class FeelPredictionTest extends FunSuite {
     expectedPredictions: Seq[String]
   ): Unit = {
     val config      = new CompletionConfiguration()
-    val feel        = new Feel
-    val predictions = predict(feel, text, offset, Some(config))
+    val predictions = predict(Feel, text, offset, Some(config))
     assertEquals(predictions.map(_.text), expectedPredictions)
   }
 

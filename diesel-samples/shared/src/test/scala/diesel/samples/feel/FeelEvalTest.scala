@@ -23,8 +23,8 @@ import diesel.Dsl
 
 class FeelEvalTest extends DslTestFunSuite {
 
-  override def dsl                                = new Feel
-  override def axiom: Some[Dsl.Axiom[Expression]] = Some(dsl.a_expression)
+  override def dsl: Dsl                           = Feel
+  override def axiom: Some[Dsl.Axiom[Expression]] = Some(Feel.a_expression)
 
   type Ast = Evaluator.EValue
   override def ast(tree: GenericTree): Evaluator.EValue =

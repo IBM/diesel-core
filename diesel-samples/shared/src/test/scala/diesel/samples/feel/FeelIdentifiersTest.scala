@@ -17,16 +17,35 @@
 package diesel.samples.feel
 
 import diesel.samples.feel.Ast._
-import diesel.Dsl
+import diesel._
 
 class FeelIdentifiersTest extends FeelFunSuite {
 
-  override def axiom: Some[Dsl.Axiom[Expression]] = Some(dsl.a_expression)
+  override def axiom: Some[Dsl.Axiom[Expression]] = Some(Feel.a_expression)
 
   type Ast = Expression
 
+  def feelReducer: (GenericNode) => Reducer = node => new FeelReducer(node)
+
+  private val reducer: Seq[GenericNode => Reducer] =
+    Seq(Reducer.noAbortAsMuchAsPossible, feelReducer, Reducer.selectOne)
+
+  private val navigatorFactory =
+    (r: Result) => Navigator(r, Seq.empty, reducer, None);
+
+  private def assertAst2(text: String)(expected: => Ast): Unit = {
+    AstHelpers.selectAst(
+      dsl,
+      axiom = axiom,
+      navigatorFactory = navigatorFactory
+    )(text) { tree =>
+      AstHelpers.assertNoMarkers(tree)
+      assertEquals(tree.value, expected)
+    }
+  }
+
   test("foo + 1") {
-    assertAst("foo + 1") {
+    assertAst2("foo + 1") {
       ETextual(e =
         TEArith(e =
           Addition(
@@ -54,8 +73,39 @@ class FeelIdentifiersTest extends FeelFunSuite {
     }
   }
 
+  test("{ foo: 1 }") {
+    assertAst2("{ foo: 1 }") {
+      EBoxed(e =
+        BEContext(c =
+          Context(entries =
+            List(
+              ContextEntry(
+                key = Left(value =
+                  Name(s =
+                    "foo"
+                  )
+                ),
+                e = ETextual(e =
+                  TELiteral(e =
+                    LSimple(l =
+                      SLNumeric(l =
+                        NumericLiteral(v =
+                          1.0
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    }
+  }
+
   test("{ foo: 1, x: foo + 1 }") {
-    assertAst("{ foo: 1, x: foo + 1 }") {
+    assertAst2("{ foo: 1, x: foo + 1 }") {
       EBoxed(e =
         BEContext(c =
           Context(entries =
@@ -118,7 +168,7 @@ class FeelIdentifiersTest extends FeelFunSuite {
   }
 
   test("{ foo + bar: 1 }") {
-    assertAst("{ foo + bar: 1 }") {
+    assertAst2("{ foo + bar: 1 }") {
       EBoxed(e =
         BEContext(c =
           Context(entries =
@@ -148,8 +198,8 @@ class FeelIdentifiersTest extends FeelFunSuite {
     }
   }
 
-  test("{ foo: 1, bar: 1, foo + bar: 2, x: foo + bar }") {
-    assertAst("{ foo: 1, bar: 1, foo + bar: 2, x: foo + bar }") {
+  test("{ foo: 1, bar: 2, foo + bar: 10, x: foo + bar }".only) {
+    assertAst2("{ foo: 1, bar: 2, foo + bar: 10, x: foo + bar }") {
       EBoxed(e =
         BEContext(c =
           Context(entries =
@@ -183,7 +233,7 @@ class FeelIdentifiersTest extends FeelFunSuite {
                     LSimple(l =
                       SLNumeric(l =
                         NumericLiteral(v =
-                          1.0
+                          2.0
                         )
                       )
                     )
@@ -201,7 +251,7 @@ class FeelIdentifiersTest extends FeelFunSuite {
                     LSimple(l =
                       SLNumeric(l =
                         NumericLiteral(v =
-                          2.0
+                          10.0
                         )
                       )
                     )

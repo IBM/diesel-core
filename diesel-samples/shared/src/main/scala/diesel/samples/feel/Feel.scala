@@ -16,91 +16,93 @@
 
 package diesel.samples.feel
 
-import diesel.{Dsl, Lexer}
+import diesel.Dsl
 import diesel.Dsl.{Axiom, Concept, DynamicLexer, Identifiers, Instance, Syntax}
 import diesel.Lexer.Scanner
 import diesel.samples.feel.Ast._
 
-class Feel extends Dsl with Identifiers with DynamicLexer {
+object Feel extends Dsl with Identifiers with DynamicLexer {
 
-  private var scope: Set[String] = Set("foo", "bar")
+  // private var scope: Set[String] = Set("foo", "bar")
 
-  override def identScanner: Lexer.Scanner = new Lexer.Scanner {
-    override def name: String = "[a-z]+"
+  // override def identScanner: Lexer.Scanner = new Lexer.Scanner {
+  //   override def name: String = "[a-z]+"
 
-    override def findPrefixOf(source: CharSequence): Option[String] = {
-      idRegex.findPrefixOf(source).map { str =>
-        // regex matches : check in scope/keywords
-        var i                 = 1
-        var m: Option[String] = None
-        while (i <= str.length()) {
-          val s = str.substring(0, i)
-          if (scope.contains(s) || keywords.contains(s)) {
-            m = Some(s)
-          }
-          i = i + 1
-        }
-        m match {
-          case Some(x) =>
-            x
-          case None    =>
-            val i = str.indexOf(" in")
-            val r =
-              if (i != -1) {
-                str.substring(0, i)
-              } else {
-                str
-              }
-            r
-        }
-      }
-    }
-  }
+  //   override def findPrefixOf(source: CharSequence): Option[String] = {
+  //     idRegex.findPrefixOf(source).map { str =>
+  //       // regex matches : check in scope/keywords
+  //       var i                 = 1
+  //       var m: Option[String] = None
+  //       while (i <= str.length()) {
+  //         val s = str.substring(0, i)
+  //         if (scope.contains(s) || keywords.contains(s)) {
+  //           m = Some(s)
+  //         }
+  //         i = i + 1
+  //       }
+  //       m match {
+  //         case Some(x) =>
+  //           x
+  //         case None    =>
+  //           val i = str.indexOf(" in")
+  //           val r =
+  //             if (i != -1) {
+  //               str.substring(0, i)
+  //             } else {
+  //               str
+  //             }
+  //           r
+  //       }
+  //     }
+  //   }
+  // }
 
-  private val idRegex = raw"[a-z]+( [a-z\+]+)*".r
+  // private val idRegex = raw"[a-z]+( [a-z\+]+)*".r
 
-  private var keywords: Set[String] = Set.empty
+  // private var keywords: Set[String] = Set.empty
 
-  override def keywordScanner: Lexer.Scanner = new Lexer.Scanner {
-    override def name: String = "xxx"
+  // override def keywordScanner: Lexer.Scanner = new Lexer.Scanner {
+  //   override def name: String = "xxx"
 
-    override def findPrefixOf(source: CharSequence): Option[String] = {
-      val res = idRegex.findPrefixOf(source)
-      res match {
-        case Some(x) =>
-          keywords = keywords + x
-        case None    =>
-        //
-      }
-      res
-    }
-  }
+  //   override def findPrefixOf(source: CharSequence): Option[String] = {
+  //     val res = idRegex.findPrefixOf(source)
+  //     res match {
+  //       case Some(x) =>
+  //         keywords = keywords + x
+  //       case None    =>
+  //       //
+  //     }
+  //     res
+  //   }
+  // }
 
-  // use this concept for declarations along with dynamic lexer
-  val declarationScanner: Scanner = new Scanner {
-    override def name: String = "decl"
+  // // use this concept for declarations along with dynamic lexer
+  // val declarationScanner: Scanner = new Scanner {
+  //   override def name: String = "decl"
 
-    override def findPrefixOf(source: CharSequence): Option[String] = {
-      val m = idRegex.findPrefixOf(source)
-      m match {
-        case Some(x) =>
-          val i = x.indexOf(" in")
-          val r =
-            if (i != -1) {
-              x.substring(0, i)
-            } else {
-              x
-            }
-          scope = scope + r
-          Some(r)
-        case None    =>
-          None
-      }
-    }
-  }
+  //   override def findPrefixOf(source: CharSequence): Option[String] = {
+  //     val m = idRegex.findPrefixOf(source)
+  //     m match {
+  //       case Some(x) =>
+  //         val i = x.indexOf(" in")
+  //         val r =
+  //           if (i != -1) {
+  //             x.substring(0, i)
+  //           } else {
+  //             x
+  //           }
+  //         scope = scope + r
+  //         Some(r)
+  //       case None    =>
+  //         None
+  //     }
+  //   }
+  // }
 
-  val variable_declaration: Concept[Name] =
-    concept(declarationScanner, Name("x")) map ((_, t) => Name(t.text))
+  override def identScanner: Scanner = "[a-z]+".r
+
+  // val variable_declaration: Concept[Name] = concept
+  // concept(declarationScanner, Name("x")) map ((_, t) => Name(t.text))
 
   val expression: Concept[Expression]                              = concept
   val boxed_expression: Concept[BoxedExpression]                   = concept
@@ -141,6 +143,51 @@ class Feel extends Dsl with Identifiers with DynamicLexer {
   val boxed_list: Concept[Seq[Expression]]                         = concept
   val function_definition: Concept[FunctionDefinition]             = concept
   val context: Concept[Context]                                    = concept
+
+  // val s_name: Syntax[Name] = syntax(name)(
+  //   (id ~ (raw"\+".r).?).rep(false) map {
+  //     case (_, ids) =>
+  //       Name(
+  //         ids.flatMap { case (id, optPlus) =>
+  //           Seq(id) ++ optPlus.toSeq
+  //         }.map(_.text).mkString(" ")
+  //       )
+  //   }
+  // )
+
+  val s_name1: Syntax[Name] = syntax(name)(
+    id map {
+      case (_, id) =>
+        Name(id.text)
+    }
+  )
+
+  val s_name2: Syntax[Name] = syntax(name)(
+    id ~ id map {
+      case (_, (id1, id2)) =>
+        Name(id1.text + " " + id2.text)
+    }
+  )
+
+  val s_name3: Syntax[Name] = syntax(name)(
+    id ~ "+" ~ id map {
+      case (_, (id1, _, id2)) =>
+        Name(id1.text + " + " + id2.text)
+    }
+  )
+
+  val variable_declaration: Syntax[Name] = syntax(
+    name map {
+      case (ctx, n) =>
+        val existing: Set[String] = ctx.contextualUserData.get("vars")
+          .map(_.asInstanceOf[Set[String]])
+          .getOrElse(Set.empty)
+
+        val vars = existing ++ Set(n.s)
+        ctx.contextualUserData.set("vars", vars)
+        n
+    }
+  )
 
   val s1ab: Syntax[Expression] = syntax(expression)(
     boxed_expression | textual_expression map {
@@ -249,12 +296,6 @@ class Feel extends Dsl with Identifiers with DynamicLexer {
   val s2h_3: Syntax[TextualExpression] = syntax(textual_expression)(
     name map {
       case (c, x) =>
-//        val name = x.s
-//        // TODO add error if variable doesn't exist
-//        if (foo.find(s => s == name).isEmpty) {
-//          c.addMarkers(Marker(Errors.SemanticError, c.offset, c.length, "toto biloute"))
-//          println("BLAH")
-//        }
         TEName(x)
     }
   )
@@ -413,11 +454,12 @@ class Feel extends Dsl with Identifiers with DynamicLexer {
 
   // TODO proper handling of names : s25 -> s30
   // for now we do with IDs
-  val s25: Syntax[Name] = syntax(name)(
-    id map {
-      case (_, i) =>
-        Name(i.text)
-    }
+  // val s25: Syntax[Name] = syntax(name)(
+  //   id map {
+  //     case (_, i) =>
+  //       Name(i.text)
+  //   }
+  // )
 //    id ~ ("+" | id).rep(true) map {
 //      case (_,(i,is)) =>
 //        val s = is.map {
@@ -428,7 +470,7 @@ class Feel extends Dsl with Identifiers with DynamicLexer {
 //        }.mkString
 //        Name(i.text + s)
 //    }
-  )
+  // )
 
   val s31: Syntax[Literal] = syntax(literal)(
     simple_literal | "null" map {
@@ -498,7 +540,16 @@ class Feel extends Dsl with Identifiers with DynamicLexer {
     }
   )
 
-  val pathName: Concept[Name] = concept(idRegex, Name("x")) map ((_, t) => Name(t.text))
+  // TODO
+  val pathName: Concept[Name] = concept
+  // concept(idRegex, Name("x")) map ((_, t) => Name(t.text))
+
+  val sPathName: Syntax[Name] = syntax(pathName)(
+    id.rep(true) map {
+      case (_, ids) =>
+        Name(ids.map(_.text).mkString(" "))
+    }
+  )
 
   val s43: Syntax[PathExpression] = syntax(path_expression)(
     expression ~ "." ~ pathName map {
@@ -736,7 +787,7 @@ class Feel extends Dsl with Identifiers with DynamicLexer {
 //  var foo: List[String] = List.empty
 
   // 58
-  val contextEntry: Syntax[ContextEntry] = syntax(
+  val contextEntry: Syntax[ContextEntry] = syntax.untyped.contextual(true)(
     (variable_declaration | string_literal) ~ ":" ~ expression map {
       case (_, (nameOrLiteral, _, e)) =>
         ContextEntry(nameOrLiteral, e)

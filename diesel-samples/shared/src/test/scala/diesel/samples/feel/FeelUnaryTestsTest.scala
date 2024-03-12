@@ -22,7 +22,7 @@ import diesel.Dsl
 class FeelUnaryTestsTest extends FeelFunSuite {
 
   type Ast = UnaryTests
-  override def axiom: Some[Dsl.Axiom[UnaryTests]] = Some(dsl.a_unary_tests)
+  override def axiom: Some[Dsl.Axiom[UnaryTests]] = Some(Feel.a_unary_tests)
 
   test("foo") {
     UTPUT(List(PositiveUnaryTest(ETextual(TEName(Name("foo"))))))

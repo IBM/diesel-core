@@ -21,7 +21,7 @@ import diesel.Dsl
 
 class FeelExpressionTest extends FeelFunSuite {
 
-  override def axiom: Some[Dsl.Axiom[Expression]] = Some(dsl.a_expression)
+  override def axiom: Some[Dsl.Axiom[Expression]] = Some(Feel.a_expression)
 
   type Ast = Expression
 

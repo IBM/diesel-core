@@ -16,10 +16,10 @@
 
 package diesel.samples.feel
 
-import diesel.{DslTestFunSuite}
+import diesel.{Dsl, DslTestFunSuite}
 
 class FeelFunSuite extends DslTestFunSuite {
 
-  override def dsl = new Feel
+  override def dsl: Dsl = Feel
 
 }
