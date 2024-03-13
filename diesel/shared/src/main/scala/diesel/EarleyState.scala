@@ -277,7 +277,7 @@ private[diesel] class StateContext(
   }
 }
 
-class Result(val axiom: Bnf.Axiom) {
+class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
 
   private val states: mutable.Map[State, StateContext] = mutable.Map()
   private val charts: ArrayBuffer[Chart]               = ArrayBuffer()
@@ -288,8 +288,18 @@ class Result(val axiom: Bnf.Axiom) {
 
   private def successState(length: Int): State = State(axiom.production, 0, length, 1)
 
-  private var currentChart: Option[Chart]                   = None
+  private var currentChart: Option[Chart]                             = None
+  private val nullableCache: mutable.Map[Bnf.NonTerminal, Set[State]] = mutable.Map()
+
   private[diesel] val processingQueue: mutable.Queue[State] = mutable.Queue()
+
+  private[diesel] def resetNullable(): Unit = {
+    nullableCache.clear()
+  }
+
+  private[diesel] def addToNullable(state: State): Unit = {
+    nullableCache.put(state.rule, nullableCache.getOrElse(state.rule, Set()) ++ Set(state))
+  }
 
   pushChart += axiomState
 
@@ -402,6 +412,15 @@ class Result(val axiom: Bnf.Axiom) {
     currentChart
       .filter(_ == chart)
       .foreach(_ => processingQueue.enqueue(state))
+    if (!state.isCompleted) {
+      state.nextSymbol match {
+        case rule: Bnf.NonTerminal =>
+          if (bnf.emptyRules.contains(rule)) {
+            nullableCache.get(rule).foreach(_.foreach(processingQueue.enqueue))
+          }
+        case _                     =>
+      }
+    }
   }
 
   private[diesel] def beginErrorRecovery(): Unit = {
