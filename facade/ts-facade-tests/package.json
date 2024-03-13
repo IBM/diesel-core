@@ -10,10 +10,10 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@diesel-parser/samples": "^0.29.0"
+    "@diesel-parser/samples": "^0.29.1"
   },
   "devDependencies": {
-    "@diesel-parser/ts-facade": "^0.29.0",
+    "@diesel-parser/ts-facade": "^0.29.1",
     "@types/chai": "^4.3.4",
     "@types/mocha": "^10.0.1",
     "chai": "^4.3.7",
