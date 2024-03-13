@@ -112,6 +112,7 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
   }
 
   private def closure(context: Result): Seq[State] = {
+    context.resetNullable()
     var scanQueue: Seq[State] = Seq()
     while (context.processingQueue.nonEmpty) {
       val state: State = context.processingQueue.dequeue()
