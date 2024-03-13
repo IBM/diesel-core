@@ -39,6 +39,23 @@ class EpsilonTest extends FunSuite {
     val a: Axiom[String] = axiom(s)
   }
 
+  test("BNF") {
+    def dsl = MyDsl
+    def bnf = Bnf(dsl)
+    assertEquals(
+      bnf.emptyRules.map(r => r.name),
+      Set(
+        "a[_,_,_,_,_]",
+        "syntax[_,_,_,_,_].b",
+        "syntax[_,_,_,_,_].b.map.1",
+        "syntax[_,_,_,_,_].s.map.0",
+        "syntax[_,_,_,_,_].b.map.1.opt.2",
+        "syntax[_,_,_,_,_].s"
+      )
+    )
+    // "syntax[_,_,_,_,_].b.map.1.opt.2.item" -> "b"
+  }
+
   test("none") {
     AstHelpers.selectAst(MyDsl)("") { tree =>
       AstHelpers.assertNoMarkers(tree)
