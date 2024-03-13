@@ -49,7 +49,7 @@ object AstHelpers {
     text: String,
     offset: Int,
     config: Option[CompletionConfiguration] = None,
-    userDataProvider: Option[UserDataProvider] = None,
+    navigatorFactory: Result => Navigator = Navigator(_),
     axiom: Option[Axiom[_]] = None
   ): Seq[CompletionProposal] = {
     val bnf: Bnf       = Bnf(dsl)
@@ -58,8 +58,8 @@ object AstHelpers {
     val res            = new CompletionProcessor(
       parser.parse(new Lexer.Input(text), a),
       text,
-      config,
-      userDataProvider
+      navigatorFactory,
+      config
     ).computeCompletionProposal(offset)
 //    println(s"predict '$text' at offset $offset : $res")
     res

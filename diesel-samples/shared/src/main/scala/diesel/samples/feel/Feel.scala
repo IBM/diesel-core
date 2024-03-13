@@ -57,7 +57,7 @@ class Feel extends Dsl with Identifiers with DynamicLexer {
     }
   }
 
-  private val idRegex = "[a-z]+( [a-z]+)*".r
+  private val idRegex = raw"[a-z]+( [a-z\+]+)*".r
 
   private var keywords: Set[String] = Set.empty
 

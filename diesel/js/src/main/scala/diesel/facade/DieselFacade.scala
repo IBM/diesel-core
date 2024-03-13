@@ -34,8 +34,7 @@ case class ParseContext(
 case class PredictContext(
   markerPostProcessor: Option[MarkerPostProcessor] = None,
   navigatorFactory: Result => Navigator = Navigator(_),
-  config: Option[CompletionConfiguration] = None,
-  userDataProvider: Option[UserDataProvider] = None
+  config: Option[CompletionConfiguration] = None
 )
 
 class DieselParserFacade(
@@ -70,8 +69,7 @@ class DieselParserFacade(
       request.text,
       request.offset,
       predictContext.config,
-      predictContext.navigatorFactory,
-      predictContext.userDataProvider
+      predictContext.navigatorFactory
     )
   }
 
@@ -235,8 +233,7 @@ object DieselPredictResult {
     text: String,
     offset: Int,
     config: Option[CompletionConfiguration],
-    navigatorFactory: Result => Navigator,
-    userDataProvider: Option[UserDataProvider]
+    navigatorFactory: Result => Navigator
   ): DieselPredictResult = {
     if (result.success) {
       val navigator = navigatorFactory(result)
@@ -244,8 +241,8 @@ object DieselPredictResult {
         val proposals = new CompletionProcessor(
           result,
           text,
-          config,
-          userDataProvider
+          navigatorFactory,
+          config
         ).computeCompletionProposal(offset).distinctBy(
           _.text
         ) // not sure why but we have to dedup this

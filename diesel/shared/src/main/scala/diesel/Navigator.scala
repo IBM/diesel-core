@@ -24,19 +24,14 @@ import diesel.Lexer.Token
 import scala.collection.mutable
 
 private[diesel] class ParsingContext(
-  val userDataProvider: Option[UserDataProvider],
   val begin: Int,
   val end: Int,
   val offset: Int,
   val length: Int,
   val ambiguity: Option[Ambiguity],
-  val children: Seq[GenericNode]
+  val children: Seq[GenericNode],
+  val contextualUserData: ContextualUserData
 ) extends Context {
-
-  override def getUserData(key: Any): Option[Any] = userDataProvider.flatMap(_.getUserData(key))
-
-  override def setUserData(key: Any, value: Any): Unit =
-    userDataProvider.foreach(_.setUserData(key, value))
 
   private var locals: Seq[Marker]              = Seq.empty
   private var style: Option[Style]             = None
@@ -299,13 +294,15 @@ object Navigator {
   val defaultReducer: Seq[GenericNode => Reducer] =
     Seq(Reducer.noAbortAsMuchAsPossible, Reducer.selectOne)
 
+  type UserDataInit = ContextualUserData => Unit
+
   def apply(
     result: Result,
     postProcessors: Seq[GenericTree => Seq[Marker]] = Seq.empty,
     reducer: Seq[GenericNode => Reducer] = defaultReducer,
-    userDataProvider: Option[UserDataProvider] = None
+    userDataInit: Option[UserDataInit] = None
   ): Navigator =
-    new Navigator(result, postProcessors, reducer, userDataProvider)
+    new Navigator(result, postProcessors, reducer, userDataInit)
 
   private[diesel] class Ambiguity(val branchCount: Int) {
 
@@ -322,13 +319,17 @@ object Navigator {
   type Filter = Seq[GenericNode] => Seq[GenericNode]
 }
 
+case class Subtree(stack: Seq[Parsing])
+
+case class Subtrees(choices: Iterator[Subtree], userData: ContextualUserData)
+
 trait Reducer {
 
   def node: GenericNode
 
   def compare(node: GenericNode): (Reducer.Kind.Kind, Reducer)
 
-  def close(subtrees: Seq[Seq[Parsing]]): Seq[Seq[Parsing]] = subtrees
+  def close(subtrees: Seq[Subtree]): Seq[Subtree] = subtrees
 }
 
 object Reducer {
@@ -396,11 +397,11 @@ object Reducer {
       }
     }
 
-    override def close(subtrees: Seq[Seq[Parsing]]): Seq[Seq[Parsing]] =
+    override def close(subtrees: Seq[Subtree]): Seq[Subtree] =
       if (ambiguous) {
         // In case of ambiguity, exactly only one subtree is available
-        val parsing = subtrees.head.head
-        Seq(Seq(parsing.asAmbiguous()))
+        val parsing = subtrees.head.stack.head
+        Seq(Subtree(Seq(parsing.asAmbiguous())))
       } else
         subtrees
   }
@@ -415,15 +416,20 @@ class Navigator(
   val result: Result,
   val postProcessors: Seq[Reducer.MarkerPostProcessor],
   val reducers: Seq[GenericNode => Reducer],
-  private val userDataProvider: Option[UserDataProvider]
+  val userDataInit: Option[Navigator.UserDataInit]
 ) {
 
-  private val root: Iterator[Seq[Parsing]] = nonTerminal(result.successState, successState = true)
+  private val root: Subtrees =
+    nonTerminal(
+      result.successState,
+      userDataInit.map(ContextualUserData.root).getOrElse(ContextualUserData.empty()),
+      successState = true
+    )
 
-  def hasNext: Boolean = root.hasNext
+  def hasNext: Boolean = root.choices.hasNext
 
   def next(): GenericTree = {
-    val current = root.next().head
+    val current = root.choices.next().stack.head
     var tree    =
       GenericTree(
         current.node,
@@ -452,55 +458,82 @@ class Navigator(
   private def backPtrsOf(state: State): Seq[BackPtr] =
     result.contextOf(state).fold[Seq[BackPtr]](Seq.empty)(ctx => ctx.backPtrs.toSeq)
 
-  private def sentinel(): Iterator[Seq[Parsing]] = Seq(Seq.empty).iterator
+  private def sentinel(): Iterator[Subtree] =
+    Seq(Subtree(Seq.empty)).iterator
 
-  private def terminal(item: TerminalItem): Iterator[Seq[Parsing]] =
-    singleton(applyToken(item))
+  private def terminal(item: TerminalItem, userData: ContextualUserData): Iterator[Subtree] =
+    singleton(applyToken(item, userData))
 
-  private def singleton(value: Parsing): Iterator[Seq[Parsing]] =
-    Seq(Seq(value)).iterator
+  private def singleton(value: Parsing): Iterator[Subtree] =
+    Seq(Subtree(Seq(value))).iterator
+
+  type AlternativeSupplier = ContextualUserData => Subtrees
 
   private def alternative(
-    causal: Iterator[Seq[Parsing]],
-    predecessor: State
-  ): Iterator[Seq[Parsing]] =
-    new BackPtrIterator(causal, predecessor)
+    causal: AlternativeSupplier,
+    predecessor: State,
+    userData: ContextualUserData
+  ): Iterator[Subtree] =
+    new BackPtrIterator(causal, predecessor, userData)
 
-  private def nonTerminal(state: State, successState: Boolean = false): Iterator[Seq[Parsing]] = {
+  private def isContextual(state: State): Boolean = state.production.element match {
+    case Some(element) => element match {
+        case Bnf.DslSyntax(syntax) => syntax.contextual
+        case _                     => false
+      }
+    case None          => false
+  }
+
+  private def nonTerminal(
+    state: State,
+    userData: ContextualUserData,
+    successState: Boolean = false
+  ): Subtrees = {
     val backPtrs: Seq[BackPtr] = backPtrsOf(state)
     if (backPtrs.isEmpty) {
-      if (state.isCompleted) singleton(reduceState(state, Seq.empty, None))
-      else sentinel()
+      if (state.isCompleted)
+        Subtrees(
+          singleton(reduceState(state, Subtree(Seq.empty), userData, None)),
+          userData
+        )
+      else {
+        if (isContextual(state)) {
+          Subtrees(sentinel(), ContextualUserData(Some(userData)))
+        } else Subtrees(sentinel(), userData)
+      }
     } else {
       val subtrees = backPtrs.map(backPtr =>
         alternative(
           backPtr.causal match {
-            case item: TerminalItem => terminal(item)
-            case state: State       => nonTerminal(state)
+            case item: TerminalItem => userData => Subtrees(terminal(item, userData), userData)
+            case state: State       => userData => nonTerminal(state, userData)
           },
-          backPtr.predecessor
+          backPtr.predecessor,
+          userData
         )
       ).reduce(_ ++ _)
       if (state.isCompleted) {
         val candidates = subtrees.toSeq
         if (candidates.size > 1 && (successState || state.production.isDslElement)) {
           val ambiguity = Some(new Ambiguity(candidates.size))
-          filterSubtrees(
-            candidates.map(s => Seq(reduceState(state, s, ambiguity))),
-            ambiguity
-          ).iterator
+          val subtrees  =
+            candidates.map(s => Subtree(Seq(reduceState(state, s, userData, ambiguity))))
+          Subtrees(filterSubtrees(subtrees, ambiguity).iterator, userData)
         } else
-          candidates.map(s => Seq(reduceState(state, s, None))).iterator
+          Subtrees(
+            candidates.map(s => Subtree(Seq(reduceState(state, s, userData, None)))).iterator,
+            userData
+          )
       } else
-        subtrees
+        Subtrees(subtrees, userData)
     }
   }
 
   private def filterSubtrees(
-    candidates: Seq[Seq[Parsing]],
+    candidates: Seq[Subtree],
     ambiguity: Option[Ambiguity]
-  ): Seq[Seq[Parsing]] = {
-    var subtrees: Seq[Seq[Parsing]] = candidates
+  ): Seq[Subtree] = {
+    var subtrees: Seq[Subtree] = candidates
     if (subtrees.nonEmpty) {
       val branchCount = subtrees.size
       subtrees = reducers.foldLeft(subtrees)((acc, r) => reduceSubtrees(acc, r))
@@ -516,13 +549,13 @@ class Navigator(
   }
 
   private def reduceSubtrees(
-    subtrees: Seq[Seq[Parsing]],
+    subtrees: Seq[Subtree],
     reducer: GenericNode => Reducer
-  ): Seq[Seq[Parsing]] = {
-    var reduced: Seq[Seq[Parsing]] = Seq(subtrees.head)
-    var ctx                        = reducer(reduced.head.head.node)
+  ): Seq[Subtree] = {
+    var reduced: Seq[Subtree] = Seq(subtrees.head)
+    var ctx                   = reducer(reduced.head.stack.head.node)
     subtrees.tail.foreach(subtree => {
-      val (kind, newCtx) = ctx.compare(subtree.head.node)
+      val (kind, newCtx) = ctx.compare(subtree.stack.head.node)
       kind match {
         case Reducer.Kind.Better =>
           reduced = Seq(subtree)
@@ -536,18 +569,18 @@ class Navigator(
     reduced
   }
 
-  private def applyToken(terminal: TerminalItem): Parsing = {
+  private def applyToken(terminal: TerminalItem, userData: ContextualUserData): Parsing = {
     val errors = terminal.reportErrors()
     val token  = terminal.token
     val node   = new GenericTerminal(
       new ParsingContext(
-        userDataProvider,
         terminal.begin,
         terminal.end,
         token.offset,
         token.text.length,
         None,
-        Seq.empty
+        Seq.empty,
+        userData
       ),
       token
     )
@@ -567,18 +600,19 @@ class Navigator(
     end: Int,
     offset: Int,
     length: Int,
+    userData: ContextualUserData,
     ambiguity: Option[Ambiguity],
     styles: Seq[(Token, Style)],
     errors: Seq[Marker]
   ): Parsing = {
     val context = new ParsingContext(
-      userDataProvider,
       begin,
       end,
       offset,
       length,
       ambiguity,
-      children
+      children,
+      userData
     )
     val value   = production.action(context, args)
     styles.foreach(pair => context.setTokenStyle(pair._1, pair._2))
@@ -594,7 +628,8 @@ class Navigator(
 
   private def reduceState(
     state: State,
-    stack: Seq[Parsing],
+    subtree: Subtree,
+    userData: ContextualUserData,
     ambiguity: Option[Ambiguity]
   ): Parsing = {
     var children: Seq[GenericNode]  = IndexedSeq.empty
@@ -602,7 +637,7 @@ class Navigator(
     var i                           = state.production.length
     var styles: Seq[(Token, Style)] = Seq.empty
     var errors: Seq[Marker]         = Seq.empty
-    stack.foreach(arg => {
+    subtree.stack.foreach(arg => {
       if (i > 0) {
         arg.value match {
           case InsertedTokenValue(_, _, _) => /* Ignore */
@@ -641,6 +676,7 @@ class Navigator(
       state.end,
       offset,
       length,
+      userData,
       ambiguity,
       styles,
       errors
@@ -648,30 +684,33 @@ class Navigator(
   }
 
   private class BackPtrIterator(
-    causal: Iterator[Seq[Parsing]],
-    predecessor: State
-  ) extends Iterator[Seq[Parsing]] {
+    val causalSupplier: AlternativeSupplier,
+    val predecessor: State,
+    val userData: ContextualUserData
+  ) extends Iterator[Subtree] {
 
-    private var current      = if (causal.hasNext) causal.next() else Seq.empty
-    private var predIterator = nonTerminal(predecessor)
+    private var predIterator = nonTerminal(predecessor, userData)
+    private val causal       = causalSupplier.apply(predIterator.userData)
+    private var current      =
+      if (causal.choices.hasNext) causal.choices.next() else Subtree(Seq.empty)
     private var finished     = false
 
-    override def next(): Seq[Parsing] = {
+    override def next(): Subtree = {
       if (finished) {
         throw new NoSuchElementException()
       }
-      val result = current ++ predIterator.next()
-      if (!predIterator.hasNext) {
-        if (causal.hasNext) {
-          current = causal.next()
-          predIterator = nonTerminal(predecessor)
+      val result: Subtree = Subtree(current.stack ++ predIterator.choices.next().stack)
+      if (!predIterator.choices.hasNext) {
+        if (causal.choices.hasNext) {
+          current = causal.choices.next()
+          predIterator = nonTerminal(predecessor, userData)
         } else
           finished = true
       }
       result
     }
 
-    override def hasNext: Boolean = predIterator.hasNext || causal.hasNext
+    override def hasNext: Boolean = predIterator.choices.hasNext || causal.choices.hasNext
   }
 
   def expectOneTree(): Either[(String, Seq[GenericTree]), GenericTree] = {

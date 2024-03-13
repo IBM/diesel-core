@@ -112,12 +112,14 @@ object Dsl {
   }
 
   sealed trait Syntax[T] extends SyntaxBase {
+    val contextual: Boolean
     val production: SyntaxProduction[T]
     val userData: Option[Any]
   }
 
   case class SyntaxUntyped[T](
     name: String,
+    contextual: Boolean,
     production: SyntaxProduction[_ <: T],
     userData: Option[Any] = None
   ) extends Syntax[T]
@@ -127,6 +129,7 @@ object Dsl {
     concept: Concept[T],
     expression: Boolean,
     hierarchical: Boolean,
+    contextual: Boolean,
     production: SyntaxProduction[_ <: T],
     userData: Option[Any] = None
   ) extends Syntax[T]
@@ -138,6 +141,7 @@ object Dsl {
     name: String,
     concept: Concept[T],
     hierarchical: Boolean,
+    contextual: Boolean,
     production: SyntaxProduction[_ <: T2],
     userData: Option[Any] = None
   ) extends Syntax[T2]
@@ -914,16 +918,25 @@ trait Dsl {
     RootSyntaxBuilder(name.name)
 
   def syntax[T](production: SyntaxProduction[T])(implicit name: DeclaringSourceName): Syntax[T] =
-    SyntaxUntyped(name.name, production)
+    SyntaxUntyped(name.name, contextual = false, production)
 
   def syntax[T](
     concept: Concept[T],
     expression: Boolean = true,
-    hierarchical: Boolean = false
+    hierarchical: Boolean = false,
+    contextual: Boolean = false
   )(production: SyntaxProduction[T], userData: Option[Any] = None)(implicit
     name: DeclaringSourceName
   ): SyntaxTyped[T] =
-    addSyntax(SyntaxTyped(name.name, concept, expression, hierarchical, production, userData))
+    addSyntax(SyntaxTyped(
+      name.name,
+      concept,
+      expression,
+      hierarchical,
+      contextual,
+      production,
+      userData
+    ))
 
   case class RootSyntaxBuilder(name: String) {
 
@@ -932,9 +945,15 @@ trait Dsl {
     def typed[T](c: Concept[T]): TypedSyntaxBuilder[T] = TypedSyntaxBuilder(name, c)
   }
 
-  case class UntypedSyntaxBuilder(name: String, userData: Option[Any] = None) {
+  case class UntypedSyntaxBuilder(
+    name: String,
+    contextual: Boolean = false,
+    userData: Option[Any] = None
+  ) {
     def apply[T](production: SyntaxProduction[T]): Syntax[T] =
-      addSyntax(SyntaxUntyped(name, production, userData))
+      addSyntax(SyntaxUntyped(name, contextual = false, production, userData))
+
+    def contextual(b: Boolean): UntypedSyntaxBuilder = copy(contextual = b)
 
     def userData(d: Any): UntypedSyntaxBuilder = copy(userData = Some(d))
   }
@@ -944,22 +963,28 @@ trait Dsl {
     concept: Concept[T],
     expression: Boolean = true,
     hierarchical: Boolean = false,
+    contextual: Boolean = false,
     userData: Option[Any] = None,
     private val _doNotAdd: Boolean = false
   ) {
     private[Dsl] def doNotAdd(): TypedSyntaxBuilder[T] = copy(_doNotAdd = true)
 
     def apply(production: SyntaxProduction[T]): SyntaxTyped[T] = {
-      val syntax = SyntaxTyped(name, concept, expression, hierarchical, production, userData)
+      val syntax =
+        SyntaxTyped(name, concept, expression, hierarchical, contextual, production, userData)
       if (_doNotAdd) syntax else addSyntax(syntax)
     }
 
     def expression(b: Boolean): TypedSyntaxBuilder[T] = copy(expression = b)
 
+    def hierarchical(b: Boolean): TypedSyntaxBuilder[T] = copy(hierarchical = b)
+
+    def contextual(b: Boolean): TypedSyntaxBuilder[T] = copy(contextual = b)
+
     def userData(x: Any): TypedSyntaxBuilder[T] = copy(userData = Some(x))
 
     def multi[T2]: SyntaxMultipleBuilder[T, T2] =
-      SyntaxMultipleBuilder(name, userData, concept, hierarchical, _doNotAdd)
+      SyntaxMultipleBuilder(name, userData, concept, hierarchical, contextual, _doNotAdd)
 
   }
 
@@ -968,14 +993,19 @@ trait Dsl {
     _userData: Option[Any],
     concept: Concept[T],
     hierarchical: Boolean,
+    contextual: Boolean,
     private val _doNotAdd: Boolean = false
   ) {
     private[Dsl] def doNotAdd(): SyntaxMultipleBuilder[T, T2] = copy(_doNotAdd = true)
 
+    def hierarchical(b: Boolean): SyntaxMultipleBuilder[T, T2] = copy(hierarchical = b)
+
+    def contextual(b: Boolean): SyntaxMultipleBuilder[T, T2] = copy(contextual = b)
+
     def userData(x: Any): SyntaxMultipleBuilder[T, T2] = copy(_userData = Some(x))
 
     def apply(production: SyntaxProduction[T2]): SyntaxMulti[T, T2] = {
-      val syntax = SyntaxMulti(name, concept, hierarchical, production, _userData)
+      val syntax = SyntaxMulti(name, concept, hierarchical, contextual, production, _userData)
       if (_doNotAdd) syntax else addSyntax(syntax)
     }
 
