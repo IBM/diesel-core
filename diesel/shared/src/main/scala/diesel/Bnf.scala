@@ -1577,4 +1577,6 @@ case class Bnf(lexer: Lexer, rules: Seq[NonTerminal]) {
       }
     }
   }
+
+  val emptyRules: Set[Bnf.NonTerminal] = BnfEmptyRules(this).emptyRules
 }

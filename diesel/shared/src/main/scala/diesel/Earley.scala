@@ -63,13 +63,14 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
   }
 
   private def buildCharts(input: Lexer.Input, axiom: Bnf.Axiom): Result = {
-    val context      = new Result(axiom)
+    val context      = new Result(bnf, axiom)
     var index        = 0
     var chart        = context.beginChart(index)
     var lexicalValue = if (dynamicLexer) dynamicScan(input, context) else scan(input, context)
     var length       = if (lexicalValue.id == Lexer.Eos) 0 else 1
     while (index <= length) {
       var scanned = false
+      context.resetNullable()
       chart.setToken(lexicalValue)
       while (context.processingQueue.nonEmpty) {
         val state: State = context.processingQueue.dequeue()
@@ -142,6 +143,7 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
       throw new RuntimeException(
         "internal error, processing queue is empty while recovering from errors"
       )
+    context.resetNullable()
     while (context.processingQueue.nonEmpty) {
       val state: State = context.processingQueue.dequeue()
       if (state.isCompleted) {
@@ -231,6 +233,9 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
   }
 
   private def completer(state: State, context: Result): Unit = {
+    if (bnf.emptyRules.contains(state.rule) && (state.begin == state.end)) {
+      context.addToNullable(state)
+    }
     val candidates =
       context.chartAt(state.begin).activeStates(candidate => candidate.nextSymbol eq state.rule)
     candidates.foreach(candidate => {
