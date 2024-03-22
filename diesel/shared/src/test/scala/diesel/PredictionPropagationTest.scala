@@ -89,6 +89,12 @@ class PredictionPropagationTest extends FunSuite {
     }
   }
 
+  test("ddd") {
+    AstHelpers.selectAst(MyDsl)("\"foo\" is 0 + \"bar\"") { tree =>
+      assertEquals(tree.markers.length, 0)
+    }
+  }
+
   private def assertPredictions(
     expectedType: Concept[_],
     text: String,
@@ -156,7 +162,7 @@ class PredictionPropagationTest extends FunSuite {
   // ( 1, 2, 3 )
   // ( 1, 4, 5, 3 )
 
-  test("predict 1".only) {
+  test("predict 1") {
     val text = "\"foo\" is "
     assertPredictions(
       MyDsl.string,
