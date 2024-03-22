@@ -86,18 +86,27 @@ class PredictionPropagationTest extends FunSuite {
     }
   }
 
-  private def assertPredictions(text: String, offset: Int, expected: Seq[String]): Unit = {
+  private def assertPredictions(text: String, offset: Int, expected: Seq[Any]): Unit = {
     val proposals = predict(MyDsl, text, offset, None)
     assertEquals(proposals.map(_.text), expected)
   }
 
+  //   1 "foo" is . <value>
+  //   2 . <values>
+  // * 3 . <number>
+  //   4 . <exprs>
+  //   5 . <number> + <string>
+
+  // ( 1, 2, 3 )
+  // ( 1, 4, 5, 3 )
+
   test("predict") {
     assertPredictions(
-      "12 is ",
-      6,
+      "\"foo\" is ",
+      10,
       Seq(
-        "ANumberValue(0.0)",
-        "AStringValue()"
+        ANumberValue(0.0),
+        AStringValue("")
       )
     )
   }

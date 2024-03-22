@@ -452,4 +452,9 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
   def getStates: Seq[State] = states.keys.toSeq
 
   def getCharts: Seq[Chart] = charts.toSeq
+
+  def getPredictors(state: State): Seq[State] =
+    charts(state.begin).activeStates(s => s.nextSymbol == state.rule)
+
+  def getPredictorPaths(state: State): Seq[Seq[State]] = ???
 }
