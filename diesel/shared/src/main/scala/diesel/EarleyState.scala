@@ -456,5 +456,27 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
   def getPredictors(state: State): Seq[State] =
     charts(state.begin).activeStates(s => s.nextSymbol == state.rule)
 
-  def getPredictorPaths(state: State): Seq[Seq[State]] = ???
+  def getPredictorPaths(state: State): Seq[Seq[State]] = {
+    case class Tree(state: State, predictors: Seq[Tree])
+
+    def buildTree(state: State): Tree = {
+      val ps = getPredictors(state)
+      if (ps.isEmpty) {
+        Tree(state, Seq())
+      } else {
+        Tree(state, ps.map(buildTree))
+      }
+    }
+
+    def buildPaths(tree: Tree): Seq[Seq[State]] = {
+      val subs = tree.predictors.map(buildPaths)
+      if (subs.isEmpty) {
+        Seq(Seq(tree.state))
+      } else {
+        subs.flatMap(sub => sub.map(tree.state +: _))
+      }
+    }
+
+    buildPaths(buildTree(state))
+  }
 }

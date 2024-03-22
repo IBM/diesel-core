@@ -26,7 +26,9 @@ case class CompletionProposal(
   replace: Option[(Int, Int)] = None,
   userData: Option[Any] = None,
   documentation: Option[String] = None
-)
+) {
+  //  val pathToProposal: Seq[DslElement] =???
+}
 
 trait CompletionFilter {
   def filterProposals(
@@ -113,6 +115,7 @@ class CompletionProcessor(
                   offset: Int,
                   node: Option[GenericNode]
                 ) => {
+                  val fw    = result.getPredictorPaths(state).map(_.flatMap(_.production.getElement))
                   val token = findTokenTextAfterDot(state)
                   token
 //                    .filter(text => prefix.forall(text.startsWith))
@@ -121,6 +124,7 @@ class CompletionProcessor(
                         element,
                         text,
                         prefix.map(p => (offset - p.length, p.length))
+                        // fw
                       )
                     )
                     .toSeq

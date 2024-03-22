@@ -19,6 +19,8 @@ package diesel
 import diesel.AstHelpers.predict
 import diesel.Dsl.{Axiom, Concept, Instance, Syntax}
 import munit.FunSuite
+import diesel.Bnf.DslElement
+import scala.annotation.tailrec
 
 class PredictionPropagationTest extends FunSuite {
 
@@ -87,8 +89,43 @@ class PredictionPropagationTest extends FunSuite {
   }
 
   private def assertPredictions(text: String, offset: Int, expected: Seq[Any]): Unit = {
-    val proposals = predict(MyDsl, text, offset, None)
+    val config    = new CompletionConfiguration
+    config.setFilter(MyCompletionFilter)
+    val proposals = predict(MyDsl, text, offset, config)
     assertEquals(proposals.map(_.text), expected)
+  }
+
+  object MyCompletionFilter extends CompletionFilter {
+    def filterProposals(
+      tree: GenericTree,
+      offset: Int,
+      node: Option[GenericNode],
+      proposals: Seq[CompletionProposal]
+    ): Seq[CompletionProposal] = proposals
+
+    def isInteresting(pathToPropsal: Seq[DslElement]): Boolean = {
+
+      @tailrec
+      def go(expected: Option[ElementType], ps: List[DslElement]): Boolean =
+        ps match {
+          case p +: ps =>
+            val expected1 = for {
+              e  <- expected
+              pe <- elementType(p)
+              if isCompatible(e, pe)
+            } yield pe
+            go(expected1, ps)
+          case Nil     => expected.isDefined
+        }
+
+      val r = pathToPropsal // .reverse
+      go(r.headOption.flatMap(elementType), r.tail.toList)
+    }
+
+    case class ElementType(concept: Concept[_], multipe: Boolean)
+    private def elementType(p: DslElement): Option[ElementType] = ???
+
+    private def isCompatible(a: ElementType, b: ElementType): Boolean = ???
   }
 
   //   1 "foo" is . <value>
