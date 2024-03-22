@@ -25,10 +25,9 @@ case class CompletionProposal(
   text: String,
   replace: Option[(Int, Int)] = None,
   userData: Option[Any] = None,
-  documentation: Option[String] = None
-) {
-  //  val pathToProposal: Seq[DslElement] =???
-}
+  documentation: Option[String] = None,
+  predictorPaths: Seq[Seq[DslElement]] = Seq.empty
+)
 
 trait CompletionFilter {
   def filterProposals(
@@ -50,6 +49,10 @@ trait CompletionProvider {
 
 object CompletionConfiguration {
   val defaultDelimiters: Set[Char] = ":(){}.,+-*/[];".toSet
+
+  trait CompletionProposalFactory {
+    def createProposal(result: Result, state: State, proto: CompletionProposal): CompletionProposal
+  }
 }
 
 class CompletionConfiguration {
@@ -123,8 +126,8 @@ class CompletionProcessor(
                       CompletionProposal(
                         element,
                         text,
-                        prefix.map(p => (offset - p.length, p.length))
-                        // fw
+                        prefix.map(p => (offset - p.length, p.length)),
+                        predictorPaths = fw
                       )
                     )
                     .toSeq

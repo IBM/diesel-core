@@ -454,21 +454,35 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
   def getCharts: Seq[Chart] = charts.toSeq
 
   def getPredictors(state: State): Seq[State] =
-    charts(state.begin).activeStates(s => s.nextSymbol == state.rule)
+    charts(state.begin)
+      .activeStates(s => s.nextSymbol == state.rule)
+
+  private def dumpPredictors(state: State, ident: Int = 0, dumped: Set[State] = Set.empty): Unit = {
+    if (!dumped.contains(state)) {
+      val sIndent = " " * ident
+      println(sIndent + state.toString)
+      getPredictors(state).foreach(ps => dumpPredictors(ps, ident + 1, dumped + state))
+    }
+  }
 
   def getPredictorPaths(state: State): Seq[Seq[State]] = {
+
+    dumpPredictors(state)
+
     case class Tree(state: State, predictors: Seq[Tree])
 
-    def buildTree(state: State): Tree = {
-      val ps = getPredictors(state)
-      if (ps.isEmpty) {
-        Tree(state, Seq())
-      } else {
-        Tree(state, ps.map(buildTree))
-      }
+    def buildTree(state: State, added: Set[State] = Set.empty): Tree = {
+      val ps         = getPredictors(state)
+      val predictors = ps
+        .filter(!added.contains(_))
+        .map(s => buildTree(s, added + state))
+      val res        = Tree(state, predictors)
+      println("return " + res)
+      res
     }
 
     def buildPaths(tree: Tree): Seq[Seq[State]] = {
+      println("build paths : " + tree)
       val subs = tree.predictors.map(buildPaths)
       if (subs.isEmpty) {
         Seq(Seq(tree.state))

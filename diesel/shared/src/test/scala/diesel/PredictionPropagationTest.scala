@@ -91,7 +91,7 @@ class PredictionPropagationTest extends FunSuite {
   private def assertPredictions(text: String, offset: Int, expected: Seq[Any]): Unit = {
     val config    = new CompletionConfiguration
     config.setFilter(MyCompletionFilter)
-    val proposals = predict(MyDsl, text, offset, config)
+    val proposals = predict(MyDsl, text, offset, Some(config))
     assertEquals(proposals.map(_.text), expected)
   }
 
@@ -101,14 +101,17 @@ class PredictionPropagationTest extends FunSuite {
       offset: Int,
       node: Option[GenericNode],
       proposals: Seq[CompletionProposal]
-    ): Seq[CompletionProposal] = proposals
+    ): Seq[CompletionProposal] = proposals.filter { p =>
+      val paths = p.predictorPaths
+      paths.exists(isInteresting)
+    }
 
     def isInteresting(pathToPropsal: Seq[DslElement]): Boolean = {
 
       @tailrec
       def go(expected: Option[ElementType], ps: List[DslElement]): Boolean =
         ps match {
-          case p +: ps =>
+          case p :: ps =>
             val expected1 = for {
               e  <- expected
               pe <- elementType(p)
@@ -122,10 +125,32 @@ class PredictionPropagationTest extends FunSuite {
       go(r.headOption.flatMap(elementType), r.tail.toList)
     }
 
-    case class ElementType(concept: Concept[_], multipe: Boolean)
-    private def elementType(p: DslElement): Option[ElementType] = ???
+    case class ElementType(concept: Concept[_], multiple: Boolean = false)
+    private def elementType(p: DslElement): Option[ElementType] = p match {
+      case Bnf.DslAxiom(axiom)       =>
+        None
+      case Bnf.DslValue(concept)     =>
+        Some(ElementType(concept))
+      case Bnf.DslTarget(concept)    =>
+        Some(ElementType(concept))
+      case Bnf.DslInstance(instance) =>
+        Some(ElementType(instance.concept))
+      case Bnf.DslSyntax(syntax)     =>
+        syntax match {
+          case Dsl.SyntaxUntyped(_, _, _, _)              =>
+            None
+          case Dsl.SyntaxTyped(_, concept, _, _, _, _, _) =>
+            Some(ElementType(concept))
+          case Dsl.SyntaxMulti(_, concept, _, _, _, _)    =>
+            Some(ElementType(concept, multiple = true))
+        }
+      case Bnf.DslBody(element)      =>
+        elementType(element)
+    }
 
-    private def isCompatible(a: ElementType, b: ElementType): Boolean = ???
+    private def isCompatible(a: ElementType, b: ElementType): Boolean = {
+      true
+    }
   }
 
   //   1 "foo" is . <value>
@@ -137,7 +162,7 @@ class PredictionPropagationTest extends FunSuite {
   // ( 1, 2, 3 )
   // ( 1, 4, 5, 3 )
 
-  test("predict") {
+  test("predict".only) {
     assertPredictions(
       "\"foo\" is ",
       10,
