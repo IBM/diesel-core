@@ -140,12 +140,6 @@ private[diesel] case class State(
     if (production.symbols.length == dot)
       builder.append(". ")
     builder.append("[").append(begin).append(", ").append(end).append("] ").append(feature)
-    //    states.get(this).foreach(ctx => {
-    //        builder.append("{ ")
-    //
-    //        builder.append("}")
-    //      }
-    //    )
     builder.toString
   }
 
@@ -433,7 +427,7 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
     currentChart = None
   }
 
-  private def success(length: Int): Boolean = states.get(successState(length)).isDefined
+  private def success(length: Int): Boolean = states.contains(successState(length))
 
   def success: Boolean = success(length - 1)
 
@@ -453,21 +447,17 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
 
   def getCharts: Seq[Chart] = charts.toSeq
 
-  def getPredictors(state: State): Seq[State] =
-    charts(state.begin)
-      .activeStates(s => s.nextSymbol == state.rule)
-
-  private def dumpPredictors(state: State, ident: Int = 0, dumped: Set[State] = Set.empty): Unit = {
-    if (!dumped.contains(state)) {
-      val sIndent = " " * ident
-      println(sIndent + state.toString)
-      getPredictors(state).foreach(ps => dumpPredictors(ps, ident + 1, dumped + state))
+  def getPredictors(state: State): Seq[State] = {
+    if (state.begin == state.end) {
+      charts(state.begin)
+        .activeStates(s => s.nextSymbol == state.rule)
+        .filter(_.kind(this) != StateKind.ErrorRecovery)
+    } else {
+      Seq.empty
     }
   }
 
   def getPredictorPaths(state: State): Seq[Seq[State]] = {
-
-    dumpPredictors(state)
 
     case class Tree(state: State, predictors: Seq[Tree])
 
@@ -476,13 +466,10 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
       val predictors = ps
         .filter(!added.contains(_))
         .map(s => buildTree(s, added + state))
-      val res        = Tree(state, predictors)
-      println("return " + res)
-      res
+      Tree(state, predictors)
     }
 
     def buildPaths(tree: Tree): Seq[Seq[State]] = {
-      println("build paths : " + tree)
       val subs = tree.predictors.map(buildPaths)
       if (subs.isEmpty) {
         Seq(Seq(tree.state))
@@ -492,5 +479,6 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
     }
 
     buildPaths(buildTree(state))
+      .map(path => path.dropRight(1))
   }
 }

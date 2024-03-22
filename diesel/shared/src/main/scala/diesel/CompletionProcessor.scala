@@ -60,6 +60,7 @@ class CompletionConfiguration {
   private val providers: mutable.Map[DslElement, CompletionProvider] = mutable.Map()
   private var filter: Option[CompletionFilter]                       = None
   private var delimiters: Set[Char]                                  = CompletionConfiguration.defaultDelimiters
+  private var includePaths: Boolean                                  = false
 
   def setProvider(dslElement: DslElement, p: CompletionProvider): Unit = {
     providers(dslElement) = p
@@ -78,6 +79,12 @@ class CompletionConfiguration {
   }
 
   def getDelimiters: Set[Char] = delimiters
+
+  def setIncludePaths(include: Boolean): Unit = {
+    this.includePaths = include
+  }
+
+  def isIncludePaths: Boolean = this.includePaths
 }
 
 class CompletionProcessor(
@@ -97,7 +104,7 @@ class CompletionProcessor(
         Some(text.charAt(offset - 1))
       else
         None
-    val afterDelimiter = c.exists(delimiters.contains(_))
+    val afterDelimiter = c.exists(delimiters.contains)
 
     val navigator = navigatorFactory(result)
     navigator.toIterator
@@ -118,18 +125,22 @@ class CompletionProcessor(
                   offset: Int,
                   node: Option[GenericNode]
                 ) => {
-                  val fw    = result.getPredictorPaths(state).map(_.flatMap(_.production.getElement))
                   val token = findTokenTextAfterDot(state)
                   token
 //                    .filter(text => prefix.forall(text.startsWith))
-                    .map(text =>
+                    .map { text =>
                       CompletionProposal(
                         element,
                         text,
                         prefix.map(p => (offset - p.length, p.length)),
-                        predictorPaths = fw
+                        predictorPaths =
+                          if (config.exists(_.isIncludePaths)) {
+                            result.getPredictorPaths(state).map(_.flatMap(_.production.getElement))
+                          } else {
+                            Seq.empty
+                          }
                       )
-                    )
+                    }
                     .toSeq
                 }
                 val element: Option[DslElement]         = state.production.getElement

@@ -20,6 +20,7 @@ import diesel.AstHelpers.predict
 import diesel.Dsl.{Axiom, Concept, Instance, Syntax}
 import munit.FunSuite
 import diesel.Bnf.DslElement
+
 import scala.annotation.tailrec
 
 class PredictionPropagationTest extends FunSuite {
@@ -35,7 +36,7 @@ class PredictionPropagationTest extends FunSuite {
   case class AIs(left: AValue, right: AValue)     extends ABoolean
   case class AConcat(left: AValue, right: AValue) extends AString
 
-  class BootVoc extends Dsl {
+  trait BootVoc extends Dsl {
 
     val value: Concept[AValue] = concept
 
@@ -88,46 +89,39 @@ class PredictionPropagationTest extends FunSuite {
     }
   }
 
-  private def assertPredictions(text: String, offset: Int, expected: Seq[Any]): Unit = {
+  private def assertPredictions(
+    expectedType: Concept[_],
+    text: String,
+    offset: Int,
+    expected: Seq[Any]
+  ): Unit = {
     val config    = new CompletionConfiguration
-    config.setFilter(MyCompletionFilter)
+    config.setFilter(MyCompletionFilter(expectedType))
+    config.setIncludePaths(true)
     val proposals = predict(MyDsl, text, offset, Some(config))
     assertEquals(proposals.map(_.text), expected)
   }
 
-  object MyCompletionFilter extends CompletionFilter {
+  case class MyCompletionFilter(expectedType: Concept[_]) extends CompletionFilter {
     def filterProposals(
       tree: GenericTree,
       offset: Int,
       node: Option[GenericNode],
       proposals: Seq[CompletionProposal]
     ): Seq[CompletionProposal] = proposals.filter { p =>
-      val paths = p.predictorPaths
-      paths.exists(isInteresting)
+      p.predictorPaths.exists(isInteresting)
     }
 
-    def isInteresting(pathToPropsal: Seq[DslElement]): Boolean = {
-
-      @tailrec
-      def go(expected: Option[ElementType], ps: List[DslElement]): Boolean =
-        ps match {
-          case p :: ps =>
-            val expected1 = for {
-              e  <- expected
-              pe <- elementType(p)
-              if isCompatible(e, pe)
-            } yield pe
-            go(expected1, ps)
-          case Nil     => expected.isDefined
-        }
-
-      val r = pathToPropsal // .reverse
-      go(r.headOption.flatMap(elementType), r.tail.toList)
-    }
+    def isInteresting(pathToPropsal: Seq[DslElement]): Boolean =
+      pathToPropsal.lastOption
+        .flatMap(elementType)
+        .exists(_.concept == expectedType)
 
     case class ElementType(concept: Concept[_], multiple: Boolean = false)
+
+    @tailrec
     private def elementType(p: DslElement): Option[ElementType] = p match {
-      case Bnf.DslAxiom(axiom)       =>
+      case Bnf.DslAxiom(_)           =>
         None
       case Bnf.DslValue(concept)     =>
         Some(ElementType(concept))
@@ -147,10 +141,6 @@ class PredictionPropagationTest extends FunSuite {
       case Bnf.DslBody(element)      =>
         elementType(element)
     }
-
-    private def isCompatible(a: ElementType, b: ElementType): Boolean = {
-      true
-    }
   }
 
   //   1 "foo" is . <value>
@@ -162,14 +152,30 @@ class PredictionPropagationTest extends FunSuite {
   // ( 1, 2, 3 )
   // ( 1, 4, 5, 3 )
 
-  test("predict".only) {
+  test("predict 1") {
+    val text = "\"foo\" is "
     assertPredictions(
-      "\"foo\" is ",
-      10,
+      MyDsl.string,
+      text,
+      text.length,
       Seq(
-        ANumberValue(0.0),
-        AStringValue("")
+        "ANumberValue(0.0)",
+        "AStringValue()"
       )
     )
   }
+
+  test("predict 2") {
+    val text = "true is "
+    assertPredictions(
+      MyDsl.boolean,
+      text,
+      text.length,
+      Seq(
+        "true",
+        "false"
+      )
+    )
+  }
+
 }
