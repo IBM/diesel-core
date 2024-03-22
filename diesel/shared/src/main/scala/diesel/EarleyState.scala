@@ -16,10 +16,12 @@
 
 package diesel
 
+import diesel.Bnf.Constraints
 import diesel.Bnf.Constraints.Feature
 import diesel.Errors.{InsertedToken, MissingToken, TokenMutation, UnknownToken}
 import diesel.Lexer.{Eos, Token}
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -457,7 +459,23 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
     }
   }
 
+//  private def dumpPredictors(
+//    state: State,
+//    ident: Int = 0,
+//    added: Set[State] = Set.empty
+//  ): Unit = {
+//    if (!added.contains(state)) {
+//      val sIndent = " " * ident
+//      println(sIndent + state.toString)
+//      getPredictors(state).foreach(ps =>
+//        dumpPredictors(ps, ident + 1, added + state)
+//      )
+//    }
+//  }
+
   def getPredictorPaths(state: State): Seq[Seq[State]] = {
+
+//    dumpPredictors(state)
 
     case class Tree(state: State, predictors: Seq[Tree])
 
@@ -478,7 +496,30 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
       }
     }
 
-    buildPaths(buildTree(state))
-      .map(path => path.dropRight(1))
+    @tailrec
+    def filterPath(path: Seq[State], precedence: Feature = Constraints.None): Boolean = path match {
+      case head :: tail =>
+        val curPrec = precedence.merge(head.dot, head.feature)
+        curPrec match {
+          case Constraints.Incompatible =>
+            false
+          case _                        =>
+            filterPath(tail, curPrec)
+        }
+      case _            =>
+        true
+    }
+
+    val p = buildPaths(buildTree(state))
+      .filter(path => filterPath(path))
+//
+//    println("Paths: ")
+//    p.foreach { p =>
+//      println(
+//        p.map(p => s"  $p f:${p.feature}").mkString("\n\t")
+//      )
+//    }
+
+    p.map(path => path.dropRight(1))
   }
 }

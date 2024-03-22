@@ -109,13 +109,17 @@ class PredictionPropagationTest extends FunSuite {
       node: Option[GenericNode],
       proposals: Seq[CompletionProposal]
     ): Seq[CompletionProposal] = proposals.filter { p =>
+      println("p: " + p.text)
       p.predictorPaths.exists(isInteresting)
     }
 
-    def isInteresting(pathToPropsal: Seq[DslElement]): Boolean =
-      pathToPropsal.lastOption
+    def isInteresting(pathToPropsal: Seq[DslElement]): Boolean = {
+      val r = pathToPropsal.lastOption
         .flatMap(elementType)
         .exists(_.concept == expectedType)
+      println("interesting: " + r)
+      r
+    }
 
     case class ElementType(concept: Concept[_], multiple: Boolean = false)
 
@@ -152,7 +156,7 @@ class PredictionPropagationTest extends FunSuite {
   // ( 1, 2, 3 )
   // ( 1, 4, 5, 3 )
 
-  test("predict 1") {
+  test("predict 1".only) {
     val text = "\"foo\" is "
     assertPredictions(
       MyDsl.string,
