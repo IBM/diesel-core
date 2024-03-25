@@ -509,16 +509,13 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
     @tailrec
     def filterPath(path: Seq[State], precedence: Feature = Constraints.None): Boolean = path match {
       case head :: tail =>
-        val accepted = if (tail.isEmpty) isPredictorRoot(head) else true
-        if (accepted) {
-          val curPrec = head.feature.merge(head.dot, precedence)
-          curPrec match {
-            case Constraints.Incompatible =>
-              false
-            case _                        =>
-              filterPath(tail, curPrec)
-          }
-        } else false
+        val curPrec = head.feature.merge(head.dot, precedence)
+        curPrec match {
+          case Constraints.Incompatible =>
+            false
+          case _                        =>
+            filterPath(tail, curPrec)
+        }
       case _            =>
         true
     }
