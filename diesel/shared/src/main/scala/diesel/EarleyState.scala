@@ -156,13 +156,16 @@ private[diesel] class Chart(
     this.token = Some(token)
   }
 
-  private val _activeStates: ArrayBuffer[State]       = ArrayBuffer()
-  private val _notCompletedStates: ArrayBuffer[State] = ArrayBuffer()
+  private val _activeStates: ArrayBuffer[State]                      = ArrayBuffer()
+  private val _activeRules: mutable.Map[Bnf.NonTerminal, Seq[State]] = mutable.Map()
+  private val _notCompletedStates: ArrayBuffer[State]                = ArrayBuffer()
 
   def `+=`(state: State): Chart = {
     states += state
     if (!state.isCompleted && state.nextSymbol.isRule) {
       _activeStates += state
+      val rule = state.nextSymbol.asInstanceOf[Bnf.NonTerminal]
+      _activeRules.put(rule, _activeRules.getOrElse(rule, Seq.empty) ++ Seq(state))
     }
     if (!state.isCompleted) {
       _notCompletedStates += state
@@ -178,6 +181,10 @@ private[diesel] class Chart(
 
   def activeStates(predicate: State => Boolean): Seq[State] = {
     _activeStates.filter(predicate).toSeq
+  }
+
+  def activeRules(rule: Bnf.NonTerminal): Seq[State] = {
+    _activeRules.getOrElse(rule, Seq.empty)
   }
 
   def notCompletedStates: Seq[State] = {

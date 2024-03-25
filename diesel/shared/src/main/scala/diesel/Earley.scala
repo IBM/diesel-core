@@ -246,8 +246,7 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
     if (bnf.emptyRules.contains(state.rule) && (state.begin == state.end)) {
       context.addToNullable(state)
     }
-    val candidates =
-      context.chartAt(state.begin).activeStates(candidate => candidate.nextSymbol eq state.rule)
+    val candidates = context.chartAt(state.begin).activeRules(state.rule)
     candidates.foreach(candidate => {
       val feature = candidate.feature.merge(candidate.dot, state.feature)
       if (feature != Constraints.Incompatible) {
