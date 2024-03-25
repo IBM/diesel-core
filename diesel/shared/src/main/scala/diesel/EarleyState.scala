@@ -449,10 +449,14 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
 
   def getCharts: Seq[Chart] = charts.toSeq
 
+  def memoize[I, O](f: I => O): I => O = new mutable.HashMap[I, O]() {
+    override def apply(x: I): O = getOrElseUpdate(x, f(x))
+  }
+
   def getPredictors(state: State): Seq[State] = {
     if (state.begin == state.end) {
       charts(state.begin)
-        .activeStates(s => s.nextSymbol == state.rule)
+        .activeStates(s => s.nextSymbol eq state.rule)
         .filter(_.kind(this) != StateKind.ErrorRecovery)
     } else {
       Seq.empty
@@ -462,14 +466,15 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
 //  private def dumpPredictors(
 //    state: State,
 //    ident: Int = 0,
-//    added: Set[State] = Set.empty
+//    added: mutable.Set[State] = mutable.Set.empty
 //  ): Unit = {
 //    if (!added.contains(state)) {
 //      val sIndent = " " * ident
 //      println(sIndent + state.toString)
-//      getPredictors(state).foreach(ps =>
-//        dumpPredictors(ps, ident + 1, added + state)
-//      )
+//      added.add(state)
+//      getPredictors(state).foreach { ps =>
+//        dumpPredictors(ps, ident + 1, added)
+//      }
 //    }
 //  }
 
@@ -477,15 +482,19 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
 
 //    dumpPredictors(state)
 
+    val memoizedGetPredictors = memoize(getPredictors)
+
     case class Tree(state: State, predictors: Seq[Tree]) {
       val valid: Boolean = predictors.nonEmpty || isPredictorRoot(state)
     }
 
-    def buildTree(state: State, added: Set[State] = Set.empty): Tree = {
-      val ps         = getPredictors(state)
+    def buildTree(state: State, added: mutable.Set[State] = mutable.Set.empty): Tree = {
+      added.add(state)
+      val ps         = memoizedGetPredictors(state)
       val predictors = ps
         .filter(!added.contains(_))
-        .map(s => buildTree(s, added + state)).filter(t => t.valid)
+        .map(s => buildTree(s, added)).filter(t => t.valid)
+      added.remove(state)
       Tree(state, predictors)
     }
 

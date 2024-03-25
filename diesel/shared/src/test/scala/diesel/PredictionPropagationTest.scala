@@ -17,7 +17,7 @@
 package diesel
 
 import diesel.AstHelpers.predict
-import diesel.Dsl.{Axiom, Concept, Instance, Syntax}
+import diesel.Dsl.{Axiom, Concept, Instance, Syntax, SyntaxGeneric}
 import munit.FunSuite
 import diesel.Bnf.{DslAxiom, DslElement}
 
@@ -33,6 +33,7 @@ class PredictionPropagationTest extends FunSuite {
 
   case class AIs(left: AValue, right: AValue)     extends ABoolean
   case class AConcat(left: AValue, right: AValue) extends AString
+  case class AElvis(left: AValue, right: AValue)  extends AValue
 
   trait BootVoc extends Dsl {
 
@@ -73,6 +74,16 @@ class PredictionPropagationTest extends FunSuite {
           AIs(lhs, rhs)
       }
     )
+
+    val elvis: SyntaxGeneric[AValue] =
+      syntaxGeneric[AValue].accept(value) { builder =>
+        builder(
+          builder.concept ~ "?:" ~ builder.concept map {
+            case (_, (l, _, r)) =>
+              AElvis(l, r)
+          }
+        )
+      }
   }
 
   object MyDsl extends BootVoc {
@@ -181,6 +192,19 @@ class PredictionPropagationTest extends FunSuite {
         "AStringValue()",
         "true",
         "false"
+      )
+    )
+  }
+
+  test("predict 5") {
+    val text = "\"foo\" ?: "
+    assertPredictions(
+      MyDsl.string,
+      text,
+      text.length,
+      Seq(
+        "ANumberValue(0)",
+        "AStringValue()"
       )
     )
   }

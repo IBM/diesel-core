@@ -156,7 +156,7 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
             Some(BackPtr(state, InsertedTokenValue(index, lexicalValue, None)))
           )
         }
-        completer(state, context)
+        completer(state, context, errorRecovery = true)
       } else {
         val next: Bnf.Symbol = state.nextSymbol
         next match {
@@ -197,7 +197,7 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
             }
 
           case rule: Bnf.Rule =>
-            predictor(state, rule, context)
+            predictor(state, rule, context, errorRecovery = true)
 
           case _ => ()
         }
@@ -223,17 +223,26 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
       false
   }
 
-  private def predictor(state: State, rule: Bnf.Rule, context: Result): Unit = {
+  private def predictor(
+    state: State,
+    rule: Bnf.Rule,
+    context: Result,
+    errorRecovery: Boolean = false
+  ): Unit = {
     rule.productions.foreach(production =>
       context.addState(
         State(production, state.end, state.end, 0),
-        StateKind.next(state.kind(context)),
+        if (errorRecovery) {
+          StateKind.ErrorRecovery
+        } else {
+          StateKind.next(state.kind(context))
+        },
         None
       )
     )
   }
 
-  private def completer(state: State, context: Result): Unit = {
+  private def completer(state: State, context: Result, errorRecovery: Boolean = false): Unit = {
     if (bnf.emptyRules.contains(state.rule) && (state.begin == state.end)) {
       context.addToNullable(state)
     }
@@ -250,7 +259,11 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
             candidate.dot + 1,
             if (candidate.feature.canPropagate) feature else candidate.feature
           ),
-          StateKind.next(state.kind(context)),
+          if (errorRecovery) {
+            StateKind.ErrorRecovery
+          } else {
+            StateKind.next(state.kind(context))
+          },
           Some(BackPtr(candidate, state))
         )
       }
