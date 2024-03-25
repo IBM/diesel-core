@@ -19,7 +19,7 @@ package diesel
 import diesel.AstHelpers.predict
 import diesel.Dsl.{Axiom, Concept, Instance, Syntax}
 import munit.FunSuite
-import diesel.Bnf.DslElement
+import diesel.Bnf.{DslAxiom, DslElement}
 
 import scala.annotation.tailrec
 
@@ -114,16 +114,12 @@ class PredictionPropagationTest extends FunSuite {
       offset: Int,
       node: Option[GenericNode],
       proposals: Seq[CompletionProposal]
-    ): Seq[CompletionProposal] = proposals.filter { p =>
-      println("p: " + p.text)
-      p.predictorPaths.exists(isInteresting)
-    }
+    ): Seq[CompletionProposal] = proposals.filter { _.predictorPaths.exists(isInteresting) }
 
     def isInteresting(pathToPropsal: Seq[DslElement]): Boolean = {
-      val r = pathToPropsal.lastOption
+      val r = pathToPropsal.filter(e => !e.isInstanceOf[DslAxiom[_]]).lastOption
         .flatMap(elementType)
         .exists(_.concept == expectedType)
-      println("interesting: " + r)
       r
     }
 
@@ -188,4 +184,31 @@ class PredictionPropagationTest extends FunSuite {
     )
   }
 
+  test("predict 3") {
+    val text = ""
+    assertPredictions(
+      MyDsl.string,
+      text,
+      text.length,
+      Seq(
+        "ANumberValue(0.0)",
+        "AStringValue()"
+      )
+    )
+  }
+
+  test("predict 4") {
+    val text = ""
+    assertPredictions(
+      MyDsl.boolean,
+      text,
+      text.length,
+      Seq(
+        "ANumberValue(0.0)",
+        "AStringValue()",
+        "true",
+        "false"
+      )
+    )
+  }
 }

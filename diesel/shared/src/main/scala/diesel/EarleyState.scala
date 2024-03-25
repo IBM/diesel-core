@@ -499,27 +499,35 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
     @tailrec
     def filterPath(path: Seq[State], precedence: Feature = Constraints.None): Boolean = path match {
       case head :: tail =>
-        val curPrec = precedence.merge(head.dot, head.feature)
-        curPrec match {
-          case Constraints.Incompatible =>
-            false
-          case _                        =>
-            filterPath(tail, curPrec)
-        }
+        val accepted = if (tail.isEmpty) {
+          if (head.dot > 0 && head.production.symbols(head.dot - 1).isToken)
+            true
+          else {
+            head.rule.isAxiom
+          }
+        } else true
+        if (accepted) {
+          val currentPrecedence = head.feature.merge(head.dot, precedence)
+          currentPrecedence match {
+            case Constraints.Incompatible =>
+              false
+            case _                        =>
+              filterPath(tail, currentPrecedence)
+          }
+        } else false
       case _            =>
         true
     }
 
-    val p = buildPaths(buildTree(state))
+    val t = buildTree(state)
+    val p = buildPaths(t)
       .filter(path => filterPath(path))
-//
 //    println("Paths: ")
 //    p.foreach { p =>
 //      println(
 //        p.map(p => s"  $p f:${p.feature}").mkString("\n\t")
 //      )
 //    }
-
     p.map(path => path.dropRight(1))
   }
 }
