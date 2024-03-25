@@ -118,6 +118,7 @@ class CompletionProcessor(
             node = tree.root.findNodeAtIndex(chart.index)
             chart.notCompletedStates
               .filterNot(_.kind(result) == StateKind.ErrorRecovery)
+//              .filter(s => s.nextSymbol.isToken)
               .flatMap(state => {
                 val defaultProvider: CompletionProvider = (
                   element: Option[DslElement],
