@@ -477,13 +477,15 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
 
 //    dumpPredictors(state)
 
-    case class Tree(state: State, predictors: Seq[Tree])
+    case class Tree(state: State, predictors: Seq[Tree]) {
+      val valid: Boolean = predictors.nonEmpty || isPredictorRoot(state)
+    }
 
     def buildTree(state: State, added: Set[State] = Set.empty): Tree = {
       val ps         = getPredictors(state)
       val predictors = ps
         .filter(!added.contains(_))
-        .map(s => buildTree(s, added + state))
+        .map(s => buildTree(s, added + state)).filter(t => t.valid)
       Tree(state, predictors)
     }
 
@@ -496,23 +498,25 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
       }
     }
 
+    def isPredictorRoot(state: State) = {
+      if (state.dot > 0 && state.production.symbols(state.dot - 1).isToken)
+        true
+      else {
+        state.rule.isAxiom
+      }
+    }
+
     @tailrec
     def filterPath(path: Seq[State], precedence: Feature = Constraints.None): Boolean = path match {
       case head :: tail =>
-        val accepted = if (tail.isEmpty) {
-          if (head.dot > 0 && head.production.symbols(head.dot - 1).isToken)
-            true
-          else {
-            head.rule.isAxiom
-          }
-        } else true
+        val accepted = if (tail.isEmpty) isPredictorRoot(head) else true
         if (accepted) {
-          val currentPrecedence = head.feature.merge(head.dot, precedence)
-          currentPrecedence match {
+          val curPrec = head.feature.merge(head.dot, precedence)
+          curPrec match {
             case Constraints.Incompatible =>
               false
             case _                        =>
-              filterPath(tail, currentPrecedence)
+              filterPath(tail, curPrec)
           }
         } else false
       case _            =>
