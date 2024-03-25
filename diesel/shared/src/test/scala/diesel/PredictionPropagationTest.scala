@@ -21,17 +21,15 @@ import diesel.Dsl.{Axiom, Concept, Instance, Syntax}
 import munit.FunSuite
 import diesel.Bnf.{DslAxiom, DslElement}
 
-import scala.annotation.tailrec
-
 class PredictionPropagationTest extends FunSuite {
 
   trait AValue
-  trait ANumber                            extends AValue
-  trait ABoolean                           extends AValue
-  trait AString                            extends AValue
-  case class ANumberValue(value: Double)   extends ANumber
-  case class ABooleanValue(value: Boolean) extends ABoolean
-  case class AStringValue(value: String)   extends AString
+  trait ANumber                           extends AValue
+  trait ABoolean                          extends AValue
+  trait AString                           extends AValue
+  case class ANumberValue(value: String)  extends ANumber
+  case class ABooleanValue(value: String) extends ABoolean
+  case class AStringValue(value: String)  extends AString
 
   case class AIs(left: AValue, right: AValue)     extends ABoolean
   case class AConcat(left: AValue, right: AValue) extends AString
@@ -41,19 +39,19 @@ class PredictionPropagationTest extends FunSuite {
     val value: Concept[AValue] = concept
 
     val number: Concept[ANumber] =
-      concept[ANumber, AValue]("\\d+(\\.\\d+)?".r, ANumberValue(0.0), Some(value)) map {
+      concept[ANumber, AValue]("\\d+(\\.\\d+)?".r, ANumberValue("0"), Some(value)) map {
         case (_, t) =>
-          ANumberValue(t.text.toDoubleOption.getOrElse(0.0))
+          ANumberValue(t.text)
       }
 
     val boolean: Concept[ABoolean] = concept(value)
 
     val booleanTrue: Instance[ABoolean] = instance(boolean)("true") map { _ =>
-      ABooleanValue(true)
+      ABooleanValue("true")
     }
 
     val booleanFalse: Instance[ABoolean] = instance(boolean)("false") map { _ =>
-      ABooleanValue(false)
+      ABooleanValue("false")
     }
 
     val string: Concept[AString] =
@@ -85,7 +83,7 @@ class PredictionPropagationTest extends FunSuite {
   test("simple number") {
     AstHelpers.selectAst(MyDsl)("12") { tree =>
       assertEquals(tree.markers.length, 0)
-      assertEquals(tree.value, ANumberValue(12.0))
+      assertEquals(tree.value, ANumberValue("12"))
     }
   }
 
@@ -118,34 +116,9 @@ class PredictionPropagationTest extends FunSuite {
 
     def isInteresting(pathToPropsal: Seq[DslElement]): Boolean = {
       val r = pathToPropsal.filter(e => !e.isInstanceOf[DslAxiom[_]]).lastOption
-        .flatMap(elementType)
+        .flatMap(_.elementType)
         .exists(_.concept == expectedType)
       r
-    }
-
-    case class ElementType(concept: Concept[_], multiple: Boolean = false)
-
-    @tailrec
-    private def elementType(p: DslElement): Option[ElementType] = p match {
-      case Bnf.DslAxiom(_)           =>
-        None
-      case Bnf.DslValue(concept)     =>
-        Some(ElementType(concept))
-      case Bnf.DslTarget(concept)    =>
-        Some(ElementType(concept))
-      case Bnf.DslInstance(instance) =>
-        Some(ElementType(instance.concept))
-      case Bnf.DslSyntax(syntax)     =>
-        syntax match {
-          case Dsl.SyntaxUntyped(_, _, _, _)              =>
-            None
-          case Dsl.SyntaxTyped(_, concept, _, _, _, _, _) =>
-            Some(ElementType(concept))
-          case Dsl.SyntaxMulti(_, concept, _, _, _, _)    =>
-            Some(ElementType(concept, multiple = true))
-        }
-      case Bnf.DslBody(element)      =>
-        elementType(element)
     }
   }
 
@@ -165,7 +138,7 @@ class PredictionPropagationTest extends FunSuite {
       text,
       text.length,
       Seq(
-        "ANumberValue(0.0)",
+        "ANumberValue(0)",
         "AStringValue()"
       )
     )
@@ -191,7 +164,7 @@ class PredictionPropagationTest extends FunSuite {
       text,
       text.length,
       Seq(
-        "ANumberValue(0.0)",
+        "ANumberValue(0)",
         "AStringValue()"
       )
     )
@@ -204,7 +177,7 @@ class PredictionPropagationTest extends FunSuite {
       text,
       text.length,
       Seq(
-        "ANumberValue(0.0)",
+        "ANumberValue(0)",
         "AStringValue()",
         "true",
         "false"

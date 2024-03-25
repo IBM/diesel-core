@@ -137,19 +137,42 @@ object Bnf {
 
   type Action = (Context, Seq[Any]) => Any
 
-  sealed trait DslElement
+  case class ElementType(concept: Concept[_], multiple: Boolean = false)
 
-  case class DslAxiom[T](axiom: Dsl.Axiom[T]) extends DslElement
+  sealed trait DslElement {
+    def elementType: Option[ElementType]
+  }
 
-  case class DslValue[T](concept: Concept[T]) extends DslElement
+  case class DslAxiom[T](axiom: Dsl.Axiom[T]) extends DslElement {
+    override def elementType: Option[ElementType] = None
+  }
 
-  case class DslTarget[T](concept: Concept[T]) extends DslElement
+  case class DslValue[T](concept: Concept[T]) extends DslElement {
+    override def elementType: Option[ElementType] = Some(ElementType(concept))
+  }
 
-  case class DslInstance[T](instance: Instance[T]) extends DslElement
+  case class DslTarget[T](concept: Concept[T]) extends DslElement {
+    override def elementType: Option[ElementType] = Some(ElementType(concept))
+  }
 
-  case class DslSyntax[T](syntax: Syntax[T]) extends DslElement
+  case class DslInstance[T](instance: Instance[T]) extends DslElement {
+    override def elementType: Option[ElementType] = Some(ElementType(instance.concept))
+  }
 
-  case class DslBody(element: DslElement) extends DslElement
+  case class DslSyntax[T](syntax: Syntax[T]) extends DslElement {
+    override def elementType: Option[ElementType] = syntax match {
+      case Dsl.SyntaxUntyped(_, _, _, _)              =>
+        None
+      case Dsl.SyntaxTyped(_, concept, _, _, _, _, _) =>
+        Some(ElementType(concept))
+      case Dsl.SyntaxMulti(_, concept, _, _, _, _)    =>
+        Some(ElementType(concept, multiple = true))
+    }
+  }
+
+  case class DslBody(element: DslElement) extends DslElement {
+    override def elementType: Option[ElementType] = element.elementType
+  }
 
   class Production(
     var rule: Option[NonTerminal] = None,
