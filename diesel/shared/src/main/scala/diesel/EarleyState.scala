@@ -456,8 +456,9 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
 
   def getCharts: Seq[Chart] = charts.toSeq
 
-  def memoize[I, O](f: I => O): I => O = new mutable.HashMap[I, O]() {
-    override def apply(x: I): O = getOrElseUpdate(x, f(x))
+  def memoize[I, O](f: I => O): I => O = {
+    val memo = mutable.Map.empty[I, O]
+    in => memo.getOrElseUpdate(in, f(in))
   }
 
   def getPredictors(state: State): Seq[State] = {
