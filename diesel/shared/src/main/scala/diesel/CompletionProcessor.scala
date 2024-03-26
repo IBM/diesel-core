@@ -111,7 +111,18 @@ class CompletionProcessor(
         .filter(_ => state.dot == 0)
         .flatMap { elem => config.flatMap(_.getProvider(elem)) }.isDefined
 
-    def findTokenTextForProduction(production: Bnf.Production): CompletionProposal = ???
+    def findTokenTextForProduction(production: Bnf.Production): CompletionProposal = {
+      val text = production.symbols
+        .takeWhile(_.isToken)
+        .map(_.asInstanceOf[Token])
+        .map(_.defaultValue)
+        .filterNot(_.isEmpty)
+        .mkString(" ")
+      CompletionProposal(
+        production.getElement,
+        text
+      )
+    }
 
     def computeAllProposals(
       rule: Bnf.NonTerminal,
@@ -150,8 +161,16 @@ class CompletionProcessor(
             chart.notCompletedStates
               .filterNot(_.kind(result) == StateKind.ErrorRecovery)
               .flatMap { s =>
-                val rule = s.nextSymbol.asInstanceOf[Bnf.NonTerminal]
-                computeAllProposals(rule, Set.empty, Seq.empty)
+                s.nextSymbol match {
+                  case t: Token                  =>
+                    val text = t.defaultValue
+//                    val element = s.rule
+                    Seq(
+                      CompletionProposal(None, text)
+                    )
+                  case terminal: Bnf.NonTerminal =>
+                    computeAllProposals(terminal, Set.empty, Seq.empty)
+                }
               }
           // state prediction root : axiom or state with a token on left of dot
           // rule after dot, predict all for that rule filter while predicting
