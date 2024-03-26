@@ -208,4 +208,16 @@ class PredictionPropagationTest extends FunSuite {
       )
     )
   }
+
+  test("predict 6".only) {
+    val text = "1 ?: "
+    assertPredictions(
+      MyDsl.number,
+      text,
+      text.length,
+      Seq(
+        "ANumberValue(0)"
+      )
+    )
+  }
 }

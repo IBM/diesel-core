@@ -111,6 +111,32 @@ class CompletionProcessor(
         .filter(_ => state.dot == 0)
         .flatMap { elem => config.flatMap(_.getProvider(elem)) }.isDefined
 
+    def findTokenTextForProduction(production: Bnf.Production): CompletionProposal = ???
+
+    def computeAllProposals(
+      rule: Bnf.NonTerminal,
+      visited: Set[Bnf.NonTerminal],
+      stack: Seq[Bnf.NonTerminal]
+    ): Seq[CompletionProposal] = {
+      if (!visited.contains(rule)) {
+        rule match {
+          case Bnf.Rule(_, productions) => productions.flatMap(p =>
+              // enforce precedence on stack
+              // filter production
+              p.symbols.headOption match {
+                case Some(value) => value match {
+                    case _: Token                     => Seq(findTokenTextForProduction(p))
+                    case nonTerminal: Bnf.NonTerminal =>
+                      computeAllProposals(nonTerminal, visited + rule, stack :+ rule)
+                  }
+                case None        => Seq.empty
+              }
+            )
+          case Bnf.Axiom(rule)          => computeAllProposals(rule, visited + rule, stack :+ rule)
+        }
+      } else Seq.empty
+    }
+
     val navigator = navigatorFactory(result)
     navigator.toIterator
       .toSeq
@@ -123,39 +149,45 @@ class CompletionProcessor(
             node = tree.root.findNodeAtIndex(chart.index)
             chart.notCompletedStates
               .filterNot(_.kind(result) == StateKind.ErrorRecovery)
-              .filter(s => s.nextSymbol.isToken || hasProvider(s))
-              .flatMap(state => {
-                val defaultProvider: CompletionProvider = (
-                  element: Option[DslElement],
-                  tree: GenericTree,
-                  offset: Int,
-                  node: Option[GenericNode]
-                ) => {
-                  val token = findTokenTextAfterDot(state)
-                  token
-//                    .filter(text => prefix.forall(text.startsWith))
-                    .map { text =>
-                      CompletionProposal(
-                        element,
-                        text,
-                        prefix.map(p => (offset - p.length, p.length)),
-                        predictorPaths =
-                          if (config.exists(_.isIncludePaths)) {
-                            result.getPredictorPaths(state).map(_.flatMap(_.production.getElement))
-                          } else {
-                            Seq.empty
-                          }
-                      )
-                    }
-                    .toSeq
-                }
-                val element: Option[DslElement]         = state.production.getElement
-                element
-                  .filter(_ => state.dot == 0)
-                  .flatMap { elem => config.flatMap(_.getProvider(elem)) }
-                  .getOrElse(defaultProvider)
-                  .getProposals(element, tree, offset, node)
-              })
+              .flatMap { s =>
+                val rule = s.nextSymbol.asInstanceOf[Bnf.NonTerminal]
+                computeAllProposals(rule, Set.empty, Seq.empty)
+              }
+          // state prediction root : axiom or state with a token on left of dot
+          // rule after dot, predict all for that rule filter while predicting
+          // .filter(s => s.nextSymbol.isToken || hasProvider(s))
+//              .flatMap(state => {
+//                val defaultProvider: CompletionProvider = (
+//                  element: Option[DslElement],
+//                  tree: GenericTree,
+//                  offset: Int,
+//                  node: Option[GenericNode]
+//                ) => {
+//                  val token = findTokenTextAfterDot(state)
+//                  token
+////                    .filter(text => prefix.forall(text.startsWith))
+//                    .map { text =>
+//                      CompletionProposal(
+//                        element,
+//                        text,
+//                        prefix.map(p => (offset - p.length, p.length)),
+//                        predictorPaths =
+//                          if (config.exists(_.isIncludePaths)) {
+//                            result.getPredictorPaths(state).map(_.flatMap(_.production.getElement))
+//                          } else {
+//                            Seq.empty
+//                          }
+//                      )
+//                    }
+//                    .toSeq
+//                }
+//                val element: Option[DslElement]         = state.production.getElement
+//                element
+//                  .filter(_ => state.dot == 0)
+//                  .flatMap { elem => config.flatMap(_.getProvider(elem)) }
+//                  .getOrElse(defaultProvider)
+//                  .getProposals(element, tree, offset, node)
+//              })
           })
           .getOrElse(Seq.empty)
         acc ++ config
