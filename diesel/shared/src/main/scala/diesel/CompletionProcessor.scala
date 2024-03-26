@@ -106,6 +106,11 @@ class CompletionProcessor(
         None
     val afterDelimiter = c.exists(delimiters.contains)
 
+    def hasProvider(state: State) =
+      state.production.getElement
+        .filter(_ => state.dot == 0)
+        .flatMap { elem => config.flatMap(_.getProvider(elem)) }.isDefined
+
     val navigator = navigatorFactory(result)
     navigator.toIterator
       .toSeq
@@ -118,7 +123,7 @@ class CompletionProcessor(
             node = tree.root.findNodeAtIndex(chart.index)
             chart.notCompletedStates
               .filterNot(_.kind(result) == StateKind.ErrorRecovery)
-//              .filter(s => s.nextSymbol.isToken)
+              .filter(s => s.nextSymbol.isToken || hasProvider(s))
               .flatMap(state => {
                 val defaultProvider: CompletionProvider = (
                   element: Option[DslElement],

@@ -464,7 +464,7 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
   def getPredictors(state: State): Seq[State] = {
     if (state.begin == state.end) {
       charts(state.begin)
-        .activeStates(s => s.nextSymbol eq state.rule)
+        .activeRules(state.rule)
         .filter(_.kind(this) != StateKind.ErrorRecovery)
     } else {
       Seq.empty
