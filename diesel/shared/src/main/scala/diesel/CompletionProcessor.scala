@@ -19,7 +19,6 @@ package diesel
 import diesel.Bnf.{DslElement, Token}
 
 import scala.collection.mutable
-import diesel.Bnf.NonTerminal
 
 case class CompletionProposal(
   element: Option[DslElement],
@@ -112,8 +111,9 @@ class CompletionProcessor(
         .filter(_ => state.dot == 0)
         .flatMap { elem => config.flatMap(_.getProvider(elem)) }.isDefined
 
-    def findTokenTextForProduction(production: Bnf.Production): CompletionProposal = {
+    def findTokenTextForProduction(production: Bnf.Production, dot: Int): CompletionProposal = {
       val text = production.symbols
+        .drop(dot)
         .takeWhile(_.isToken)
         .map(_.asInstanceOf[Token])
         .map(_.defaultValue)
@@ -126,52 +126,57 @@ class CompletionProcessor(
     }
 
     def computeAllProposals(
-      rule: Bnf.NonTerminal,
+      production: Bnf.Production,
+      dot: Int,
       visited: Set[Bnf.NonTerminal],
       stack: Seq[Bnf.NonTerminal],
       tree: GenericTree,
       offset: Int,
       node: Option[GenericNode]
     ): Seq[CompletionProposal] = {
-      if (!visited.contains(rule)) {
-        rule match {
-          case Bnf.Rule(_, productions) => productions.flatMap { p =>
-              val provided =
-                (for {
-                  element  <- p.element
-                  c        <- config
-                  provider <- c.getProvider(element)
-                } yield provider.getProposals(Some(element), tree, offset, node))
+      if (dot < production.length) {
+        production.symbols(dot) match {
+          case _: Token       =>
+            Seq(findTokenTextForProduction(production, dot))
+          case _: Bnf.Axiom   => Seq.empty // not possible
+          case rule: Bnf.Rule =>
+            if (!visited.contains(rule)) {
+              rule.productions.flatMap { p =>
+                val provided =
+                  (for {
+                    element  <- p.element
+                    c        <- config
+                    provider <- c.getProvider(element)
+                  } yield provider.getProposals(Some(element), tree, offset, node))
 
-              // enforce precedence on stack
-              // filter production
-              provided.getOrElse(p.symbols.headOption match {
-                case Some(value) => value match {
-                    case _: Token                     =>
-                      Seq(findTokenTextForProduction(p))
-                    case nonTerminal: Bnf.NonTerminal =>
-                      computeAllProposals(
-                        nonTerminal,
-                        visited + rule,
-                        stack :+ rule,
-                        tree,
-                        offset,
-                        node
-                      )
-                  }
-                case None        => Seq.empty
-              })
-            }
-          case Bnf.Axiom(rule)          =>
-            computeAllProposals(rule, visited + rule, stack :+ rule, tree, offset, node)
+                provided.getOrElse(computeAllProposals(
+                  p,
+                  0,
+                  visited + rule,
+                  stack :+ rule,
+                  tree,
+                  offset,
+                  node
+                )).concat(if (result.bnf.emptyRules.contains(rule))
+                  computeAllProposals(
+                    production,
+                    dot + 1,
+                    visited,
+                    stack,
+                    tree,
+                    offset,
+                    node
+                  )
+                else Seq.empty)
+              }
+            } else Seq.empty
         }
-      } else Seq.empty
+      } else
+        Seq.empty
     }
 
     def isPredictionState(s: State): Boolean = {
-      s.production.symbols.lift(s.dot - 1).exists(
-        _.isToken
-      ) || (s.dot == 0 && s.rule.isAxiom) || (s.dot > 0 && s.dot < s.production.length && s.nextSymbol.isToken)
+      s.kind(result) == StateKind.Kernel
     }
 
     val navigator = navigatorFactory(result)
@@ -188,16 +193,7 @@ class CompletionProcessor(
               .filterNot(_.kind(result) == StateKind.ErrorRecovery)
               .filter(isPredictionState)
               .flatMap { s =>
-                s.nextSymbol match {
-                  case _: Token        => findTokenTextAfterDot(s).map(text =>
-                      CompletionProposal(
-                        s.production.getElement,
-                        text
-                      )
-                    ).toSeq
-                  case nt: NonTerminal =>
-                    computeAllProposals(nt, Set.empty, Seq.empty, tree, offset, node)
-                }
+                computeAllProposals(s.production, s.dot, Set.empty, Seq.empty, tree, offset, node)
               }
           // state prediction root : axiom or state with a token on left of dot
           // rule after dot, predict all for that rule filter while predicting
