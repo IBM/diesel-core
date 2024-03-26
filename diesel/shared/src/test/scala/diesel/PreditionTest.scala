@@ -83,9 +83,9 @@ class PredictTest extends FunSuite {
     val config = new CompletionConfiguration()
     config.setProvider(element, completionProvider(matcher, proposer))
 
-    assert(
-      predict(dsl, text, offset, Some(config)).map(_.text)
-        == expected
+    assertEquals(
+      predict(dsl, text, offset, Some(config)).map(_.text),
+      expected
     )
   }
 

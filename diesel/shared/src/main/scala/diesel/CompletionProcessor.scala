@@ -19,6 +19,7 @@ package diesel
 import diesel.Bnf.{DslElement, Token}
 
 import scala.collection.mutable
+import diesel.Bnf.NonTerminal
 
 case class CompletionProposal(
   element: Option[DslElement],
@@ -127,25 +128,50 @@ class CompletionProcessor(
     def computeAllProposals(
       rule: Bnf.NonTerminal,
       visited: Set[Bnf.NonTerminal],
-      stack: Seq[Bnf.NonTerminal]
+      stack: Seq[Bnf.NonTerminal],
+      tree: GenericTree,
+      offset: Int,
+      node: Option[GenericNode]
     ): Seq[CompletionProposal] = {
       if (!visited.contains(rule)) {
         rule match {
-          case Bnf.Rule(_, productions) => productions.flatMap(p =>
+          case Bnf.Rule(_, productions) => productions.flatMap { p =>
+              val provided =
+                (for {
+                  element  <- p.element
+                  c        <- config
+                  provider <- c.getProvider(element)
+                } yield provider.getProposals(Some(element), tree, offset, node))
+
               // enforce precedence on stack
               // filter production
-              p.symbols.headOption match {
+              provided.getOrElse(p.symbols.headOption match {
                 case Some(value) => value match {
-                    case _: Token                     => Seq(findTokenTextForProduction(p))
+                    case _: Token                     =>
+                      Seq(findTokenTextForProduction(p))
                     case nonTerminal: Bnf.NonTerminal =>
-                      computeAllProposals(nonTerminal, visited + rule, stack :+ rule)
+                      computeAllProposals(
+                        nonTerminal,
+                        visited + rule,
+                        stack :+ rule,
+                        tree,
+                        offset,
+                        node
+                      )
                   }
                 case None        => Seq.empty
-              }
-            )
-          case Bnf.Axiom(rule)          => computeAllProposals(rule, visited + rule, stack :+ rule)
+              })
+            }
+          case Bnf.Axiom(rule)          =>
+            computeAllProposals(rule, visited + rule, stack :+ rule, tree, offset, node)
         }
       } else Seq.empty
+    }
+
+    def isPredictionState(s: State): Boolean = {
+      s.production.symbols.lift(s.dot - 1).exists(
+        _.isToken
+      ) || (s.dot == 0 && s.rule.isAxiom) || (s.dot > 0 && s.dot < s.production.length && s.nextSymbol.isToken)
     }
 
     val navigator = navigatorFactory(result)
@@ -160,16 +186,17 @@ class CompletionProcessor(
             node = tree.root.findNodeAtIndex(chart.index)
             chart.notCompletedStates
               .filterNot(_.kind(result) == StateKind.ErrorRecovery)
+              .filter(isPredictionState)
               .flatMap { s =>
                 s.nextSymbol match {
-                  case t: Token                  =>
-                    val text = t.defaultValue
-//                    val element = s.rule
-                    Seq(
-                      CompletionProposal(None, text)
-                    )
-                  case terminal: Bnf.NonTerminal =>
-                    computeAllProposals(terminal, Set.empty, Seq.empty)
+                  case _: Token        => findTokenTextAfterDot(s).map(text =>
+                      CompletionProposal(
+                        s.production.getElement,
+                        text
+                      )
+                    ).toSeq
+                  case nt: NonTerminal =>
+                    computeAllProposals(nt, Set.empty, Seq.empty, tree, offset, node)
                 }
               }
           // state prediction root : axiom or state with a token on left of dot

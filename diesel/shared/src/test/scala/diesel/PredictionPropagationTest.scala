@@ -209,7 +209,7 @@ class PredictionPropagationTest extends FunSuite {
     )
   }
 
-  test("predict 6".only) {
+  test("predict 6") {
     val text = "1 ?: "
     assertPredictions(
       MyDsl.number,
