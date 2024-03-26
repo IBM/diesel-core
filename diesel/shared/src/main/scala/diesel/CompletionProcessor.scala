@@ -161,8 +161,8 @@ class CompletionProcessor(
                   computeAllProposals(
                     production,
                     dot + 1,
-                    visited,
-                    stack,
+                    visited + rule,
+                    stack :+ rule,
                     tree,
                     offset,
                     node
