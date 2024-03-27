@@ -157,17 +157,7 @@ class CompletionProcessor(
                   tree,
                   offset,
                   node
-                )).concat(if (result.bnf.emptyRules.contains(rule))
-                  computeAllProposals(
-                    production,
-                    dot + 1,
-                    visited + rule,
-                    stack :+ rule,
-                    tree,
-                    offset,
-                    node
-                  )
-                else Seq.empty)
+                ))
               }
             } else Seq.empty
         }
@@ -176,7 +166,7 @@ class CompletionProcessor(
     }
 
     def isPredictionState(s: State): Boolean = {
-      s.kind(result) == StateKind.Kernel
+      (s.dot == 0 && s.rule.isAxiom) || s.dot > 0
     }
 
     val navigator = navigatorFactory(result)
@@ -241,14 +231,14 @@ class CompletionProcessor(
       .distinct
   }
 
-  private def findTokenTextAfterDot(state: State): Option[String] = {
-    Some(state.production.symbols
-      .drop(state.dot)
-      .takeWhile(_.isToken)
-      .map(_.asInstanceOf[Token])
-      .map(_.defaultValue)
-      .filterNot(_.isEmpty)
-      .mkString(" "))
-      .filterNot(_.isEmpty)
-  }
+//  private def findTokenTextAfterDot(state: State): Option[String] = {
+//    Some(state.production.symbols
+//      .drop(state.dot)
+//      .takeWhile(_.isToken)
+//      .map(_.asInstanceOf[Token])
+//      .map(_.defaultValue)
+//      .filterNot(_.isEmpty)
+//      .mkString(" "))
+//      .filterNot(_.isEmpty)
+//  }
 }
