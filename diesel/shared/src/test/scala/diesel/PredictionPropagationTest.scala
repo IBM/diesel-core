@@ -20,6 +20,12 @@ import diesel.AstHelpers.predict
 import diesel.Dsl.{Axiom, Concept, Instance, Syntax, SyntaxGeneric}
 import munit.FunSuite
 import diesel.Bnf.{DslAxiom, DslElement}
+import diesel.Bnf.DslInstance
+import diesel.Bnf.DslTarget
+import diesel.Bnf.DslValue
+import diesel.Bnf.DslSyntax
+import diesel.Bnf.DslBody
+import diesel.Dsl.SyntaxTyped
 
 class PredictionPropagationTest extends FunSuite {
 
@@ -111,8 +117,9 @@ class PredictionPropagationTest extends FunSuite {
     expected: Seq[Any]
   ): Unit = {
     val config    = new CompletionConfiguration
-    config.setFilter(MyCompletionFilter(expectedType))
+    // config.setFilter(MyCompletionFilter(expectedType))
     config.setIncludePaths(true)
+    config.setComputeFilter(MyComputeFilter(expectedType))
     val proposals = predict(MyDsl, text, offset, Some(config))
     assertEquals(proposals.map(_.text), expected)
   }
@@ -130,6 +137,70 @@ class PredictionPropagationTest extends FunSuite {
         .flatMap(_.elementType)
         .exists(_.concept == expectedType)
       r
+    }
+  }
+
+  case class MyComputeFilter(expectedType: Concept[_]) extends CompletionComputeFilter {
+
+    var visitedTypes = Set.empty[Concept[_]]
+
+    def beginVisit(): Unit = {
+      this.visitedTypes = Set(expectedType)
+    }
+
+    private def isContinue(concept: Concept[_]): Boolean = {
+      this.visitedTypes.exists(visited => MyDsl.isSubtypeOf(visited, concept))
+    }
+
+    private def isExpected(concept: Concept[_]): Boolean = {
+      this.visitedTypes.exists(visited => MyDsl.isSubtypeOf(concept, visited))
+    }
+
+    def continueVisit(
+      element: DslElement
+    ): Boolean = {
+      // println("FW", element)
+      // (true, context)
+      val fw = element match {
+        case DslInstance(instance)                      => true
+        case DslTarget(concept)                         => true
+        case DslValue(concept)                          => true
+        case DslBody(DslSyntax(syntax: SyntaxTyped[_])) =>
+          if (isContinue(syntax.concept)) {
+            // TODO context is first 'hole'
+            if (syntax == MyDsl.concat) {
+              this.visitedTypes = this.visitedTypes + MyDsl.number
+              true
+            } else if (syntax == MyDsl.is) {
+              this.visitedTypes = this.visitedTypes + MyDsl.value
+              true
+            } else {
+              false
+            }
+          } else {
+            false
+          }
+        case _: DslSyntax[_]                            => true
+        case DslAxiom(axiom)                            => true
+        case DslBody(element)                           => continueVisit(element)
+      }
+      // println(
+      //   "FW accept",
+      //   fw._1,
+      //   element.elementType,
+      //   context.asInstanceOf[Concept[_]].name
+      // )
+      fw
+    }
+
+    override def endVisit(candidates: Seq[CompletionProposal]): Seq[CompletionProposal] = {
+      val fw1 = candidates.map(_.element)
+      val fw2 = fw1.flatten.map(_.elementType)
+      val fw3 = fw2.flatten.map(_.concept.name)
+      println("FW3", fw3, this.visitedTypes.map(_.name))
+
+      candidates
+        .filter(c => c.element.exists(_.elementType.exists(t => isExpected(t.concept))))
     }
   }
 

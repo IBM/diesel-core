@@ -48,6 +48,13 @@ trait CompletionProvider {
   ): Seq[CompletionProposal]
 }
 
+// TODO CompletionComputeFilter[T]
+trait CompletionComputeFilter {
+  def beginVisit(): Unit
+  def continueVisit(element: DslElement): Boolean
+  def endVisit(candidates: Seq[CompletionProposal]): Seq[CompletionProposal]
+}
+
 object CompletionConfiguration {
   val defaultDelimiters: Set[Char] = ":(){}.,+-*/[];".toSet
 
@@ -62,6 +69,7 @@ class CompletionConfiguration {
   private var filter: Option[CompletionFilter]                       = None
   private var delimiters: Set[Char]                                  = CompletionConfiguration.defaultDelimiters
   private var includePaths: Boolean                                  = false
+  private var computeFilter: Option[CompletionComputeFilter]         = None
 
   def setProvider(dslElement: DslElement, p: CompletionProvider): Unit = {
     providers(dslElement) = p
@@ -86,6 +94,13 @@ class CompletionConfiguration {
   }
 
   def isIncludePaths: Boolean = this.includePaths
+
+  def setComputeFilter[T](filter: CompletionComputeFilter): Unit = {
+    this.computeFilter = Some(filter)
+  }
+
+  def getComputeFilter: Option[CompletionComputeFilter] =
+    this.computeFilter.map(_.asInstanceOf[CompletionComputeFilter])
 }
 
 class CompletionProcessor(
@@ -107,10 +122,29 @@ class CompletionProcessor(
         None
     val afterDelimiter = c.exists(delimiters.contains)
 
-    def hasProvider(state: State) =
-      state.production.getElement
-        .filter(_ => state.dot == 0)
+    def hasProvider(state: State): Boolean =
+      state.dot == 0 && hasProviderFor(state.production)
+
+    def hasProviderFor(production: Bnf.Production): Boolean =
+      production.getElement
         .flatMap { elem => config.flatMap(_.getProvider(elem)) }.isDefined
+
+    def computeProposalFor(production: Bnf.Production): Boolean = {
+      val continueVisit = for {
+        element       <- production.getElement
+        c             <- config
+        computeFilter <- c.getComputeFilter
+      } yield computeFilter.continueVisit(element)
+      continueVisit.getOrElse(true)
+    }
+
+    def beginCompute(): Unit = {
+      config.flatMap(_.getComputeFilter).foreach(_.beginVisit)
+    }
+
+    def endCompute(candidates: Seq[CompletionProposal]): Seq[CompletionProposal] = {
+      config.flatMap(_.getComputeFilter).map(_.endVisit(candidates)).getOrElse(candidates)
+    }
 
     def findTokenTextForProduction(production: Bnf.Production, dot: Int): CompletionProposal = {
       val text = production.symbols
@@ -129,7 +163,7 @@ class CompletionProcessor(
     def computeAllProposals(
       production: Bnf.Production,
       dot: Int,
-      visited: Set[Bnf.NonTerminal],
+      visited: Set[Bnf.Production],
       stack: Seq[Bnf.NonTerminal],
       feature: Feature,
       tree: GenericTree,
@@ -138,37 +172,40 @@ class CompletionProcessor(
     ): Seq[CompletionProposal] = {
       if (dot < production.length) {
         production.symbols(dot) match {
-          case _: Token       =>
-            Seq(findTokenTextForProduction(production, dot))
+          case _: Token       => Seq(findTokenTextForProduction(production, dot))
           case _: Bnf.Axiom   => Seq.empty // not possible
           case rule: Bnf.Rule =>
-            if (!visited.contains(rule)) {
+            if (!visited.contains(production)) {
+              val visited1 = visited + production
               rule.productions.flatMap { p =>
+                // val newFeature = feature.merge(dot, production.feature)
                 val newFeature = p.feature.merge(dot, feature)
                 if (newFeature != Constraints.Incompatible) {
-                  val provided =
-                    (for {
-                      element  <- p.element
-                      c        <- config
-                      provider <- c.getProvider(element)
-                    } yield provider.getProposals(Some(element), tree, offset, node))
+                  val continueVisit = computeProposalFor(p)
+                  if (continueVisit) {
+                    val provided =
+                      (for {
+                        element  <- p.element
+                        c        <- config
+                        provider <- c.getProvider(element)
+                      } yield provider.getProposals(Some(element), tree, offset, node))
 
-                  provided.getOrElse(computeAllProposals(
-                    p,
-                    0,
-                    visited + rule,
-                    stack :+ rule,
-                    newFeature,
-                    tree,
-                    offset,
-                    node
-                  ))
+                    provided.getOrElse(computeAllProposals(
+                      p,
+                      0,
+                      visited1,
+                      stack :+ rule,
+                      newFeature,
+                      tree,
+                      offset,
+                      node
+                    ))
+                  } else Seq.empty
                 } else Seq.empty
               }
             } else Seq.empty
         }
-      } else
-        Seq.empty
+      } else Seq.empty
     }
 
     def isPredictionState(s: State): Boolean = {
@@ -189,16 +226,18 @@ class CompletionProcessor(
               .filterNot(_.kind(result) == StateKind.ErrorRecovery)
               .filter(isPredictionState)
               .flatMap { s =>
-                computeAllProposals(
+                beginCompute();
+                val candidates = computeAllProposals(
                   s.production,
                   s.dot,
                   Set.empty,
                   Seq.empty,
-                  Constraints.None,
+                  s.feature,
                   tree,
                   offset,
                   node
                 )
+                endCompute(candidates)
               }
           })
           .getOrElse(Seq.empty)
