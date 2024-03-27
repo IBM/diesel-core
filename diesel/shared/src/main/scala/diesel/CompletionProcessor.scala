@@ -139,7 +139,7 @@ class CompletionProcessor(
     }
 
     def beginCompute(): Unit = {
-      config.flatMap(_.getComputeFilter).foreach(_.beginVisit)
+      config.flatMap(_.getComputeFilter).foreach(_.beginVisit())
     }
 
     def endCompute(candidates: Seq[CompletionProposal]): Seq[CompletionProposal] = {
