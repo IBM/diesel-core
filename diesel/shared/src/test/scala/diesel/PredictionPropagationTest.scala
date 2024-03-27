@@ -142,7 +142,7 @@ class PredictionPropagationTest extends FunSuite {
   // ( 1, 2, 3 )
   // ( 1, 4, 5, 3 )
 
-  test("predict 1".only) {
+  test("predict 1") {
     val text = "\"foo\" is "
     assertPredictions(
       MyDsl.string,
