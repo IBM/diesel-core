@@ -181,8 +181,9 @@ class PredictionPropagationTest extends FunSuite {
             false
           }
         case _: DslSyntax[_]                            => true
-        case DslAxiom(axiom)                            => true
-        case DslBody(element)                           => continueVisit(element)
+        case DslAxiom(_)                                => true
+        case DslBody(element)                           =>
+          continueVisit(element)
       }
       // println(
       //   "FW accept",
@@ -194,10 +195,10 @@ class PredictionPropagationTest extends FunSuite {
     }
 
     override def endVisit(candidates: Seq[CompletionProposal]): Seq[CompletionProposal] = {
-      val fw1 = candidates.map(_.element)
-      val fw2 = fw1.flatten.map(_.elementType)
-      val fw3 = fw2.flatten.map(_.concept.name)
-      println("FW3", fw3, this.visitedTypes.map(_.name))
+//      val fw1 = candidates.map(_.element)
+//      val fw2 = fw1.flatten.map(_.elementType)
+//      val fw3 = fw2.flatten.map(_.concept.name)
+//      println("FW3", fw3, this.visitedTypes.map(_.name))
 
       candidates
         .filter(c => c.element.exists(_.elementType.exists(t => isExpected(t.concept))))

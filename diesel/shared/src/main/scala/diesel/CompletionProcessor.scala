@@ -131,7 +131,7 @@ class CompletionProcessor(
 
     def computeProposalFor(production: Bnf.Production): Boolean = {
       val continueVisit = for {
-        element       <- production.getElement
+        element       <- production.element
         c             <- config
         computeFilter <- c.getComputeFilter
       } yield computeFilter.continueVisit(element)
@@ -165,6 +165,7 @@ class CompletionProcessor(
       dot: Int,
       visited: Set[Bnf.Production],
       stack: Seq[Bnf.NonTerminal],
+      from: Int,
       feature: Feature,
       tree: GenericTree,
       offset: Int,
@@ -176,10 +177,9 @@ class CompletionProcessor(
           case _: Bnf.Axiom   => Seq.empty // not possible
           case rule: Bnf.Rule =>
             if (!visited.contains(production)) {
-              val visited1 = visited + production
+              val newVisited = visited + production
               rule.productions.flatMap { p =>
-                // val newFeature = feature.merge(dot, production.feature)
-                val newFeature = p.feature.merge(dot, feature)
+                val newFeature = feature.merge(from, p.feature)
                 if (newFeature != Constraints.Incompatible) {
                   val continueVisit = computeProposalFor(p)
                   if (continueVisit) {
@@ -193,8 +193,9 @@ class CompletionProcessor(
                     provided.getOrElse(computeAllProposals(
                       p,
                       0,
-                      visited1,
+                      newVisited,
                       stack :+ rule,
+                      from,
                       newFeature,
                       tree,
                       offset,
@@ -232,6 +233,7 @@ class CompletionProcessor(
                   s.dot,
                   Set.empty,
                   Seq.empty,
+                  s.dot,
                   s.feature,
                   tree,
                   offset,
