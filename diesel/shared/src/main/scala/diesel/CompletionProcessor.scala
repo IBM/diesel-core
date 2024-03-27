@@ -16,7 +16,8 @@
 
 package diesel
 
-import diesel.Bnf.{DslElement, Token}
+import diesel.Bnf.Constraints.Feature
+import diesel.Bnf.{Constraints, DslElement, Token}
 
 import scala.collection.mutable
 
@@ -130,6 +131,7 @@ class CompletionProcessor(
       dot: Int,
       visited: Set[Bnf.NonTerminal],
       stack: Seq[Bnf.NonTerminal],
+      feature: Feature,
       tree: GenericTree,
       offset: Int,
       node: Option[GenericNode]
@@ -142,22 +144,26 @@ class CompletionProcessor(
           case rule: Bnf.Rule =>
             if (!visited.contains(rule)) {
               rule.productions.flatMap { p =>
-                val provided =
-                  (for {
-                    element  <- p.element
-                    c        <- config
-                    provider <- c.getProvider(element)
-                  } yield provider.getProposals(Some(element), tree, offset, node))
+                val newFeature = p.feature.merge(dot, feature)
+                if (newFeature != Constraints.Incompatible) {
+                  val provided =
+                    (for {
+                      element  <- p.element
+                      c        <- config
+                      provider <- c.getProvider(element)
+                    } yield provider.getProposals(Some(element), tree, offset, node))
 
-                provided.getOrElse(computeAllProposals(
-                  p,
-                  0,
-                  visited + rule,
-                  stack :+ rule,
-                  tree,
-                  offset,
-                  node
-                ))
+                  provided.getOrElse(computeAllProposals(
+                    p,
+                    0,
+                    visited + rule,
+                    stack :+ rule,
+                    newFeature,
+                    tree,
+                    offset,
+                    node
+                  ))
+                } else Seq.empty
               }
             } else Seq.empty
         }
@@ -183,43 +189,17 @@ class CompletionProcessor(
               .filterNot(_.kind(result) == StateKind.ErrorRecovery)
               .filter(isPredictionState)
               .flatMap { s =>
-                computeAllProposals(s.production, s.dot, Set.empty, Seq.empty, tree, offset, node)
+                computeAllProposals(
+                  s.production,
+                  s.dot,
+                  Set.empty,
+                  Seq.empty,
+                  Constraints.None,
+                  tree,
+                  offset,
+                  node
+                )
               }
-          // state prediction root : axiom or state with a token on left of dot
-          // rule after dot, predict all for that rule filter while predicting
-          // .filter(s => s.nextSymbol.isToken || hasProvider(s))
-//              .flatMap(state => {
-//                val defaultProvider: CompletionProvider = (
-//                  element: Option[DslElement],
-//                  tree: GenericTree,
-//                  offset: Int,
-//                  node: Option[GenericNode]
-//                ) => {
-//                  val token = findTokenTextAfterDot(state)
-//                  token
-////                    .filter(text => prefix.forall(text.startsWith))
-//                    .map { text =>
-//                      CompletionProposal(
-//                        element,
-//                        text,
-//                        prefix.map(p => (offset - p.length, p.length)),
-//                        predictorPaths =
-//                          if (config.exists(_.isIncludePaths)) {
-//                            result.getPredictorPaths(state).map(_.flatMap(_.production.getElement))
-//                          } else {
-//                            Seq.empty
-//                          }
-//                      )
-//                    }
-//                    .toSeq
-//                }
-//                val element: Option[DslElement]         = state.production.getElement
-//                element
-//                  .filter(_ => state.dot == 0)
-//                  .flatMap { elem => config.flatMap(_.getProvider(elem)) }
-//                  .getOrElse(defaultProvider)
-//                  .getProposals(element, tree, offset, node)
-//              })
           })
           .getOrElse(Seq.empty)
         acc ++ config
@@ -231,14 +211,4 @@ class CompletionProcessor(
       .distinct
   }
 
-//  private def findTokenTextAfterDot(state: State): Option[String] = {
-//    Some(state.production.symbols
-//      .drop(state.dot)
-//      .takeWhile(_.isToken)
-//      .map(_.asInstanceOf[Token])
-//      .map(_.defaultValue)
-//      .filterNot(_.isEmpty)
-//      .mkString(" "))
-//      .filterNot(_.isEmpty)
-//  }
 }

@@ -181,7 +181,7 @@ class JsModelDslPredictionTest extends FunSuite {
       """root: MyClass
         |class MyClass """.stripMargin,
       28,
-      Seq("extends", "{", "discriminator")
+      Seq("extends", "discriminator", "{")
     )
   }
 

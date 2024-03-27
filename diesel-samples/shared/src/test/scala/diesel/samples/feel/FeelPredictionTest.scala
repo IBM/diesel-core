@@ -35,28 +35,28 @@ class FeelPredictionTest extends FunSuite {
 
   private def ALL = List(
     "-",
-    "not (",
-    "(",
     "[",
     "function (",
     "{",
     "for",
     "if",
-    "-",
-    "[a-z]+",
     "some",
     "every",
-    "null",
-    ">=",
-    "<=",
-    ">",
-    "<",
-    "[",
-    "true",
-    "false",
+    "-",
     "0",
     "\"\"",
-    "@"
+    "true",
+    "false",
+    "@",
+    "null",
+    ">",
+    "<",
+    "<=",
+    ">=",
+    "[",
+    "[a-z]+",
+    "(",
+    "not ("
   )
 
   test("empty text") {
