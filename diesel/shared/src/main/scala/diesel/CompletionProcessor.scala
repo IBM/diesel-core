@@ -163,7 +163,7 @@ class CompletionProcessor(
     def computeAllProposals(
       production: Bnf.Production,
       dot: Int,
-      visited: Set[Bnf.Production],
+      visited: Set[Bnf.NonTerminal],
       stack: Seq[Bnf.NonTerminal],
       from: Int,
       feature: Feature,
@@ -176,8 +176,8 @@ class CompletionProcessor(
           case _: Token       => Seq(findTokenTextForProduction(production, dot))
           case _: Bnf.Axiom   => Seq.empty // not possible
           case rule: Bnf.Rule =>
-            if (!visited.contains(production)) {
-              val newVisited = visited + production
+            if (!visited.contains(rule)) {
+              val newVisited = visited + rule
               rule.productions.flatMap { p =>
                 val newFeature = feature.merge(from, p.feature)
                 if (newFeature != Constraints.Incompatible) {
