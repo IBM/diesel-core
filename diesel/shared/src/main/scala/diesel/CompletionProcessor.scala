@@ -252,12 +252,9 @@ class CompletionProcessor(
       .distinct
   }
 
-  private def backPtrsOf(state: State): Seq[BackPtr] =
-    result.contextOf(state).fold[Seq[BackPtr]](Seq.empty)(ctx => ctx.backPtrs.toSeq)
-
   def elementsAt(state: State, index: Int): Seq[DslElement] =
     if (index < state.dot) {
-      visitAt(backPtrsOf(state), index, state.dot)
+      visitAt(result.backPtrsOf(state), index, state.dot)
     } else
       Seq.empty
 
@@ -275,7 +272,7 @@ class CompletionProcessor(
         }
       } else {
         backPtrs flatMap {
-          bp => visitAt(backPtrsOf(bp.predecessor), index, bp.predecessor.dot)
+          bp => visitAt(result.backPtrsOf(bp.predecessor), index, bp.predecessor.dot)
         }
       }
     } else Seq.empty

@@ -455,9 +455,6 @@ class Navigator(
     }
   }
 
-  private def backPtrsOf(state: State): Seq[BackPtr] =
-    result.contextOf(state).fold[Seq[BackPtr]](Seq.empty)(ctx => ctx.backPtrs.toSeq)
-
   private def sentinel(): Iterator[Subtree] =
     Seq(Subtree(Seq.empty)).iterator
 
@@ -489,7 +486,7 @@ class Navigator(
     userData: ContextualUserData,
     successState: Boolean = false
   ): Subtrees = {
-    val backPtrs: Seq[BackPtr] = backPtrsOf(state)
+    val backPtrs: Seq[BackPtr] = result.backPtrsOf(state)
     if (backPtrs.isEmpty) {
       if (state.isCompleted)
         Subtrees(
