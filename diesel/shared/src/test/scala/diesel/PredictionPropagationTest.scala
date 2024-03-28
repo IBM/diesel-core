@@ -117,27 +117,9 @@ class PredictionPropagationTest extends FunSuite {
     expected: Seq[Any]
   ): Unit = {
     val config    = new CompletionConfiguration
-    // config.setFilter(MyCompletionFilter(expectedType))
-    config.setIncludePaths(true)
     config.setComputeFilter(MyComputeFilter(expectedType))
     val proposals = predict(MyDsl, text, offset, Some(config))
     assertEquals(proposals.map(_.text), expected)
-  }
-
-  case class MyCompletionFilter(expectedType: Concept[_]) extends CompletionFilter {
-    def filterProposals(
-      tree: GenericTree,
-      offset: Int,
-      node: Option[GenericNode],
-      proposals: Seq[CompletionProposal]
-    ): Seq[CompletionProposal] = proposals.filter { _.predictorPaths.exists(isInteresting) }
-
-    def isInteresting(pathToPropsal: Seq[DslElement]): Boolean = {
-      val r = pathToPropsal.filter(e => !e.isInstanceOf[DslAxiom[_]]).lastOption
-        .flatMap(_.elementType)
-        .exists(_.concept == expectedType)
-      r
-    }
   }
 
   case class MyComputeFilter(expectedType: Concept[_]) extends CompletionComputeFilter {
@@ -156,10 +138,9 @@ class PredictionPropagationTest extends FunSuite {
       this.visitedTypes.exists(visited => MyDsl.isSubtypeOf(concept, visited))
     }
 
-  // axiom
+    // axiom
     // value "+" value
     // foo "xx" bar
-
 
     def continueVisit(
       element: DslElement
@@ -167,9 +148,9 @@ class PredictionPropagationTest extends FunSuite {
       // println("FW", element)
       // (true, context)
       val fw = element match {
-        case DslInstance(_)                      => true
-        case DslTarget(_)                         => true
-        case DslValue(_)                          => true
+        case DslInstance(_)                             => true
+        case DslTarget(_)                               => true
+        case DslValue(_)                                => true
         case DslBody(DslSyntax(syntax: SyntaxTyped[_])) =>
           if (isContinue(syntax.concept)) {
             // TODO context is first 'hole'

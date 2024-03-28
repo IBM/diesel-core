@@ -26,8 +26,7 @@ case class CompletionProposal(
   text: String,
   replace: Option[(Int, Int)] = None,
   userData: Option[Any] = None,
-  documentation: Option[String] = None,
-  predictorPaths: Seq[Seq[DslElement]] = Seq.empty
+  documentation: Option[String] = None
 )
 
 trait CompletionFilter {
@@ -57,10 +56,6 @@ trait CompletionComputeFilter {
 
 object CompletionConfiguration {
   val defaultDelimiters: Set[Char] = ":(){}.,+-*/[];".toSet
-
-  trait CompletionProposalFactory {
-    def createProposal(result: Result, state: State, proto: CompletionProposal): CompletionProposal
-  }
 }
 
 class CompletionConfiguration {
@@ -68,7 +63,6 @@ class CompletionConfiguration {
   private val providers: mutable.Map[DslElement, CompletionProvider] = mutable.Map()
   private var filter: Option[CompletionFilter]                       = None
   private var delimiters: Set[Char]                                  = CompletionConfiguration.defaultDelimiters
-  private var includePaths: Boolean                                  = false
   private var computeFilter: Option[CompletionComputeFilter]         = None
 
   def setProvider(dslElement: DslElement, p: CompletionProvider): Unit = {
@@ -89,18 +83,12 @@ class CompletionConfiguration {
 
   def getDelimiters: Set[Char] = delimiters
 
-  def setIncludePaths(include: Boolean): Unit = {
-    this.includePaths = include
-  }
-
-  def isIncludePaths: Boolean = this.includePaths
-
-  def setComputeFilter[T](filter: CompletionComputeFilter): Unit = {
+  def setComputeFilter(filter: CompletionComputeFilter): Unit = {
     this.computeFilter = Some(filter)
   }
 
   def getComputeFilter: Option[CompletionComputeFilter] =
-    this.computeFilter.map(_.asInstanceOf[CompletionComputeFilter])
+    this.computeFilter
 }
 
 class CompletionProcessor(
@@ -122,12 +110,12 @@ class CompletionProcessor(
         None
     val afterDelimiter = c.exists(delimiters.contains)
 
-    def hasProvider(state: State): Boolean =
-      state.dot == 0 && hasProviderFor(state.production)
+//    def hasProvider(state: State): Boolean =
+//      state.dot == 0 && hasProviderFor(state.production)
 
-    def hasProviderFor(production: Bnf.Production): Boolean =
-      production.getElement
-        .flatMap { elem => config.flatMap(_.getProvider(elem)) }.isDefined
+//    def hasProviderFor(production: Bnf.Production): Boolean =
+//      production.getElement
+//        .flatMap { elem => config.flatMap(_.getProvider(elem)) }.isDefined
 
     def computeProposalFor(production: Bnf.Production): Boolean = {
       val continueVisit = for {
@@ -252,28 +240,28 @@ class CompletionProcessor(
       .distinct
   }
 
-  def elementsAt(state: State, index: Int): Seq[DslElement] =
-    if (index < state.dot) {
-      visitAt(result.backPtrsOf(state), index, state.dot)
-    } else
-      Seq.empty
-
-  def visitAt(backPtrs: Seq[BackPtr], index: Int, dot: Int): Seq[DslElement] =
-    if (backPtrs.nonEmpty) {
-      if (index + 1 == dot) {
-        backPtrs flatMap { bp =>
-          bp.causal match {
-            case _: TerminalItem                        => Seq.empty
-            case causal @ State(production, _, _, _, _) => production.element match {
-                case Some(value) => Seq(value)
-                case None        => elementsAt(causal, index)
-              }
-          }
-        }
-      } else {
-        backPtrs flatMap {
-          bp => visitAt(result.backPtrsOf(bp.predecessor), index, bp.predecessor.dot)
-        }
-      }
-    } else Seq.empty
+//  def elementsAt(state: State, index: Int): Seq[DslElement] =
+//    if (index < state.dot) {
+//      visitAt(result.backPtrsOf(state), index, state.dot)
+//    } else
+//      Seq.empty
+//
+//  def visitAt(backPtrs: Seq[BackPtr], index: Int, dot: Int): Seq[DslElement] =
+//    if (backPtrs.nonEmpty) {
+//      if (index + 1 == dot) {
+//        backPtrs flatMap { bp =>
+//          bp.causal match {
+//            case _: TerminalItem                        => Seq.empty
+//            case causal @ State(production, _, _, _, _) => production.element match {
+//                case Some(value) => Seq(value)
+//                case None        => elementsAt(causal, index)
+//              }
+//          }
+//        }
+//      } else {
+//        backPtrs flatMap {
+//          bp => visitAt(result.backPtrsOf(bp.predecessor), index, bp.predecessor.dot)
+//        }
+//      }
+//    } else Seq.empty
 }
