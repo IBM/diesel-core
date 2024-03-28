@@ -49,7 +49,7 @@ trait CompletionProvider {
 
 // TODO CompletionComputeFilter[T]
 trait CompletionComputeFilter {
-  def beginVisit(): Unit
+  def beginVisit(predictionRoot: Option[DslElement]): Boolean
   def continueVisit(element: DslElement): Boolean
   def endVisit(candidates: Seq[CompletionProposal]): Seq[CompletionProposal]
 }
@@ -126,8 +126,8 @@ class CompletionProcessor(
       continueVisit.getOrElse(true)
     }
 
-    def beginCompute(): Unit = {
-      config.flatMap(_.getComputeFilter).foreach(_.beginVisit())
+    def beginCompute(predictionRoot: Option[DslElement]): Boolean = {
+      config.flatMap(_.getComputeFilter).forall(_.beginVisit(predictionRoot))
     }
 
     def endCompute(candidates: Seq[CompletionProposal]): Seq[CompletionProposal] = {
@@ -215,19 +215,22 @@ class CompletionProcessor(
               .filterNot(_.kind(result) == StateKind.ErrorRecovery)
               .filter(isPredictionState)
               .flatMap { s =>
-                beginCompute();
-                val candidates = computeAllProposals(
-                  s.production,
-                  s.dot,
-                  Set.empty,
-                  Seq.empty,
-                  s.dot,
-                  s.feature,
-                  tree,
-                  offset,
-                  node
-                )
-                endCompute(candidates)
+                if (beginCompute(s.production.getElement)) {
+                  val candidates = computeAllProposals(
+                    s.production,
+                    s.dot,
+                    Set.empty,
+                    Seq.empty,
+                    s.dot,
+                    s.feature,
+                    tree,
+                    offset,
+                    node
+                  )
+                  endCompute(candidates)
+                } else {
+                  Seq.empty
+                }
               }
           })
           .getOrElse(Seq.empty)
@@ -240,28 +243,28 @@ class CompletionProcessor(
       .distinct
   }
 
-//  def elementsAt(state: State, index: Int): Seq[DslElement] =
-//    if (index < state.dot) {
-//      visitAt(result.backPtrsOf(state), index, state.dot)
-//    } else
-//      Seq.empty
-//
-//  def visitAt(backPtrs: Seq[BackPtr], index: Int, dot: Int): Seq[DslElement] =
-//    if (backPtrs.nonEmpty) {
-//      if (index + 1 == dot) {
-//        backPtrs flatMap { bp =>
-//          bp.causal match {
-//            case _: TerminalItem                        => Seq.empty
-//            case causal @ State(production, _, _, _, _) => production.element match {
-//                case Some(value) => Seq(value)
-//                case None        => elementsAt(causal, index)
-//              }
-//          }
-//        }
-//      } else {
-//        backPtrs flatMap {
-//          bp => visitAt(result.backPtrsOf(bp.predecessor), index, bp.predecessor.dot)
-//        }
-//      }
-//    } else Seq.empty
+  def elementsAt(state: State, index: Int): Seq[DslElement] =
+    if (index < state.dot) {
+      visitAt(result.backPtrsOf(state), index, state.dot)
+    } else
+      Seq.empty
+
+  def visitAt(backPtrs: Seq[BackPtr], index: Int, dot: Int): Seq[DslElement] =
+    if (backPtrs.nonEmpty) {
+      if (index + 1 == dot) {
+        backPtrs flatMap { bp =>
+          bp.causal match {
+            case _: TerminalItem                        => Seq.empty
+            case causal @ State(production, _, _, _, _) => production.element match {
+                case Some(value) => Seq(value)
+                case None        => elementsAt(causal, index)
+              }
+          }
+        }
+      } else {
+        backPtrs flatMap {
+          bp => visitAt(result.backPtrsOf(bp.predecessor), index, bp.predecessor.dot)
+        }
+      }
+    } else Seq.empty
 }

@@ -126,8 +126,9 @@ class PredictionPropagationTest extends FunSuite {
 
     var visitedTypes = Set.empty[Concept[_]]
 
-    def beginVisit(): Unit = {
+    override def beginVisit(predictionRoot: Option[DslElement]): Boolean = {
       this.visitedTypes = Set(expectedType)
+      true
     }
 
     private def isContinue(concept: Concept[_]): Boolean = {
@@ -142,7 +143,7 @@ class PredictionPropagationTest extends FunSuite {
     // value "+" value
     // foo "xx" bar
 
-    def continueVisit(
+    override def continueVisit(
       element: DslElement
     ): Boolean = {
       // println("FW", element)
