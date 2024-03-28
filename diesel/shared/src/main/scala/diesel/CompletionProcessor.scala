@@ -252,4 +252,31 @@ class CompletionProcessor(
       .distinct
   }
 
+  private def backPtrsOf(state: State): Seq[BackPtr] =
+    result.contextOf(state).fold[Seq[BackPtr]](Seq.empty)(ctx => ctx.backPtrs.toSeq)
+
+  def elementsAt(state: State, index: Int): Seq[DslElement] =
+    if (index < state.dot) {
+      visitAt(backPtrsOf(state), index, state.dot)
+    } else
+      Seq.empty
+
+  def visitAt(backPtrs: Seq[BackPtr], index: Int, dot: Int): Seq[DslElement] =
+    if (backPtrs.nonEmpty) {
+      if (index + 1 == dot) {
+        backPtrs flatMap { bp =>
+          bp.causal match {
+            case _: TerminalItem                        => Seq.empty
+            case causal @ State(production, _, _, _, _) => production.element match {
+                case Some(value) => Seq(value)
+                case None        => elementsAt(causal, index)
+              }
+          }
+        }
+      } else {
+        backPtrs flatMap {
+          bp => visitAt(backPtrsOf(bp.predecessor), index, bp.predecessor.dot)
+        }
+      }
+    } else Seq.empty
 }
