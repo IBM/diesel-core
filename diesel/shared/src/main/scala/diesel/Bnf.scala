@@ -621,7 +621,8 @@ object Bnf {
       owner: Rule,
       ctx: GrammarContext,
       text: String,
-      v: Verbalizer
+      v: Verbalizer,
+      element: Option[DslElement]
     ): Partial = {
       val context     = VerbalizationContext(
         article = ctx.article.getOrElse(NoArticle),
@@ -639,7 +640,8 @@ object Bnf {
         (_: Context, args: Any) => {
           args
         },
-        verbalized
+        verbalized,
+        element
       )
       Partial(Seq(subjectRule))
     }
@@ -692,7 +694,7 @@ object Bnf {
           // verbalize str and split
           verbalizations(dsl) match {
             case Some(v) =>
-              verbalizeSubject(owner, ctx, str.text, v.verbalizer)
+              verbalizeSubject(owner, ctx, str.text, v.verbalizer, element)
             case None    =>
               splitText(str.text)
           }
@@ -954,7 +956,13 @@ object Bnf {
         case SPAndN(ps) =>
           ps.zipWithIndex.map { case (p, n) =>
             val mustBePropagated = n == 0 && first
-            mapSyntaxProduction(owner, p, ctx.propagate(mustBePropagated), None, mustBePropagated)
+            mapSyntaxProduction(
+              owner,
+              p,
+              ctx.propagate(mustBePropagated),
+              element,
+              mustBePropagated
+            )
           }
             .foldLeft(Partial(Seq())) { (acc, p) => acc ++ p }
 
@@ -1011,7 +1019,7 @@ object Bnf {
           mapAction(
             mapRule,
             p,
-            mapSyntaxProduction(mapRule, p, ctx, None, first),
+            mapSyntaxProduction(mapRule, p, ctx, element, first),
             element match {
               case Some(value) => Some(DslBody(value))
               case None        => None

@@ -16,12 +16,10 @@
 
 package diesel
 
-import diesel.Bnf.Constraints
 import diesel.Bnf.Constraints.Feature
 import diesel.Errors.{InsertedToken, MissingToken, TokenMutation, UnknownToken}
 import diesel.Lexer.{Eos, Token}
 
-import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 

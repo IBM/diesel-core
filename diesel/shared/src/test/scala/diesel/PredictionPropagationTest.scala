@@ -156,15 +156,20 @@ class PredictionPropagationTest extends FunSuite {
       this.visitedTypes.exists(visited => MyDsl.isSubtypeOf(concept, visited))
     }
 
+  // axiom
+    // value "+" value
+    // foo "xx" bar
+
+
     def continueVisit(
       element: DslElement
     ): Boolean = {
       // println("FW", element)
       // (true, context)
       val fw = element match {
-        case DslInstance(instance)                      => true
-        case DslTarget(concept)                         => true
-        case DslValue(concept)                          => true
+        case DslInstance(_)                      => true
+        case DslTarget(_)                         => true
+        case DslValue(_)                          => true
         case DslBody(DslSyntax(syntax: SyntaxTyped[_])) =>
           if (isContinue(syntax.concept)) {
             // TODO context is first 'hole'
