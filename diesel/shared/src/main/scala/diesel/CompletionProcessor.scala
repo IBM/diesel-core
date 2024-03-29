@@ -149,8 +149,11 @@ case class PredictionState(private val state: State, private val result: Result)
                   value match {
                     case syntax: DslSyntax[_] =>
                       if (recurse(syntax.syntax)) elementsAt(causal, 0, recurse) else Seq(value)
-                    case _: DslBody           =>
-                      elementsAt(causal, 0, recurse)
+                    case DslBody(element)     =>
+                      if (production.symbols.apply(0).isRule)
+                        elementsAt(causal, 0, recurse)
+                      else
+                        Seq(element)
                     case _                    => Seq(value)
                   }
                 case None        => elementsAt(causal, 0, recurse)
