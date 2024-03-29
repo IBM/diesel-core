@@ -126,7 +126,7 @@ class PredictionPropagationTest extends FunSuite {
 
     var visitedTypes = Set.empty[Concept[_]]
 
-    override def beginVisit(predictionRoot: Option[DslElement]): Boolean = {
+    override def beginVisit(predictionState: PredictionState): Boolean = {
       this.visitedTypes = Set(expectedType)
       true
     }

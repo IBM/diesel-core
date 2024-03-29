@@ -17,7 +17,7 @@
 package diesel
 
 import diesel.Bnf.Constraints.Feature
-import diesel.Bnf.{Constraints, DslElement, Token}
+import diesel.Bnf.{Constraints, DslAxiom, DslBody, DslElement, DslSyntax, Production, Token}
 
 import scala.collection.mutable
 
@@ -49,7 +49,7 @@ trait CompletionProvider {
 
 // TODO CompletionComputeFilter[T]
 trait CompletionComputeFilter {
-  def beginVisit(predictionRoot: Option[DslElement]): Boolean
+  def beginVisit(predictionState: PredictionState): Boolean
   def continueVisit(element: DslElement): Boolean
   def endVisit(candidates: Seq[CompletionProposal]): Seq[CompletionProposal]
 }
@@ -91,6 +91,107 @@ class CompletionConfiguration {
     this.computeFilter
 }
 
+case class PredictionState(private val state: State, private val result: Result) {
+  def isAxiom: Boolean =
+    state.production.element match {
+      case Some(element) => element match {
+          case DslAxiom(_) => true
+          case _           => false
+        }
+      case None          => false
+    }
+
+  val subIndex: Option[Int] =
+    if (state.production.symbols(state.dot).isToken)
+      None
+    else
+      Some(state.production.symbols.take(state.dot + 1).count(_.isRule) - 1)
+
+  val leftSubIndex: Option[Int] =
+    if (state.dot == 0)
+      None
+    else {
+      val rulesLeftOfDot = state.production.symbols.take(state.dot).filter(_.isRule)
+      if (rulesLeftOfDot.isEmpty) None else Some(rulesLeftOfDot.length - 1)
+    }
+
+  def element: Option[DslElement] = state.production.getElement
+
+  private def toIndex(subIndex: Int): Int =
+    state.production.symbols.zipWithIndex.filter(_._1.isRule).drop(subIndex).head._2
+
+  def elementsAt(subIndex: Int, recurse: Dsl.Syntax[_] => Boolean = _ => false): Seq[DslElement] =
+    elementsAt(state, toIndex(subIndex), recurse)
+
+  private def elementsAt(
+    state: State,
+    index: Int,
+    recurse: Dsl.Syntax[_] => Boolean
+  ): Seq[DslElement] =
+    if (index < state.dot) {
+      elementsAt(result.backPtrsOf(state), index, state.dot, recurse)
+    } else
+      Seq.empty
+
+  private def elementsAt(
+    backPtrs: Seq[BackPtr],
+    index: Int,
+    dot: Int,
+    recurse: Dsl.Syntax[_] => Boolean
+  ): Seq[DslElement] =
+    if (backPtrs.nonEmpty) {
+      if (index + 1 == dot) {
+        backPtrs flatMap { bp =>
+          bp.causal match {
+            case _: TerminalItem                        => Seq.empty
+            case causal @ State(production, _, _, _, _) => production.element match {
+                case Some(value) =>
+                  value match {
+                    case syntax: DslSyntax[_] =>
+                      if (recurse(syntax.syntax)) elementsAt(causal, 0, recurse) else Seq(value)
+                    case _: DslBody           =>
+                      elementsAt(causal, 0, recurse)
+                    case _                    => Seq(value)
+                  }
+                case None        => elementsAt(causal, 0, recurse)
+              }
+          }
+        }
+      } else {
+        backPtrs flatMap {
+          bp => elementsAt(result.backPtrsOf(bp.predecessor), index, bp.predecessor.dot, recurse)
+        }
+      }
+    } else Seq.empty
+
+  def textsAt(subIndex: Int): Seq[String] = textsAt(state, toIndex(subIndex))
+
+  private def textsAt(state: State, index: Int): Seq[String] =
+    if (index < state.dot) {
+      textsAt(result.backPtrsOf(state), index, state.dot)
+    } else
+      Seq.empty
+
+  private def textsAt(backPtrs: Seq[BackPtr], index: Int, dot: Int): Seq[String] =
+    if (backPtrs.nonEmpty) {
+      if (index + 1 == dot) {
+        backPtrs flatMap { bp =>
+          bp.causal match {
+            case terminal: TerminalItem => Seq(terminal.token.text)
+            case causal: State          =>
+              Seq(Seq.range(causal.begin, causal.end).flatMap(i =>
+                result.chartAt(i).token.map(_.text)
+              ).mkString(" "))
+          }
+        }
+      } else {
+        backPtrs flatMap {
+          bp => textsAt(result.backPtrsOf(bp.predecessor), index, bp.predecessor.dot)
+        }
+      }
+    } else Seq.empty
+}
+
 class CompletionProcessor(
   val result: Result,
   val text: String,
@@ -103,19 +204,13 @@ class CompletionProcessor(
     val delimiters =
       config.map(_.getDelimiters).getOrElse(CompletionConfiguration.defaultDelimiters)
 
-    val c              =
+    val previousChar =
       if (offset >= 1 && offset <= text.length)
         Some(text.charAt(offset - 1))
       else
         None
-    val afterDelimiter = c.exists(delimiters.contains)
 
-//    def hasProvider(state: State): Boolean =
-//      state.dot == 0 && hasProviderFor(state.production)
-
-//    def hasProviderFor(production: Bnf.Production): Boolean =
-//      production.getElement
-//        .flatMap { elem => config.flatMap(_.getProvider(elem)) }.isDefined
+    val afterDelimiter = previousChar.exists(delimiters.contains)
 
     def computeProposalFor(production: Bnf.Production): Boolean = {
       val continueVisit = for {
@@ -126,8 +221,8 @@ class CompletionProcessor(
       continueVisit.getOrElse(true)
     }
 
-    def beginCompute(predictionRoot: Option[DslElement]): Boolean = {
-      config.flatMap(_.getComputeFilter).forall(_.beginVisit(predictionRoot))
+    def beginCompute(predictionState: PredictionState): Boolean = {
+      config.flatMap(_.getComputeFilter).forall(_.beginVisit(predictionState))
     }
 
     def endCompute(candidates: Seq[CompletionProposal]): Seq[CompletionProposal] = {
@@ -197,8 +292,17 @@ class CompletionProcessor(
       } else Seq.empty
     }
 
+    def isAxiom(production: Production): Boolean =
+      production.element match {
+        case Some(element) => element match {
+            case DslAxiom(_) => true
+            case _           => false
+          }
+        case None          => false
+      }
+
     def isPredictionState(s: State): Boolean = {
-      (s.dot == 0 && s.rule.isAxiom) || s.dot > 0
+      (s.dot == 0 && isAxiom(s.production)) || s.dot > 0
     }
 
     val navigator = navigatorFactory(result)
@@ -215,7 +319,7 @@ class CompletionProcessor(
               .filterNot(_.kind(result) == StateKind.ErrorRecovery)
               .filter(isPredictionState)
               .flatMap { s =>
-                if (beginCompute(s.production.getElement)) {
+                if (beginCompute(PredictionState(s, result))) {
                   val candidates = computeAllProposals(
                     s.production,
                     s.dot,
@@ -242,29 +346,4 @@ class CompletionProcessor(
       }
       .distinct
   }
-
-  def elementsAt(state: State, index: Int): Seq[DslElement] =
-    if (index < state.dot) {
-      visitAt(result.backPtrsOf(state), index, state.dot)
-    } else
-      Seq.empty
-
-  def visitAt(backPtrs: Seq[BackPtr], index: Int, dot: Int): Seq[DslElement] =
-    if (backPtrs.nonEmpty) {
-      if (index + 1 == dot) {
-        backPtrs flatMap { bp =>
-          bp.causal match {
-            case _: TerminalItem                        => Seq.empty
-            case causal @ State(production, _, _, _, _) => production.element match {
-                case Some(value) => Seq(value)
-                case None        => elementsAt(causal, index)
-              }
-          }
-        }
-      } else {
-        backPtrs flatMap {
-          bp => visitAt(result.backPtrsOf(bp.predecessor), index, bp.predecessor.dot)
-        }
-      }
-    } else Seq.empty
 }
