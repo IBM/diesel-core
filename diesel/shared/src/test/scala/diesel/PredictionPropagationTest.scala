@@ -17,7 +17,16 @@
 package diesel
 
 import diesel.AstHelpers.predict
-import diesel.Dsl.{Axiom, Concept, Instance, Syntax, SyntaxGeneric}
+import diesel.Dsl.{
+  Axiom,
+  Concept,
+  Expressions,
+  Identifiers,
+  Instance,
+  Syntax,
+  SyntaxGeneric,
+  SyntaxTyped
+}
 import munit.FunSuite
 import diesel.Bnf.{DslAxiom, DslElement}
 import diesel.Bnf.DslInstance
@@ -25,8 +34,8 @@ import diesel.Bnf.DslTarget
 import diesel.Bnf.DslValue
 import diesel.Bnf.DslSyntax
 import diesel.Bnf.DslBody
-import diesel.Dsl.SyntaxTyped
-import diesel.Dsl.Identifiers
+
+import scala.util.matching.Regex
 
 class PredictionPropagationTest extends FunSuite {
 
@@ -101,19 +110,38 @@ class PredictionPropagationTest extends FunSuite {
       }
     )
 
-    def identRegex                           = "[a-zA-Z_\\\\$][a-zA-Z0-9_\\\\$]*".r
+    def Variables: Expressions.Custom = Expressions.Custom("Variables")
+
+    override def defaultExprs: Set[Expressions.Type] = Set(
+      Expressions.Values,
+      Expressions.Instances,
+      Expressions.Syntaxes,
+      Expressions.Targets,
+      Variables
+    )
+
+    def identRegex: Regex                    = "[a-zA-Z_\\\\$][a-zA-Z0-9_\\\\$]*".r
     override def identScanner: Lexer.Scanner = identRegex
 
-    val variableRef: Syntax[AValue] = syntax(value)(
-      idOrKeyword map {
-        case (ctx, name) =>
-          if (Set("true", "false").contains(name.text)) {
-            // ctx.abort()
-            ctx.addMarkers(createMarker(NotAVariable, ctx.offset, ctx.length))
-          }
-          AVarRef(name.text)
-      }
-    )
+    val variableId = "variable tradfs"
+
+    val variableRef: SyntaxGeneric[AValue] = {
+      syntaxGeneric[AValue]
+        .accept((_: Dsl.Concept[AValue], types: Dsl.Expressions.Types, _: Dsl) =>
+          types.has(Variables)
+        ) {
+          builder =>
+            builder.userData(variableId) {
+              idOrKeyword map {
+                case (ctx, name) =>
+                  if (Set("true", "false").contains(name.text)) {
+                    ctx.addMarkers(createMarker(NotAVariable, ctx.offset, ctx.length))
+                  }
+                  AVarRef(name.text)
+              }
+            }
+        }
+    }
 
     object NotAVariable extends MarkerMessage {
       def format(locale: String): String = ???
@@ -202,10 +230,10 @@ class PredictionPropagationTest extends FunSuite {
         println("FW begin state", predictionState)
 
         val accept =
-          predictionState.leftSubIndex.map { i =>
+          predictionState.leftSubIndex.forall { i =>
             val elements        = predictionState.elementsAt(i)
             val allVariableRefs = elements.forall {
-              case DslSyntax(syntax) => syntax == MyDsl.variableRef
+              case DslSyntax(syntax) => syntax.userData.contains(MyDsl.variableId)
               case _                 => false
             }
             if (allVariableRefs) {
@@ -223,7 +251,7 @@ class PredictionPropagationTest extends FunSuite {
               // }.getOrElse(false)
               variableType.isDefined
             } else true
-          }.getOrElse(true)
+          }
         if (accept) {
           val propagate = predictionState.element match {
             case Some(DslSyntax(syntax)) if syntax == MyDsl.is => true
@@ -235,7 +263,7 @@ class PredictionPropagationTest extends FunSuite {
               .map(_ =>
                 predictionState.elementsAt(0)
                   .filter {
-                    case DslSyntax(syntax) => syntax != MyDsl.variableRef
+                    case DslSyntax(syntax) => !syntax.userData.contains(MyDsl.variableId)
                     case _                 => true
                   }
                   .flatMap(_.elementType).map(_.concept)
@@ -282,7 +310,7 @@ class PredictionPropagationTest extends FunSuite {
             }
             if (syntax == MyDsl.concat) {
               this.visitedTypes = this.visitedTypes + MyDsl.number
-            } else if (syntax == MyDsl.variableRef) {
+            } else if (syntax.userData.contains(MyDsl.variableId)) {
               // TODO infer variable type?
             }
             true
@@ -318,8 +346,29 @@ class PredictionPropagationTest extends FunSuite {
 //      val fw3 = fw2.flatten.map(_.concept.name)
 //      println("FW3", fw3, this.visitedTypes.map(_.name))
 
-      candidates
+      var mustAddX = false
+      val res      = candidates
         .filter(c => c.element.exists(_.elementType.exists(t => isExpected(t.concept))))
+        .filter(p =>
+          p.element match {
+            case Some(s @ DslSyntax(syntax)) =>
+              if (syntax.userData.contains(MyDsl.variableId))
+                if (
+                  s.elementType.exists(t => t.concept == MyDsl.number || t.concept == MyDsl.value)
+                ) {
+                  mustAddX = true
+                  false
+                } else
+                  false
+              else true
+            case _                           =>
+              true
+          }
+        )
+      if (mustAddX) {
+        res ++ Seq(CompletionProposal(None, "AVarRef(x)", None, None, None))
+      } else
+        res
     }
   }
 
@@ -340,7 +389,8 @@ class PredictionPropagationTest extends FunSuite {
       text.length,
       Seq(
         "ANumberValue(0)",
-        "AStringValue()"
+        "AStringValue()",
+        "AVarRef(x)"
       )
     )
   }
@@ -366,7 +416,8 @@ class PredictionPropagationTest extends FunSuite {
       text.length,
       Seq(
         "ANumberValue(0)",
-        "AStringValue()"
+        "AStringValue()",
+        "AVarRef(x)"
       )
     )
   }
@@ -395,7 +446,8 @@ class PredictionPropagationTest extends FunSuite {
       text.length,
       Seq(
         "ANumberValue(0)",
-        "AStringValue()"
+        "AStringValue()",
+        "AVarRef(x)"
       )
     )
   }
@@ -407,7 +459,8 @@ class PredictionPropagationTest extends FunSuite {
       text,
       text.length,
       Seq(
-        "ANumberValue(0)"
+        "ANumberValue(0)",
+        "AVarRef(x)"
       )
     )
   }
@@ -438,8 +491,6 @@ class PredictionPropagationTest extends FunSuite {
         // "?:",
         "is",
         "?:"
-        // TODO
-        // "+"
       )
     )
   }
