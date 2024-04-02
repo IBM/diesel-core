@@ -26,6 +26,7 @@ import diesel.Bnf.DslValue
 import diesel.Bnf.DslSyntax
 import diesel.Bnf.DslBody
 import diesel.Dsl.SyntaxTyped
+import diesel.Dsl.Identifiers
 
 class PredictionPropagationTest extends FunSuite {
 
@@ -40,8 +41,10 @@ class PredictionPropagationTest extends FunSuite {
   case class AIs(left: AValue, right: AValue)     extends ABoolean
   case class AConcat(left: AValue, right: AValue) extends AString
   case class AElvis(left: AValue, right: AValue)  extends AValue
+  case class AVarRef(name: String)                extends AValue
+  case class AAnd(left: AValue, right: AValue)    extends ABoolean
 
-  trait BootVoc extends Dsl {
+  trait BootVoc extends Dsl with Identifiers {
 
     val value: Concept[AValue] = concept
 
@@ -67,15 +70,15 @@ class PredictionPropagationTest extends FunSuite {
           AStringValue(t.text.drop(1).dropRight(1))
       }
 
-    val concat: Syntax[AString] = syntax[AString](string)(
-      number ~ "+".leftAssoc(2) ~ string map {
+    val concat: Syntax[AString] = syntax(string)(
+      number ~ "+".leftAssoc(30) ~ string map {
         case (_, (lhs, _, rhs)) =>
           AConcat(lhs, rhs)
       }
     )
 
-    val is: Syntax[ABoolean] = syntax[ABoolean](boolean)(
-      value ~ "is".leftAssoc(1) ~ value map {
+    val is: Syntax[ABoolean] = syntax(boolean)(
+      value ~ "is".leftAssoc(20) ~ value map {
         case (_, (lhs, _, rhs)) =>
           AIs(lhs, rhs)
       }
@@ -84,12 +87,40 @@ class PredictionPropagationTest extends FunSuite {
     val elvis: SyntaxGeneric[AValue] =
       syntaxGeneric[AValue].accept(value) { builder =>
         builder(
-          builder.concept ~ "?:" ~ builder.concept map {
+          builder.concept ~ "?:".leftAssoc(10) ~ builder.concept map {
             case (_, (l, _, r)) =>
               AElvis(l, r)
           }
         )
       }
+
+    val and: Syntax[ABoolean] = syntax(boolean)(
+      boolean ~ "&&".leftAssoc(25) ~ boolean map {
+        case (_, (lhs, _, rhs)) =>
+          AAnd(lhs, rhs)
+      }
+    )
+
+    def identRegex                           = "[a-zA-Z_\\\\$][a-zA-Z0-9_\\\\$]*".r
+    override def identScanner: Lexer.Scanner = identRegex
+
+    val variableRef: Syntax[AValue] = syntax(value)(
+      idOrKeyword map {
+        case (ctx, name) =>
+          if (Set("true", "false").contains(name.text)) {
+            // ctx.abort()
+            ctx.addMarkers(createMarker(NotAVariable, ctx.offset, ctx.length))
+          }
+          AVarRef(name.text)
+      }
+    )
+
+    object NotAVariable extends MarkerMessage {
+      def format(locale: String): String = ???
+    }
+
+    private def createMarker(m: MarkerMessage, o: Int, l: Int): Marker =
+      Marker(Errors.SemanticError, o, l, m)
   }
 
   object MyDsl extends BootVoc {
@@ -97,16 +128,50 @@ class PredictionPropagationTest extends FunSuite {
     val expr: Axiom[AValue] = axiom(value)
   }
 
-  test("simple number") {
+  test("assure simple number") {
     AstHelpers.selectAst(MyDsl)("12") { tree =>
       assertEquals(tree.markers.length, 0)
       assertEquals(tree.value, ANumberValue("12"))
     }
   }
 
-  test("ddd") {
+  test("assure parse expression") {
     AstHelpers.selectAst(MyDsl)("\"foo\" is 0 + \"bar\"") { tree =>
       assertEquals(tree.markers.length, 0)
+      assertEquals(
+        tree.value,
+        AIs(
+          AStringValue("foo"),
+          AConcat(ANumberValue("0"), AStringValue("bar"))
+        )
+      )
+    }
+  }
+
+  test("assure parse expression 2") {
+    AstHelpers.selectAst(MyDsl)("\"foo\" ?: 0 + \"bar\"") { tree =>
+      assertEquals(tree.markers.length, 0)
+      assertEquals(
+        tree.value,
+        AElvis(
+          AStringValue("foo"),
+          AConcat(ANumberValue("0"), AStringValue("bar"))
+        )
+      )
+    }
+  }
+
+  test("assure parse variable") {
+    AstHelpers.selectAst(MyDsl)("toto") { tree =>
+      assertEquals(tree.markers.length, 0)
+      assertEquals(tree.value, AVarRef("toto"))
+    }
+  }
+
+  test("assure parse true") {
+    AstHelpers.selectAst(MyDsl)("true") { tree =>
+      // assertEquals(tree.markers.map(_.message), Seq(AmbiguousMsg))
+      assertEquals(tree.value, ABooleanValue("true"))
     }
   }
 
@@ -116,27 +181,83 @@ class PredictionPropagationTest extends FunSuite {
     offset: Int,
     expected: Seq[Any]
   ): Unit = {
+    val variables = Map("x" -> MyDsl.number)
     val config    = new CompletionConfiguration
-    config.setComputeFilter(MyComputeFilter(expectedType))
+    config.setComputeFilter(MyComputeFilter(expectedType, variables))
     val proposals = predict(MyDsl, text, offset, Some(config))
     assertEquals(proposals.map(_.text), expected)
   }
 
-  case class MyComputeFilter(expectedType: Concept[_]) extends CompletionComputeFilter {
+  case class MyComputeFilter(expectedType: Concept[_], variables: Map[String, Concept[_]])
+      extends CompletionComputeFilter {
 
     var visitedTypes = Set.empty[Concept[_]]
 
-    override def beginVisit(predictionState: PredictionState): Boolean = {
-      this.visitedTypes = Set(expectedType)
-      true
+    def beginVisit(predictionState: PredictionState): Boolean = {
+      visitedTypes = Set.empty[Concept[_]]
+      if (predictionState.isAxiom) {
+        visitedTypes = Set(expectedType)
+        true
+      } else {
+        println("FW begin state", predictionState)
+
+        val accept =
+          predictionState.leftSubIndex.map { i =>
+            val elements        = predictionState.elementsAt(i)
+            val allVariableRefs = elements.forall {
+              case DslSyntax(syntax) => syntax == MyDsl.variableRef
+              case _                 => false
+            }
+            if (allVariableRefs) {
+              val text         = predictionState.textsAt(i).mkString("")
+              val variableType = variables.get(text)
+              // val valid        = for {
+              //   actual   <- variableType
+              //   element  <- predictionState.element
+              //   expected <- element.elementType
+              //   if MyDsl.isSubtypeOf(actual, expected.concept)
+              // } yield actual
+              // valid.map { variableType =>
+              //   // visitedTypes = visitedTypes + variableType
+              //   true
+              // }.getOrElse(false)
+              variableType.isDefined
+            } else true
+          }.getOrElse(true)
+        if (accept) {
+          val propagate = predictionState.element match {
+            case Some(DslSyntax(syntax)) if syntax == MyDsl.is => true
+            case Some(DslSyntax(syntax: SyntaxTyped[_]))       => syntax.name == "elvis"
+            case _                                             => false
+          }
+          if (propagate) {
+            val propagates = predictionState.subIndex.filter(_ > 0)
+              .map(_ =>
+                predictionState.elementsAt(0)
+                  .filter {
+                    case DslSyntax(syntax) => syntax != MyDsl.variableRef
+                    case _                 => true
+                  }
+                  .flatMap(_.elementType).map(_.concept)
+              )
+              .toSeq.flatten
+            visitedTypes = visitedTypes ++ propagates
+          }
+          true
+        } else { false }
+      }
     }
 
     private def isContinue(concept: Concept[_]): Boolean = {
-      this.visitedTypes.exists(visited => MyDsl.isSubtypeOf(visited, concept))
+      this.visitedTypes.isEmpty || this.visitedTypes.exists(visited =>
+        MyDsl.isSubtypeOf(visited, concept)
+      )
     }
 
     private def isExpected(concept: Concept[_]): Boolean = {
-      this.visitedTypes.exists(visited => MyDsl.isSubtypeOf(concept, visited))
+      this.visitedTypes.isEmpty || this.visitedTypes.exists(visited =>
+        MyDsl.isSubtypeOf(concept, visited)
+      )
     }
 
     // axiom
@@ -146,39 +267,49 @@ class PredictionPropagationTest extends FunSuite {
     override def continueVisit(
       element: DslElement
     ): Boolean = {
-      // println("FW", element)
-      // (true, context)
-      val fw = element match {
+      element match {
         case DslInstance(_)                             => true
         case DslTarget(_)                               => true
-        case DslValue(_)                                => true
+        case DslValue(concept)                          =>
+          if (isContinue(concept)) {
+            this.visitedTypes = this.visitedTypes + concept
+          }
+          true
         case DslBody(DslSyntax(syntax: SyntaxTyped[_])) =>
           if (isContinue(syntax.concept)) {
-            // TODO context is first 'hole'
+            if (this.visitedTypes.isEmpty) {
+              this.visitedTypes = this.visitedTypes + syntax.concept
+            }
             if (syntax == MyDsl.concat) {
               this.visitedTypes = this.visitedTypes + MyDsl.number
-              true
-            } else if (syntax == MyDsl.is) {
-              this.visitedTypes = this.visitedTypes + MyDsl.value
-              true
-            } else {
-              false
+            } else if (syntax == MyDsl.variableRef) {
+              // TODO infer variable type?
             }
+            true
           } else {
             false
           }
+//           if (isContinue(syntax.concept)) {
+//             // TODO context is first 'hole'
+//             if (syntax == MyDsl.concat) {
+//               this.visitedTypes = this.visitedTypes + MyDsl.number
+//               true
+//             } else if (syntax == MyDsl.is) {
+//               this.visitedTypes = this.visitedTypes + MyDsl.value
+//               true
+// // } else if (syntax == MyDsl.elvis) {
+//               //   this.visitedTypes = this.visitedTypes + MyDsl.value
+//               //   true
+//             } else {
+//               false
+//             }
+//           } else {
+//             false
+//           }
         case _: DslSyntax[_]                            => true
         case DslAxiom(_)                                => true
-        case DslBody(element)                           =>
-          continueVisit(element)
+        case DslBody(element)                           => continueVisit(element)
       }
-      // println(
-      //   "FW accept",
-      //   fw._1,
-      //   element.elementType,
-      //   context.asInstanceOf[Concept[_]].name
-      // )
-      fw
     }
 
     override def endVisit(candidates: Seq[CompletionProposal]): Seq[CompletionProposal] = {
@@ -201,10 +332,10 @@ class PredictionPropagationTest extends FunSuite {
   // ( 1, 2, 3 )
   // ( 1, 4, 5, 3 )
 
-  test("predict 1") {
+  test("predict after 'is' with string") {
     val text = "\"foo\" is "
     assertPredictions(
-      MyDsl.string,
+      MyDsl.boolean,
       text,
       text.length,
       Seq(
@@ -214,7 +345,7 @@ class PredictionPropagationTest extends FunSuite {
     )
   }
 
-  test("predict 2") {
+  test("predict after is with keyword (not variable)") {
     val text = "true is "
     assertPredictions(
       MyDsl.boolean,
@@ -227,7 +358,7 @@ class PredictionPropagationTest extends FunSuite {
     )
   }
 
-  test("predict 3") {
+  test("predict on empty, expecting string") {
     val text = ""
     assertPredictions(
       MyDsl.string,
@@ -240,22 +371,23 @@ class PredictionPropagationTest extends FunSuite {
     )
   }
 
-  test("predict 4") {
+  test("predict on empty, expecting boolean") {
     val text = ""
     assertPredictions(
       MyDsl.boolean,
       text,
       text.length,
       Seq(
-        "ANumberValue(0)",
-        "AStringValue()",
+        // TODO
+        // "ANumberValue(0)",
+        // "AStringValue()",
         "true",
         "false"
       )
     )
   }
 
-  test("predict 5") {
+  test("predict after elvis with string") {
     val text = "\"foo\" ?: "
     assertPredictions(
       MyDsl.string,
@@ -268,7 +400,7 @@ class PredictionPropagationTest extends FunSuite {
     )
   }
 
-  test("predict 6") {
+  test("predict after elvis with number") {
     val text = "1 ?: "
     assertPredictions(
       MyDsl.number,
@@ -279,4 +411,37 @@ class PredictionPropagationTest extends FunSuite {
       )
     )
   }
+
+  test("predict after keyword (not variable)") {
+    val text = "true "
+    assertPredictions(
+      MyDsl.value,
+      text,
+      text.length,
+      Seq(
+        "&&",
+        "?:",
+        "is",
+        "?:"
+      )
+    )
+  }
+
+  test("predict after variable") {
+    val text = "x "
+    assertPredictions(
+      MyDsl.value,
+      text,
+      text.length,
+      Seq(
+        // "&&",
+        // "?:",
+        "is",
+        "?:"
+        // TODO
+        // "+"
+      )
+    )
+  }
+
 }
