@@ -138,7 +138,7 @@ class PredictionPropagationTest extends FunSuite {
             builder.userData(variableId) {
               idOrKeyword map {
                 case (ctx, name) =>
-                  if (!Set("x", "toto").contains(name.text)) {
+                  if (!Set("x", "toto").contains(name.text)) { // TODO variable scope and check type
                     ctx.addMarkers(createMarker(NotAVariable, ctx.offset, ctx.length))
                   }
                   AVarRef(name.text)
@@ -246,8 +246,6 @@ class PredictionPropagationTest extends FunSuite {
         visitedTypes = Set(expectedType)
         true
       } else {
-        println("FW begin state", predictionState)
-
         val accept =
           predictionState.leftSubIndex.forall { i =>
             val elements        = predictionState.elementsAt(i)
@@ -304,56 +302,30 @@ class PredictionPropagationTest extends FunSuite {
       element: DslElement
     ): Boolean = {
       element match {
-        case DslInstance(_)                             => true
-        case DslTarget(_)                               => true
-        case DslValue(concept)                          =>
-          if (isContinue(concept)) {
-            this.visitedTypes = this.visitedTypes + concept
-          }
-          true
-        case DslBody(DslSyntax(syntax: SyntaxTyped[_])) =>
+        case DslInstance(_)                    => true
+        case DslTarget(_)                      => true
+        case DslValue(_)                       => true
+        case DslSyntax(syntax: SyntaxTyped[_]) =>
           if (isContinue(syntax.concept)) {
-            if (this.visitedTypes.isEmpty) {
-              this.visitedTypes = this.visitedTypes + syntax.concept
-            }
-            if (syntax == MyDsl.concat) {
-              this.visitedTypes = this.visitedTypes + MyDsl.number
-            } else if (syntax.userData.contains(MyDsl.variableId)) {
-              // TODO infer variable type?
+            if (visitedTypes.nonEmpty) {
+              if (syntax == MyDsl.is) {
+                this.visitedTypes = this.visitedTypes + MyDsl.value
+              }
+              if (syntax == MyDsl.concat) {
+                this.visitedTypes = this.visitedTypes + MyDsl.number
+              }
             }
             true
           } else {
             false
           }
-//           if (isContinue(syntax.concept)) {
-//             // TODO context is first 'hole'
-//             if (syntax == MyDsl.concat) {
-//               this.visitedTypes = this.visitedTypes + MyDsl.number
-//               true
-//             } else if (syntax == MyDsl.is) {
-//               this.visitedTypes = this.visitedTypes + MyDsl.value
-//               true
-// // } else if (syntax == MyDsl.elvis) {
-//               //   this.visitedTypes = this.visitedTypes + MyDsl.value
-//               //   true
-//             } else {
-//               false
-//             }
-//           } else {
-//             false
-//           }
-        case _: DslSyntax[_]                            => true
-        case DslAxiom(_)                                => true
-        case DslBody(element)                           => continueVisit(element)
+        case _: DslSyntax[_]                   => true
+        case DslAxiom(_)                       => true
+        case DslBody(element)                  => continueVisit(element)
       }
     }
 
     override def endVisit(candidates: Seq[CompletionProposal]): Seq[CompletionProposal] = {
-//      val fw1 = candidates.map(_.element)
-//      val fw2 = fw1.flatten.map(_.elementType)
-//      val fw3 = fw2.flatten.map(_.concept.name)
-//      println("FW3", fw3, this.visitedTypes.map(_.name))
-
       var mustAddX = false
       val res      = candidates
         .filter(c => c.element.exists(_.elementType.exists(t => isExpected(t.concept))))
@@ -403,6 +375,7 @@ class PredictionPropagationTest extends FunSuite {
     )
   }
 
+  // TODO fix
   test("predict after is with keyword (not variable)") {
     val text = "true is "
     assertPredictions(
@@ -437,11 +410,11 @@ class PredictionPropagationTest extends FunSuite {
       text,
       text.length,
       Seq(
-        // TODO
-        // "ANumberValue(0)",
-        // "AStringValue()",
+        "ANumberValue(0)",
+        "AStringValue()",
         "true",
-        "false"
+        "false",
+        "AVarRef(x)"
       )
     )
   }
