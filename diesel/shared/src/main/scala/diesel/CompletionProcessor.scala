@@ -47,7 +47,6 @@ trait CompletionProvider {
   ): Seq[CompletionProposal]
 }
 
-// TODO CompletionComputeFilter[T]
 trait CompletionComputeFilter {
   def beginVisit(predictionState: PredictionState): Boolean
   def continueVisit(element: DslElement): Boolean
@@ -250,12 +249,9 @@ class CompletionProcessor(
       production: Bnf.Production,
       dot: Int,
       visited: Set[Bnf.NonTerminal],
-      stack: Seq[Bnf.NonTerminal],
       from: Int,
       feature: Feature,
-      tree: GenericTree,
-      offset: Int,
-      node: Option[GenericNode]
+      providedProposals: DslElement => Option[Seq[CompletionProposal]]
     ): Seq[CompletionProposal] = {
       if (dot < production.length) {
         production.symbols(dot) match {
@@ -269,23 +265,13 @@ class CompletionProcessor(
                 if (newFeature != Constraints.Incompatible) {
                   val continueVisit = computeProposalFor(p)
                   if (continueVisit) {
-                    val provided =
-                      (for {
-                        element  <- p.element
-                        c        <- config
-                        provider <- c.getProvider(element)
-                      } yield provider.getProposals(Some(element), tree, offset, node))
-
-                    provided.getOrElse(computeAllProposals(
+                    p.element.flatMap(providedProposals).getOrElse(computeAllProposals(
                       p,
                       0,
                       newVisited,
-                      stack :+ rule,
                       from,
                       newFeature,
-                      tree,
-                      offset,
-                      node
+                      providedProposals
                     ))
                   } else Seq.empty
                 } else Seq.empty
@@ -308,6 +294,13 @@ class CompletionProcessor(
       (s.dot == 0 && isAxiom(s.production)) || s.dot > 0
     }
 
+    def providedProposals(
+      tree: GenericTree,
+      offset: Int,
+      node: Option[GenericNode]
+    )(element: DslElement): Option[Seq[CompletionProposal]] =
+      config.flatMap(_.getProvider(element)).map(_.getProposals(Some(element), tree, offset, node))
+
     val navigator = navigatorFactory(result)
     navigator.toIterator
       .toSeq
@@ -327,12 +320,9 @@ class CompletionProcessor(
                     s.production,
                     s.dot,
                     Set.empty,
-                    Seq.empty,
                     s.dot,
                     s.feature,
-                    tree,
-                    offset,
-                    node
+                    providedProposals(tree, offset, node)
                   )
                   endCompute(candidates)
                 } else {
