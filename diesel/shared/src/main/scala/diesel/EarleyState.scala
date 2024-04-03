@@ -140,12 +140,6 @@ private[diesel] case class State(
     if (production.symbols.length == dot)
       builder.append(". ")
     builder.append("[").append(begin).append(", ").append(end).append("] ").append(feature)
-    //    states.get(this).foreach(ctx => {
-    //        builder.append("{ ")
-    //
-    //        builder.append("}")
-    //      }
-    //    )
     builder.toString
   }
 
@@ -160,13 +154,14 @@ private[diesel] class Chart(
     this.token = Some(token)
   }
 
-  private val _activeStates: ArrayBuffer[State]       = ArrayBuffer()
-  private val _notCompletedStates: ArrayBuffer[State] = ArrayBuffer()
+  private val _activeRules: mutable.Map[Bnf.NonTerminal, Seq[State]] = mutable.Map()
+  private val _notCompletedStates: ArrayBuffer[State]                = ArrayBuffer()
 
   def `+=`(state: State): Chart = {
     states += state
     if (!state.isCompleted && state.nextSymbol.isRule) {
-      _activeStates += state
+      val rule = state.nextSymbol.asInstanceOf[Bnf.NonTerminal]
+      _activeRules.put(rule, _activeRules.getOrElse(rule, Seq.empty) ++ Seq(state))
     }
     if (!state.isCompleted) {
       _notCompletedStates += state
@@ -180,8 +175,8 @@ private[diesel] class Chart(
     states.foreach(state => processingQueue.enqueue(state))
   }
 
-  def activeStates(predicate: State => Boolean): Seq[State] = {
-    _activeStates.filter(predicate).toSeq
+  def activeRules(rule: Bnf.NonTerminal): Seq[State] = {
+    _activeRules.getOrElse(rule, Seq.empty)
   }
 
   def notCompletedStates: Seq[State] = {
@@ -433,7 +428,7 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
     currentChart = None
   }
 
-  private def success(length: Int): Boolean = states.get(successState(length)).isDefined
+  private def success(length: Int): Boolean = states.contains(successState(length))
 
   def success: Boolean = success(length - 1)
 
@@ -452,4 +447,7 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
   def getStates: Seq[State] = states.keys.toSeq
 
   def getCharts: Seq[Chart] = charts.toSeq
+
+  private[diesel] def backPtrsOf(state: State): Seq[BackPtr] =
+    contextOf(state).fold[Seq[BackPtr]](Seq.empty)(ctx => ctx.backPtrs.toSeq)
 }

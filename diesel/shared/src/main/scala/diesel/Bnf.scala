@@ -137,19 +137,42 @@ object Bnf {
 
   type Action = (Context, Seq[Any]) => Any
 
-  sealed trait DslElement
+  case class ElementType(concept: Concept[_], multiple: Boolean = false)
 
-  case class DslAxiom[T](axiom: Dsl.Axiom[T]) extends DslElement
+  sealed trait DslElement {
+    def elementType: Option[ElementType]
+  }
 
-  case class DslValue[T](concept: Concept[T]) extends DslElement
+  case class DslAxiom[T](axiom: Dsl.Axiom[T]) extends DslElement {
+    override def elementType: Option[ElementType] = None
+  }
 
-  case class DslTarget[T](concept: Concept[T]) extends DslElement
+  case class DslValue[T](concept: Concept[T]) extends DslElement {
+    override def elementType: Option[ElementType] = Some(ElementType(concept))
+  }
 
-  case class DslInstance[T](instance: Instance[T]) extends DslElement
+  case class DslTarget[T](concept: Concept[T]) extends DslElement {
+    override def elementType: Option[ElementType] = Some(ElementType(concept))
+  }
 
-  case class DslSyntax[T](syntax: Syntax[T]) extends DslElement
+  case class DslInstance[T](instance: Instance[T]) extends DslElement {
+    override def elementType: Option[ElementType] = Some(ElementType(instance.concept))
+  }
 
-  case class DslBody(element: DslElement) extends DslElement
+  case class DslSyntax[T](syntax: Syntax[T]) extends DslElement {
+    override def elementType: Option[ElementType] = syntax match {
+      case Dsl.SyntaxUntyped(_, _, _, _)              =>
+        None
+      case Dsl.SyntaxTyped(_, concept, _, _, _, _, _) =>
+        Some(ElementType(concept))
+      case Dsl.SyntaxMulti(_, concept, _, _, _, _)    =>
+        Some(ElementType(concept, multiple = true))
+    }
+  }
+
+  case class DslBody(element: DslElement) extends DslElement {
+    override def elementType: Option[ElementType] = element.elementType
+  }
 
   class Production(
     var rule: Option[NonTerminal] = None,
@@ -598,7 +621,8 @@ object Bnf {
       owner: Rule,
       ctx: GrammarContext,
       text: String,
-      v: Verbalizer
+      v: Verbalizer,
+      element: Option[DslElement]
     ): Partial = {
       val context     = VerbalizationContext(
         article = ctx.article.getOrElse(NoArticle),
@@ -616,7 +640,8 @@ object Bnf {
         (_: Context, args: Any) => {
           args
         },
-        verbalized
+        verbalized,
+        element
       )
       Partial(Seq(subjectRule))
     }
@@ -669,7 +694,7 @@ object Bnf {
           // verbalize str and split
           verbalizations(dsl) match {
             case Some(v) =>
-              verbalizeSubject(owner, ctx, str.text, v.verbalizer)
+              verbalizeSubject(owner, ctx, str.text, v.verbalizer, element)
             case None    =>
               splitText(str.text)
           }
@@ -931,7 +956,13 @@ object Bnf {
         case SPAndN(ps) =>
           ps.zipWithIndex.map { case (p, n) =>
             val mustBePropagated = n == 0 && first
-            mapSyntaxProduction(owner, p, ctx.propagate(mustBePropagated), None, mustBePropagated)
+            mapSyntaxProduction(
+              owner,
+              p,
+              ctx.propagate(mustBePropagated),
+              element,
+              mustBePropagated
+            )
           }
             .foldLeft(Partial(Seq())) { (acc, p) => acc ++ p }
 
@@ -988,7 +1019,7 @@ object Bnf {
           mapAction(
             mapRule,
             p,
-            mapSyntaxProduction(mapRule, p, ctx, None, first),
+            mapSyntaxProduction(mapRule, p, ctx, element, first),
             element match {
               case Some(value) => Some(DslBody(value))
               case None        => None

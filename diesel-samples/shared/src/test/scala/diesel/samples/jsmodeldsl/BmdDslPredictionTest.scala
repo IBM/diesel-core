@@ -121,7 +121,13 @@ class BmdDslPredictionTest extends FunSuite {
     assertPredictions(
       "a shopping cart",
       15,
-      Seq("has", "can be", "is a", "can be one of", ".")
+      Seq(
+        "has",
+        "can be",
+        "can be one of",
+        "is a",
+        "."
+      )
     )
   }
 
@@ -169,13 +175,13 @@ class BmdDslPredictionTest extends FunSuite {
         |""".stripMargin,
       11,
       Seq(
-        "concept",
         "Bar",
         "Gnu",
+        "concept",
         "has",
         "can be",
-        "is a",
         "can be one of",
+        "is a",
         "."
       )
     )
@@ -200,12 +206,12 @@ class BmdDslPredictionTest extends FunSuite {
         |a Gnu is a xx.""".stripMargin,
       17 + 19 + 2 + 11,
       Seq(
-        "concept",
         "Foo",
+        "concept",
         "has",
         "can be",
-        "is a",
-        "can be one of"
+        "can be one of",
+        "is a"
       )
     )
   }
