@@ -302,10 +302,10 @@ class PredictionPropagationTest extends FunSuite {
       element: DslElement
     ): Boolean = {
       element match {
-        case DslInstance(_)                    => true
-        case DslTarget(_)                      => true
-        case DslValue(_)                       => true
-        case DslSyntax(syntax: SyntaxTyped[_]) =>
+        case DslInstance(_)                             => true
+        case DslTarget(_)                               => true
+        case DslValue(_)                                => true
+        case DslBody(DslSyntax(syntax: SyntaxTyped[_])) =>
           if (isContinue(syntax.concept)) {
             if (visitedTypes.nonEmpty) {
               if (syntax == MyDsl.is) {
@@ -319,9 +319,9 @@ class PredictionPropagationTest extends FunSuite {
           } else {
             false
           }
-        case _: DslSyntax[_]                   => true
-        case DslAxiom(_)                       => true
-        case DslBody(element)                  => continueVisit(element)
+        case _: DslSyntax[_]                            => true
+        case DslAxiom(_)                                => true
+        case DslBody(element)                           => continueVisit(element)
       }
     }
 
@@ -375,7 +375,6 @@ class PredictionPropagationTest extends FunSuite {
     )
   }
 
-  // TODO fix
   test("predict after is with keyword (not variable)") {
     val text = "true is "
     assertPredictions(
