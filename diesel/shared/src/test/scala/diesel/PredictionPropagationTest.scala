@@ -28,12 +28,16 @@ import diesel.Dsl.{
   SyntaxTyped
 }
 import munit.FunSuite
-import diesel.Bnf.{DslAxiom, DslElement}
-import diesel.Bnf.DslInstance
-import diesel.Bnf.DslTarget
-import diesel.Bnf.DslValue
-import diesel.Bnf.DslSyntax
-import diesel.Bnf.DslBody
+import diesel.Bnf.{
+  DslAxiom,
+  DslBody,
+  DslElement,
+  DslInstance,
+  DslSyntax,
+  DslTarget,
+  DslValue,
+  ElementType
+}
 
 import scala.util.matching.Regex
 
@@ -134,7 +138,7 @@ class PredictionPropagationTest extends FunSuite {
             builder.userData(variableId) {
               idOrKeyword map {
                 case (ctx, name) =>
-                  if (Set("true", "false").contains(name.text)) {
+                  if (!Set("x", "toto").contains(name.text)) {
                     ctx.addMarkers(createMarker(NotAVariable, ctx.offset, ctx.length))
                   }
                   AVarRef(name.text)
@@ -221,6 +225,21 @@ class PredictionPropagationTest extends FunSuite {
 
     var visitedTypes = Set.empty[Concept[_]]
 
+    def isDeclaredVariable(
+      subIndex: Int,
+      e: DslElement,
+      predictionState: PredictionState
+    ): Boolean = {
+      val texts = predictionState.textsAt(subIndex)
+      e.elementType match {
+        case Some(ElementType(concept, _)) =>
+          texts.exists(t =>
+            variables.get(t).exists(c => MyDsl.isSubtypeOf(c, concept))
+          )
+        case None                          => false
+      }
+    }
+
     def beginVisit(predictionState: PredictionState): Boolean = {
       visitedTypes = Set.empty[Concept[_]]
       if (predictionState.isAxiom) {
@@ -236,21 +255,10 @@ class PredictionPropagationTest extends FunSuite {
               case DslSyntax(syntax) => syntax.userData.contains(MyDsl.variableId)
               case _                 => false
             }
-            if (allVariableRefs) {
-              val text         = predictionState.textsAt(i).mkString("")
-              val variableType = variables.get(text)
-              // val valid        = for {
-              //   actual   <- variableType
-              //   element  <- predictionState.element
-              //   expected <- element.elementType
-              //   if MyDsl.isSubtypeOf(actual, expected.concept)
-              // } yield actual
-              // valid.map { variableType =>
-              //   // visitedTypes = visitedTypes + variableType
-              //   true
-              // }.getOrElse(false)
-              variableType.isDefined
-            } else true
+            if (allVariableRefs)
+              elements.exists(e => isDeclaredVariable(i, e, predictionState))
+            else
+              true
           }
         if (accept) {
           val propagate = predictionState.element match {
@@ -487,9 +495,9 @@ class PredictionPropagationTest extends FunSuite {
       text,
       text.length,
       Seq(
-        // "&&",
-        // "?:",
         "is",
+        "?:",
+        "+",
         "?:"
       )
     )
