@@ -202,7 +202,7 @@ class PredictionPropagationTest extends FunSuite {
 
   test("assure parse true") {
     AstHelpers.selectAst(MyDsl)("true") { tree =>
-      // assertEquals(tree.markers.map(_.message), Seq(AmbiguousMsg))
+      assertEquals(tree.markers.length, 0)
       assertEquals(tree.value, ABooleanValue("true"))
     }
   }
