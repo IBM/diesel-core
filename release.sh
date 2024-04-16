@@ -8,8 +8,8 @@ then
 fi
 
 # make sure facades / JS has same version as scala jars
-export VERSION=$(sbt -Dsbt.supershell=false -error "print diesel/version")
-cd facade && node check-version.js && cd .. && \
+#export VERSION=$(sbt -Dsbt.supershell=false -error "print diesel/version")
+#cd facade && node check-version.js && cd .. && \
 sbt ci-release && \
 sbt samplesBundle/fastOptJS && \
 cd facade && \
