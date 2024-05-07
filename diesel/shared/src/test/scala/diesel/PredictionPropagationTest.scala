@@ -138,6 +138,8 @@ class PredictionPropagationTest extends FunSuite {
 
     val variableId = "variable tradfs"
 
+    val literalListId = "literalList tradfs"
+
     val variableRef: SyntaxGeneric[AValue] = {
       syntaxGeneric[AValue]
         .accept((_: Dsl.Concept[AValue], types: Dsl.Expressions.Types, _: Dsl) =>
@@ -160,7 +162,7 @@ class PredictionPropagationTest extends FunSuite {
       syntaxGeneric[AValue]
         .accept(value)
         .multi[AValue] { builder =>
-          builder.userData(13) {
+          builder.userData(literalListId) {
             (("{" ~ builder.concept) ~ ("," ~ builder.concept).rep(true) ~ "}") map {
               case (_, (_, e, es, _)) =>
                 ListLiteral(e, es.map(_._2))
@@ -262,6 +264,18 @@ class PredictionPropagationTest extends FunSuite {
       }
     }
 
+    override def initVisit(predictionState: PredictionState): Seq[PredictionState] = {
+      val up = predictionState.element match {
+        case Some(DslSyntax(syntax)) if syntax.userData.contains(MyDsl.literalListId) => true
+        case _                                                                        => false
+      }
+      if (up) {
+        predictionState.predecessorStates
+      } else {
+        super.initVisit(predictionState)
+      }
+    }
+
     def beginVisit(predictionState: PredictionState): Boolean = {
       visitedTypes = Set.empty[Concept[_]]
       if (predictionState.isAxiom) {
@@ -282,9 +296,10 @@ class PredictionPropagationTest extends FunSuite {
           }
         if (accept) {
           val propagate = predictionState.element match {
-            case Some(DslSyntax(syntax)) if syntax == MyDsl.is => true
-            case Some(DslSyntax(syntax: SyntaxTyped[_]))       => syntax.name == "elvis"
-            case _                                             => false
+            case Some(DslSyntax(syntax)) if syntax == MyDsl.is      => true
+            case Some(DslSyntax(syntax)) if syntax == MyDsl.isOneOf => true
+            case Some(DslSyntax(syntax: SyntaxTyped[_]))            => syntax.name == "elvis"
+            case _                                                  => false
           }
           if (propagate) {
             val propagates = predictionState.subIndex.filter(_ > 0)
@@ -312,7 +327,7 @@ class PredictionPropagationTest extends FunSuite {
 
     private def isExpected(concept: Concept[_]): Boolean = {
       this.visitedTypes.isEmpty || this.visitedTypes.exists(visited =>
-        MyDsl.isSubtypeOf(concept, visited)
+        MyDsl.isSubtypeOf(concept, visited) || MyDsl.isSubtypeOf(visited, concept)
       )
     }
 
@@ -407,6 +422,7 @@ class PredictionPropagationTest extends FunSuite {
       Seq(
         "true",
         "false",
+        "AVarRef(x)",
         "one of"
       )
     )
@@ -521,7 +537,8 @@ class PredictionPropagationTest extends FunSuite {
       text.length,
       Seq(
         "ANumberValue(0)",
-        "AStringValue()"
+        "AStringValue()",
+        "AVarRef(x)"
       )
     )
   }
@@ -534,7 +551,8 @@ class PredictionPropagationTest extends FunSuite {
       text.length,
       Seq(
         "ANumberValue(0)",
-        "AStringValue()"
+        "AStringValue()",
+        "AVarRef(x)"
       )
     )
   }

@@ -18,6 +18,7 @@ package diesel
 
 import diesel.Bnf.Constraints.Feature
 import diesel.Bnf.{Constraints, DslAxiom, DslBody, DslElement, DslSyntax, Production, Token}
+import diesel.PredictionState.isPredictionState
 
 import scala.collection.mutable
 
@@ -112,6 +113,22 @@ trait PredictionNode {
 // 4: . { <...> }
 // 4:  "foo" is one of . {
 
+object PredictionState {
+
+  def isAxiom(production: Production): Boolean =
+    production.element match {
+      case Some(element) => element match {
+          case DslAxiom(_) => true
+          case _           => false
+        }
+      case None          => false
+    }
+
+  def isPredictionState(s: State): Boolean = {
+    (s.dot == 0 && isAxiom(s.production)) || s.dot > 0
+  }
+}
+
 case class PredictionState(private[diesel] val state: State, private val result: Result) {
 
   def toPredictionNode: PredictionNode = ???
@@ -144,19 +161,22 @@ case class PredictionState(private[diesel] val state: State, private val result:
   private def toIndex(subIndex: Int): Int =
     state.production.symbols.zipWithIndex.filter(_._1.isRule).drop(subIndex).head._2
 
-//  def stateAt(subIndex: Int): Seq[PredictionState] = {
-//    val index = toIndex(subIndex)
-//    if (index < state.dot) {
-//      Some(PredictionState(stateAt(result.backPtrsOf(state), index), result))
-//    } else
-//      None
-//  }
-//
-//  private def stateAt(backPtrs: Seq[BackPtr], index: Int): Seq[State] =
-//    if (backPtrs.nonEmpty) {
-//      if (index + 1 == dot) {} else {}
-//    } else
-//      None
+  def predecessorStates: Seq[PredictionState] = {
+    val chart = result.chartAt(state.begin)
+    predecessorStates(state, chart)
+  }
+
+  private def predecessorStates(state: State, chart: Chart): Seq[PredictionState] = {
+    val matched = chart.notCompletedStates.filter(candidate =>
+      candidate.production.symbols.apply(candidate.dot) match {
+        case rule: Bnf.NonTerminal => state.rule == rule
+        case _                     => false
+      }
+    ).map(s => PredictionState(s, result))
+    matched.flatMap(s =>
+      if (isPredictionState(s.state)) Seq(s) else predecessorStates(s.state, chart)
+    )
+  }
 
   def elementsAt(subIndex: Int, recurse: Dsl.Syntax[_] => Boolean = _ => false): Seq[DslElement] =
     elementsAt(state, toIndex(subIndex), recurse)
@@ -324,19 +344,6 @@ class CompletionProcessor(
       } else Seq.empty
     }
 
-    def isAxiom(production: Production): Boolean =
-      production.element match {
-        case Some(element) => element match {
-            case DslAxiom(_) => true
-            case _           => false
-          }
-        case None          => false
-      }
-
-    def isPredictionState(s: State): Boolean = {
-      (s.dot == 0 && isAxiom(s.production)) || s.dot > 0
-    }
-
     def providedProposals(
       tree: GenericTree,
       offset: Int,
@@ -356,16 +363,16 @@ class CompletionProcessor(
             node = tree.root.findNodeAtIndex(chart.index)
             chart.notCompletedStates
               .filterNot(_.kind(result) == StateKind.ErrorRecovery)
-              .filter(isPredictionState)
+              .filter(PredictionState.isPredictionState)
               .flatMap { s =>
                 initCompute(PredictionState(s, result)).flatMap(ps =>
                   if (beginCompute(ps)) {
                     val candidates = computeAllProposals(
-                      ps.state.production,
-                      ps.state.dot,
+                      s.production,
+                      s.dot,
                       Set.empty,
-                      ps.state.dot,
-                      ps.state.feature,
+                      s.dot,
+                      s.feature,
                       providedProposals(tree, offset, node)
                     )
                     endCompute(candidates)
