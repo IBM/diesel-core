@@ -48,6 +48,7 @@ trait CompletionProvider {
 }
 
 trait CompletionComputeFilter {
+  def initVisit(predictionState: PredictionState): Seq[PredictionState] = Seq(predictionState)
   def beginVisit(predictionState: PredictionState): Boolean
   def continueVisit(element: DslElement): Boolean
   def endVisit(candidates: Seq[CompletionProposal]): Seq[CompletionProposal]
@@ -90,7 +91,31 @@ class CompletionConfiguration {
     this.computeFilter
 }
 
-case class PredictionState(private val state: State, private val result: Result) {
+trait PredictionNode {
+
+  def element: Option[DslElement]
+
+  def predecessorNodes: Seq[PredictionNode]
+
+  def subElementsBefore: Seq[DslElement]
+
+  def subElementAfter: Option[DslElement]
+}
+
+// <...> the brother of 'joe' 's sister is . 'someone' <...>
+// "toto" is . null
+
+// "foo" is one of { .
+//    "foo" is one of . {
+
+// 5:  { . <...> } 4 .. 5
+// 4: . { <...> }
+// 4:  "foo" is one of . {
+
+case class PredictionState(private[diesel] val state: State, private val result: Result) {
+
+  def toPredictionNode: PredictionNode = ???
+
   def isAxiom: Boolean =
     state.production.element match {
       case Some(element) => element match {
@@ -118,6 +143,20 @@ case class PredictionState(private val state: State, private val result: Result)
 
   private def toIndex(subIndex: Int): Int =
     state.production.symbols.zipWithIndex.filter(_._1.isRule).drop(subIndex).head._2
+
+//  def stateAt(subIndex: Int): Seq[PredictionState] = {
+//    val index = toIndex(subIndex)
+//    if (index < state.dot) {
+//      Some(PredictionState(stateAt(result.backPtrsOf(state), index), result))
+//    } else
+//      None
+//  }
+//
+//  private def stateAt(backPtrs: Seq[BackPtr], index: Int): Seq[State] =
+//    if (backPtrs.nonEmpty) {
+//      if (index + 1 == dot) {} else {}
+//    } else
+//      None
 
   def elementsAt(subIndex: Int, recurse: Dsl.Syntax[_] => Boolean = _ => false): Seq[DslElement] =
     elementsAt(state, toIndex(subIndex), recurse)
@@ -223,6 +262,10 @@ class CompletionProcessor(
       continueVisit.getOrElse(true)
     }
 
+    def initCompute(predictionState: PredictionState): Seq[PredictionState] = {
+      config.flatMap(_.getComputeFilter).toSeq.flatMap(_.initVisit(predictionState))
+    }
+
     def beginCompute(predictionState: PredictionState): Boolean = {
       config.flatMap(_.getComputeFilter).forall(_.beginVisit(predictionState))
     }
@@ -315,19 +358,21 @@ class CompletionProcessor(
               .filterNot(_.kind(result) == StateKind.ErrorRecovery)
               .filter(isPredictionState)
               .flatMap { s =>
-                if (beginCompute(PredictionState(s, result))) {
-                  val candidates = computeAllProposals(
-                    s.production,
-                    s.dot,
-                    Set.empty,
-                    s.dot,
-                    s.feature,
-                    providedProposals(tree, offset, node)
-                  )
-                  endCompute(candidates)
-                } else {
-                  Seq.empty
-                }
+                initCompute(PredictionState(s, result)).flatMap(ps =>
+                  if (beginCompute(ps)) {
+                    val candidates = computeAllProposals(
+                      ps.state.production,
+                      ps.state.dot,
+                      Set.empty,
+                      ps.state.dot,
+                      ps.state.feature,
+                      providedProposals(tree, offset, node)
+                    )
+                    endCompute(candidates)
+                  } else {
+                    Seq.empty
+                  }
+                )
               }
           })
           .getOrElse(Seq.empty)
