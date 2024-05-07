@@ -51,11 +51,13 @@ class PredictionPropagationTest extends FunSuite {
   case class ABooleanValue(value: String) extends ABoolean
   case class AStringValue(value: String)  extends AString
 
-  case class AIs(left: AValue, right: AValue)     extends ABoolean
-  case class AConcat(left: AValue, right: AValue) extends AString
-  case class AElvis(left: AValue, right: AValue)  extends AValue
-  case class AVarRef(name: String)                extends AValue
-  case class AAnd(left: AValue, right: AValue)    extends ABoolean
+  case class AIs(left: AValue, right: AValue)             extends ABoolean
+  case class AIsOneOf(left: AValue, right: AValue)        extends ABoolean
+  case class AConcat(left: AValue, right: AValue)         extends AString
+  case class AElvis(left: AValue, right: AValue)          extends AValue
+  case class AVarRef(name: String)                        extends AValue
+  case class AAnd(left: AValue, right: AValue)            extends ABoolean
+  case class ListLiteral(head: AValue, tail: Seq[AValue]) extends AValue
 
   trait BootVoc extends Dsl with Identifiers {
 
@@ -94,6 +96,13 @@ class PredictionPropagationTest extends FunSuite {
       value ~ "is".leftAssoc(20) ~ value map {
         case (_, (lhs, _, rhs)) =>
           AIs(lhs, rhs)
+      }
+    )
+
+    val isOneOf: Syntax[ABoolean] = syntax(boolean)(
+      value ~ "is" ~ "one" ~ "of" ~ value.multiple[AValue] map {
+        case (_, (lhs, _, _, _, rhs)) =>
+          AIsOneOf(lhs, rhs)
       }
     )
 
@@ -144,6 +153,19 @@ class PredictionPropagationTest extends FunSuite {
                   AVarRef(name.text)
               }
             }
+        }
+    }
+
+    val listLiteral: Dsl.SyntaxGenericMulti[AValue, AValue] = {
+      syntaxGeneric[AValue]
+        .accept(value)
+        .multi[AValue] { builder =>
+          builder.userData(13) {
+            (("{" ~ builder.concept) ~ ("," ~ builder.concept).rep(true) ~ "}") map {
+              case (_, (_, e, es, _)) =>
+                ListLiteral(e, es.map(_._2))
+            }
+          }
         }
     }
 
@@ -370,7 +392,8 @@ class PredictionPropagationTest extends FunSuite {
       Seq(
         "ANumberValue(0)",
         "AStringValue()",
-        "AVarRef(x)"
+        "AVarRef(x)",
+        "one of"
       )
     )
   }
@@ -383,7 +406,8 @@ class PredictionPropagationTest extends FunSuite {
       text.length,
       Seq(
         "true",
-        "false"
+        "false",
+        "one of"
       )
     )
   }
@@ -455,6 +479,7 @@ class PredictionPropagationTest extends FunSuite {
         "&&",
         "?:",
         "is",
+        "is one of",
         "?:"
       )
     )
@@ -468,9 +493,48 @@ class PredictionPropagationTest extends FunSuite {
       text.length,
       Seq(
         "is",
+        "is one of",
         "?:",
         "+",
         "?:"
+      )
+    )
+  }
+
+  test("predict open brace after is_one_of") {
+    val text = "\"foo\" is one of "
+    assertPredictions(
+      MyDsl.value,
+      text,
+      text.length,
+      Seq(
+        "{"
+      )
+    )
+  }
+
+  test("predict after open brace in literal list") {
+    val text = "\"foo\" is one of { "
+    assertPredictions(
+      MyDsl.value,
+      text,
+      text.length,
+      Seq(
+        "ANumberValue(0)",
+        "AStringValue()"
+      )
+    )
+  }
+
+  test("predict after comma in literal list") {
+    val text = "\"foo\" is one of { \"bar\",  "
+    assertPredictions(
+      MyDsl.value,
+      text,
+      text.length,
+      Seq(
+        "ANumberValue(0)",
+        "AStringValue()"
       )
     )
   }
