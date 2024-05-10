@@ -8,3 +8,8 @@ addSbtPlugin("com.github.sbt"     % "sbt-ci-release"           % "1.5.12")
 addSbtPlugin(
   "com.ibm.cloud.diesel" % "diesel-i18n-plugin" % "0.6.0"
 ) // Dependencies.dieselI18nVersion
+
+// until we get Mend/Whitesource to work:
+// manual updates via "dependencyUpdates",
+// see https://github.com/aiyanbo/sbt-dependency-updates
+addSbtPlugin("org.jmotor.sbt" % "sbt-dependency-updates" % "1.2.9")
