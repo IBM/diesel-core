@@ -283,7 +283,9 @@ class CompletionProcessor(
     }
 
     def initCompute(predictionState: PredictionState): Seq[PredictionState] = {
-      config.flatMap(_.getComputeFilter).toSeq.flatMap(_.initVisit(predictionState))
+      config.flatMap(_.getComputeFilter).map(_.initVisit(predictionState)).getOrElse(Seq(
+        predictionState
+      ))
     }
 
     def beginCompute(predictionState: PredictionState): Boolean = {
