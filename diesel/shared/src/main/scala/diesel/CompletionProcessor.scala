@@ -163,18 +163,25 @@ case class PredictionState(private[diesel] val state: State, private val result:
 
   def predecessorStates: Seq[PredictionState] = {
     val chart = result.chartAt(state.begin)
-    predecessorStates(state, chart)
+    predecessorStates(state, chart, Set())
   }
 
-  private def predecessorStates(state: State, chart: Chart): Seq[PredictionState] = {
+  private def predecessorStates(
+    state: State,
+    chart: Chart,
+    dejaVue: Set[State]
+  ): Seq[PredictionState] = {
     val matched = chart.notCompletedStates.filter(candidate =>
       candidate.production.symbols.apply(candidate.dot) match {
         case rule: Bnf.NonTerminal => state.rule == rule
         case _                     => false
       }
-    ).map(s => PredictionState(s, result))
+    )
+      .filterNot(dejaVue.contains)
+      .map(s => PredictionState(s, result))
     matched.flatMap(s =>
-      if (isPredictionState(s.state)) Seq(s) else predecessorStates(s.state, chart)
+      if (isPredictionState(s.state)) Seq(s)
+      else predecessorStates(s.state, chart, dejaVue + s.state)
     )
   }
 
