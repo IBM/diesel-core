@@ -241,10 +241,11 @@ class PredictionPropagationTest extends FunSuite {
             }
           if (accept) {
             val propagate = predictionState.element match {
-              case Some(DslSyntax(syntax)) if syntax == MyDsl.is      => true
-              case Some(DslSyntax(syntax)) if syntax == MyDsl.isOneOf => true
-              case Some(DslSyntax(syntax: SyntaxTyped[_]))            => syntax.name == "elvis"
-              case _                                                  => false
+              case Some(DslSyntax(syntax)) if syntax == MyDsl.is                      => true
+              case Some(DslSyntax(syntax)) if syntax == MyDsl.isOneOf                 => true
+              case Some(DslSyntax(syntax: SyntaxTyped[_])) if syntax.name == "elvis"  => true
+              case Some(DslSyntax(syntax: Syntax[_])) if syntax.name == "listLiteral" => true
+              case _                                                                  => false
             }
             if (propagate) {
               val propagates = predictionState.subIndex.filter(_ > 0)
@@ -551,6 +552,20 @@ class PredictionPropagationTest extends FunSuite {
 
   test("predict after comma in literal list") {
     val text = "\"foo\" is one of { \"bar\",  "
+    assertPredictions(
+      MyDsl.value,
+      text,
+      text.length,
+      Seq(
+        "ANumberValue(0)",
+        "AStringValue()",
+        "AVarRef(x)"
+      )
+    )
+  }
+
+  test("predict inside literal list") {
+    val text = "{ \"foo\",  "
     assertPredictions(
       MyDsl.value,
       text,
