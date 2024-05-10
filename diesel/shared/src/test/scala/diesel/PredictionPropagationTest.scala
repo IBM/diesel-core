@@ -265,14 +265,20 @@ class PredictionPropagationTest extends FunSuite {
     }
 
     override def initVisit(predictionState: PredictionState): Seq[PredictionState] = {
-      val up = predictionState.element match {
-        case Some(DslSyntax(syntax)) if syntax.userData.contains(MyDsl.literalListId) => true
-        case _                                                                        => false
+      def isLiteralList(element: DslElement): Boolean = element match {
+        case DslSyntax(syntax) => syntax.userData.contains(MyDsl.literalListId)
+        case _                 => false
       }
-      if (up) {
+
+      if (predictionState.element.exists(isLiteralList)) {
         predictionState.predecessorStates
       } else {
-        super.initVisit(predictionState)
+        val precedingListLiterals =
+          predictionState.predecessorStates.filter(_.element.exists(isLiteralList))
+        if (precedingListLiterals.nonEmpty) {
+          precedingListLiterals
+        } else
+          super.initVisit(predictionState)
       }
     }
 
