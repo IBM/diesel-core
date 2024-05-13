@@ -3,7 +3,7 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 import scala.sys.process._
 
-val scalaVersion2 = "2.13.10"
+val scalaVersion2 = "2.13.14"
 // val scalaVersion3 = "3.2.1"
 
 lazy val commonSettings = Seq(
@@ -115,7 +115,7 @@ lazy val diesel = crossProject(JSPlatform, JVMPlatform)
     libraryDependencies ++= Seq(
       "com.ibm.cloud.diesel" %%% "diesel-i18n"   % Dependencies.dieselI18nVersion,
       scalaOrganization.value  % "scala-reflect" % scalaVersion.value,
-      "org.scalameta"        %%% "munit"         % "1.0.0-M7" % Test
+      "org.scalameta"        %%% "munit"         % "1.0.0-RC1" % Test
     )
   )
   .settings(sharedSettings_test)
