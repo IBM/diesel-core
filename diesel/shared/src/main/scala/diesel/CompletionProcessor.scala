@@ -180,16 +180,19 @@ case class PredictionState(private[diesel] val state: State, private val result:
     )
   }
 
-  def elementsAt(subIndex: Int, recurse: Dsl.Syntax[_] => Boolean = _ => false): Seq[DslElement] =
-    elementsAt(state, toIndex(subIndex), recurse)
+  def elementsAt(subIndex: Int,
+                 recurse: Dsl.Syntax[_] => Boolean = _ => false,
+                 atIndex: DslElement => Int = _ => 0): Seq[DslElement] =
+    elementsAt(state, toIndex(subIndex), recurse, atIndex)
 
   private def elementsAt(
     state: State,
     index: Int,
-    recurse: Dsl.Syntax[_] => Boolean
+    recurse: Dsl.Syntax[_] => Boolean,
+    atIndex: DslElement => Int
   ): Seq[DslElement] =
     if (index < state.dot) {
-      elementsAt(result.backPtrsOf(state), index, state.dot, recurse)
+      elementsAt(result.backPtrsOf(state), index, state.dot, recurse, atIndex)
     } else
       Seq.empty
 
@@ -197,7 +200,8 @@ case class PredictionState(private[diesel] val state: State, private val result:
     backPtrs: Seq[BackPtr],
     index: Int,
     dot: Int,
-    recurse: Dsl.Syntax[_] => Boolean
+    recurse: Dsl.Syntax[_] => Boolean,
+    atIndex: DslElement => Int
   ): Seq[DslElement] =
     if (backPtrs.nonEmpty) {
       if (index + 1 == dot) {
@@ -208,21 +212,22 @@ case class PredictionState(private[diesel] val state: State, private val result:
                 case Some(value) =>
                   value match {
                     case syntax: DslSyntax[_] =>
-                      if (recurse(syntax.syntax)) elementsAt(causal, 0, recurse) else Seq(value)
+                      if (recurse(syntax.syntax)) elementsAt(causal, 0, recurse, atIndex) else Seq(value)
                     case DslBody(element)     =>
-                      if (production.symbols.apply(0).isRule)
-                        elementsAt(causal, 0, recurse)
+                      val subIndex = atIndex(element)
+                      if (production.symbols.apply(subIndex).isRule)
+                        elementsAt(causal, subIndex, recurse, atIndex)
                       else
                         Seq(element)
                     case _                    => Seq(value)
                   }
-                case None        => elementsAt(causal, 0, recurse)
+                case None        => elementsAt(causal, 0, recurse, atIndex)
               }
           }
         }
       } else {
         backPtrs flatMap {
-          bp => elementsAt(result.backPtrsOf(bp.predecessor), index, bp.predecessor.dot, recurse)
+          bp => elementsAt(result.backPtrsOf(bp.predecessor), index, bp.predecessor.dot, recurse, atIndex)
         }
       }
     } else Seq.empty
