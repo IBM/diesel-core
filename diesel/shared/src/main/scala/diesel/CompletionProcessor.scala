@@ -171,12 +171,7 @@ case class PredictionState(private[diesel] val state: State, private val result:
     chart: Chart,
     dejaVue: Set[State]
   ): Seq[PredictionState] = {
-    val matched = chart.notCompletedStates.filter(candidate =>
-      candidate.production.symbols.apply(candidate.dot) match {
-        case rule: Bnf.NonTerminal => state.rule == rule
-        case _                     => false
-      }
-    )
+    val matched = chart.activeRules(state.rule)
       .filterNot(dejaVue.contains)
       .map(s => PredictionState(s, result))
     matched.flatMap(s =>
