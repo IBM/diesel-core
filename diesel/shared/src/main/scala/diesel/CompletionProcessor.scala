@@ -91,17 +91,6 @@ class CompletionConfiguration {
     this.computeFilter
 }
 
-trait PredictionNode {
-
-  def element: Option[DslElement]
-
-  def predecessorNodes: Seq[PredictionNode]
-
-  def subElementsBefore: Seq[DslElement]
-
-  def subElementAfter: Option[DslElement]
-}
-
 // <...> the brother of 'joe' 's sister is . 'someone' <...>
 // "toto" is . null
 
@@ -130,8 +119,6 @@ object PredictionState {
 
 case class PredictionState(private[diesel] val state: State, private val result: Result) {
 
-  def toPredictionNode: PredictionNode = ???
-
   def isAxiom: Boolean =
     state.production.element match {
       case Some(element) => element match {
@@ -141,12 +128,17 @@ case class PredictionState(private[diesel] val state: State, private val result:
       case None          => false
     }
 
+  /** If there is a non-terminal right to the dot, it returns the number of non-terminals to the
+    * left of the dot.
+    */
   val subIndex: Option[Int] =
     if (state.production.symbols(state.dot).isToken)
       None
     else
       Some(state.production.symbols.take(state.dot + 1).count(_.isRule) - 1)
 
+  /** It returns the first 'sub index' left to the dot, if it exists.
+    */
   val leftSubIndex: Option[Int] =
     if (state.dot == 0)
       None
@@ -241,6 +233,8 @@ case class PredictionState(private[diesel] val state: State, private val result:
       }
     } else Seq.empty
 
+  /** Returns all the text under the non-terminal at 'sub index'
+    */
   def textsAt(subIndex: Int): Seq[String] = textsAt(state, toIndex(subIndex))
 
   private def textsAt(state: State, index: Int): Seq[String] =
