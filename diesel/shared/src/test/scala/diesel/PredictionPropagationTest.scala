@@ -51,11 +51,14 @@ class PredictionPropagationTest extends FunSuite {
   case class ABooleanValue(value: String) extends ABoolean
   case class AStringValue(value: String)  extends AString
 
-  case class AIs(left: AValue, right: AValue)     extends ABoolean
-  case class AConcat(left: AValue, right: AValue) extends AString
-  case class AElvis(left: AValue, right: AValue)  extends AValue
-  case class AVarRef(name: String)                extends AValue
-  case class AAnd(left: AValue, right: AValue)    extends ABoolean
+  case class AIs(left: AValue, right: AValue)             extends ABoolean
+  case class AIsOneOf(left: AValue, right: ListLiteral)   extends ABoolean
+  case class AConcat(left: AValue, right: AValue)         extends AString
+  case class AElvis(left: AValue, right: AValue)          extends AValue
+  case class AVarRef(name: String)                        extends AValue
+  case class AAnd(left: AValue, right: AValue)            extends ABoolean
+  case class ListLiteral(head: AValue, tail: Seq[AValue]) extends AValue
+  case class Sum(values: ListLiteral)                     extends ANumber
 
   trait BootVoc extends Dsl with Identifiers {
 
@@ -97,6 +100,20 @@ class PredictionPropagationTest extends FunSuite {
       }
     )
 
+    val isOneOf: Syntax[ABoolean] = syntax(boolean)(
+      value ~ "is" ~ "one" ~ "of" ~ value.multiple[AValue] map {
+        case (_, (lhs, _, _, _, rhs)) =>
+          AIsOneOf(lhs, rhs.asInstanceOf[ListLiteral])
+      }
+    )
+
+    val sum: Syntax[ANumber] = syntax(number)(
+      "sum" ~ "(" ~ number.multiple[AValue] ~ ")" map {
+        case (_, (_, _, values, _)) =>
+          Sum(values.asInstanceOf[ListLiteral])
+      }
+    )
+
     val elvis: SyntaxGeneric[AValue] =
       syntaxGeneric[AValue].accept(value) { builder =>
         builder(
@@ -129,6 +146,8 @@ class PredictionPropagationTest extends FunSuite {
 
     val variableId = "variable tradfs"
 
+    val literalListId = "literalList tradfs"
+
     val variableRef: SyntaxGeneric[AValue] = {
       syntaxGeneric[AValue]
         .accept((_: Dsl.Concept[AValue], types: Dsl.Expressions.Types, _: Dsl) =>
@@ -147,6 +166,19 @@ class PredictionPropagationTest extends FunSuite {
         }
     }
 
+    val listLiteral: Dsl.SyntaxGenericMulti[AValue, AValue] = {
+      syntaxGeneric[AValue]
+        .accept(value)
+        .multi[AValue] { builder =>
+          builder.userData(literalListId) {
+            (("{" ~ builder.concept) ~ ("," ~ builder.concept).rep(true) ~ "}") map {
+              case (_, (_, e, es, _)) =>
+                ListLiteral(e, es.map(_._2))
+            }
+          }
+        }
+    }
+
     object NotAVariable extends MarkerMessage {
       def format(locale: String): String = ???
     }
@@ -158,6 +190,188 @@ class PredictionPropagationTest extends FunSuite {
   object MyDsl extends BootVoc {
 
     val expr: Axiom[AValue] = axiom(value)
+
+    case class MyComputeFilter(expectedType: Concept[_], variables: Map[String, Concept[_]])
+        extends CompletionComputeFilter {
+
+      var visitedTypes = Set.empty[Concept[_]]
+
+      def isDeclaredVariable(
+        subIndex: Int,
+        e: DslElement,
+        predictionState: PredictionState
+      ): Boolean = {
+        val texts = predictionState.textsAt(subIndex)
+        e.elementType match {
+          case Some(ElementType(concept, _)) =>
+            texts.exists(t =>
+              variables.get(t).exists(c => MyDsl.isSubtypeOf(c, concept))
+            )
+          case None                          => false
+        }
+      }
+
+//      override def initVisit(predictionState: PredictionState): Seq[PredictionState] = {
+//        def isLiteralList(element: DslElement): Boolean = element match {
+//          case DslSyntax(syntax) => syntax.userData.contains(MyDsl.literalListId)
+//          case _                 => false
+//        }
+//
+//        if (predictionState.element.exists(isLiteralList)) {
+//          predictionState.predecessorStates
+//        } else {
+//          val precedingListLiterals =
+//            predictionState.predecessorStates.filter(_.element.exists(isLiteralList))
+//          if (precedingListLiterals.nonEmpty) {
+//            precedingListLiterals
+//          } else
+//            super.initVisit(predictionState)
+//        }
+//      }
+
+      def isLiteralList(element: DslElement): Boolean = element match {
+        case DslSyntax(syntax) => syntax.userData.contains(MyDsl.literalListId)
+        case _                 => false
+      }
+
+      def beginVisit(predictionState: PredictionState): Boolean = {
+        visitedTypes = Set.empty[Concept[_]]
+        if (predictionState.isAxiom) {
+          visitedTypes = Set(expectedType)
+          true
+        } else {
+          val accept =
+            predictionState.leftSubIndex.forall { i =>
+              val elements        = predictionState.elementsAt(i)
+              val allVariableRefs = elements.forall {
+                case DslSyntax(syntax) => syntax.userData.contains(MyDsl.variableId)
+                case _                 => false
+              }
+              if (allVariableRefs)
+                elements.exists(e => isDeclaredVariable(i, e, predictionState))
+              else
+                true
+            }
+          if (accept) {
+            addToExpectedTypes(predictionState)
+            true
+          } else
+            false
+        }
+      }
+
+      private def addToExpectedTypes(predictionState: PredictionState): Unit = {
+        val propagate = predictionState.element match {
+          case Some(DslSyntax(syntax)) if syntax == MyDsl.is                      => true
+          case Some(DslSyntax(syntax)) if syntax == MyDsl.isOneOf                 => true
+          case Some(DslSyntax(syntax: SyntaxTyped[_])) if syntax.name == "elvis"  => true
+          case Some(DslSyntax(syntax: Syntax[_])) if syntax.name == "listLiteral" => true
+          case _                                                                  => false
+        }
+        if (propagate) {
+          val propagates = if (predictionState.element.exists(isLiteralList)) {
+            val predecessors = predictionState.predecessorStates
+            predecessors.flatMap(_.elementsAt(
+              0,
+              _ => true
+            )).flatMap(_.elementType).map(_.concept)
+          } else {
+            predictionState.subIndex.filter(_ > 0)
+              .map(_ =>
+                predictionState.elementsAt(0)
+                  .filter {
+                    case DslSyntax(syntax) => !syntax.userData.contains(MyDsl.variableId)
+                    case _                 => true
+                  }
+                  .flatMap(_.elementType).map(_.concept)
+              )
+              .toSeq.flatten
+          }
+          visitedTypes = visitedTypes ++ propagates
+        } else {
+          val predecessors = predictionState.predecessorStates
+          predecessors.foreach(p =>
+            p.element match {
+              case Some(DslSyntax(syntax: Syntax[_]))
+                  if syntax.name == "listLiteral" =>
+                p.predecessorStates.foreach(b => addToExpectedTypes(b))
+              case Some(_: DslElement) => addToExpectedTypes(p)
+              case None                =>
+            }
+          )
+          // addToExpectedTypes(p))
+        }
+      }
+
+      private def isContinue(concept: Concept[_]): Boolean = {
+        this.visitedTypes.isEmpty || this.visitedTypes.exists(visited =>
+          MyDsl.isSubtypeOf(visited, concept)
+        )
+      }
+
+      private def isExpected(concept: Concept[_]): Boolean = {
+        this.visitedTypes.isEmpty || this.visitedTypes.exists(visited =>
+          MyDsl.isSubtypeOf(concept, visited) || MyDsl.isSubtypeOf(visited, concept)
+        )
+      }
+
+      // axiom
+      // value "+" value
+      // foo "xx" bar
+
+      override def continueVisit(
+        element: DslElement
+      ): Boolean = {
+        element match {
+          case DslInstance(_)                             => true
+          case DslTarget(_)                               => true
+          case DslValue(_)                                => true
+          case DslBody(DslSyntax(syntax: SyntaxTyped[_])) =>
+            if (isContinue(syntax.concept)) {
+              if (visitedTypes.nonEmpty) {
+                if (syntax == MyDsl.is) {
+                  this.visitedTypes = this.visitedTypes + MyDsl.value
+                }
+                if (syntax == MyDsl.concat) {
+                  this.visitedTypes = this.visitedTypes + MyDsl.number
+                }
+              }
+              true
+            } else {
+              false
+            }
+          case _: DslSyntax[_]                            => true
+          case DslAxiom(_)                                => true
+          case DslBody(element)                           => continueVisit(element)
+        }
+      }
+
+      override def endVisit(candidates: Seq[CompletionProposal]): Seq[CompletionProposal] = {
+        var mustAddX = false
+        val res      = candidates
+          .filter(c => c.element.exists(_.elementType.exists(t => isExpected(t.concept))))
+          .filter(p =>
+            p.element match {
+              case Some(s @ DslSyntax(syntax)) =>
+                if (syntax.userData.contains(MyDsl.variableId))
+                  if (
+                    s.elementType.exists(t => t.concept == MyDsl.number || t.concept == MyDsl.value)
+                  ) {
+                    mustAddX = true
+                    false
+                  } else
+                    false
+                else true
+              case _                           =>
+                true
+            }
+          )
+        if (mustAddX) {
+          res ++ Seq(CompletionProposal(None, "AVarRef(x)", None, None, None))
+        } else
+          res
+      }
+    }
   }
 
   test("assure simple number") {
@@ -207,6 +421,12 @@ class PredictionPropagationTest extends FunSuite {
     }
   }
 
+  test("assure parse is one of") {
+    AstHelpers.selectAst(MyDsl)("2 is one of { 1, 2, 3 }") { tree =>
+      assertEquals(tree.markers.length, 0)
+    }
+  }
+
   private def assertPredictions(
     expectedType: Concept[_],
     text: String,
@@ -215,141 +435,9 @@ class PredictionPropagationTest extends FunSuite {
   ): Unit = {
     val variables = Map("x" -> MyDsl.number)
     val config    = new CompletionConfiguration
-    config.setComputeFilter(MyComputeFilter(expectedType, variables))
+    config.setComputeFilter(MyDsl.MyComputeFilter(expectedType, variables))
     val proposals = predict(MyDsl, text, offset, Some(config))
-    assertEquals(proposals.map(_.text), expected)
-  }
-
-  case class MyComputeFilter(expectedType: Concept[_], variables: Map[String, Concept[_]])
-      extends CompletionComputeFilter {
-
-    var visitedTypes = Set.empty[Concept[_]]
-
-    def isDeclaredVariable(
-      subIndex: Int,
-      e: DslElement,
-      predictionState: PredictionState
-    ): Boolean = {
-      val texts = predictionState.textsAt(subIndex)
-      e.elementType match {
-        case Some(ElementType(concept, _)) =>
-          texts.exists(t =>
-            variables.get(t).exists(c => MyDsl.isSubtypeOf(c, concept))
-          )
-        case None                          => false
-      }
-    }
-
-    def beginVisit(predictionState: PredictionState): Boolean = {
-      visitedTypes = Set.empty[Concept[_]]
-      if (predictionState.isAxiom) {
-        visitedTypes = Set(expectedType)
-        true
-      } else {
-        val accept =
-          predictionState.leftSubIndex.forall { i =>
-            val elements        = predictionState.elementsAt(i)
-            val allVariableRefs = elements.forall {
-              case DslSyntax(syntax) => syntax.userData.contains(MyDsl.variableId)
-              case _                 => false
-            }
-            if (allVariableRefs)
-              elements.exists(e => isDeclaredVariable(i, e, predictionState))
-            else
-              true
-          }
-        if (accept) {
-          val propagate = predictionState.element match {
-            case Some(DslSyntax(syntax)) if syntax == MyDsl.is => true
-            case Some(DslSyntax(syntax: SyntaxTyped[_]))       => syntax.name == "elvis"
-            case _                                             => false
-          }
-          if (propagate) {
-            val propagates = predictionState.subIndex.filter(_ > 0)
-              .map(_ =>
-                predictionState.elementsAt(0)
-                  .filter {
-                    case DslSyntax(syntax) => !syntax.userData.contains(MyDsl.variableId)
-                    case _                 => true
-                  }
-                  .flatMap(_.elementType).map(_.concept)
-              )
-              .toSeq.flatten
-            visitedTypes = visitedTypes ++ propagates
-          }
-          true
-        } else { false }
-      }
-    }
-
-    private def isContinue(concept: Concept[_]): Boolean = {
-      this.visitedTypes.isEmpty || this.visitedTypes.exists(visited =>
-        MyDsl.isSubtypeOf(visited, concept)
-      )
-    }
-
-    private def isExpected(concept: Concept[_]): Boolean = {
-      this.visitedTypes.isEmpty || this.visitedTypes.exists(visited =>
-        MyDsl.isSubtypeOf(concept, visited)
-      )
-    }
-
-    // axiom
-    // value "+" value
-    // foo "xx" bar
-
-    override def continueVisit(
-      element: DslElement
-    ): Boolean = {
-      element match {
-        case DslInstance(_)                             => true
-        case DslTarget(_)                               => true
-        case DslValue(_)                                => true
-        case DslBody(DslSyntax(syntax: SyntaxTyped[_])) =>
-          if (isContinue(syntax.concept)) {
-            if (visitedTypes.nonEmpty) {
-              if (syntax == MyDsl.is) {
-                this.visitedTypes = this.visitedTypes + MyDsl.value
-              }
-              if (syntax == MyDsl.concat) {
-                this.visitedTypes = this.visitedTypes + MyDsl.number
-              }
-            }
-            true
-          } else {
-            false
-          }
-        case _: DslSyntax[_]                            => true
-        case DslAxiom(_)                                => true
-        case DslBody(element)                           => continueVisit(element)
-      }
-    }
-
-    override def endVisit(candidates: Seq[CompletionProposal]): Seq[CompletionProposal] = {
-      var mustAddX = false
-      val res      = candidates
-        .filter(c => c.element.exists(_.elementType.exists(t => isExpected(t.concept))))
-        .filter(p =>
-          p.element match {
-            case Some(s @ DslSyntax(syntax)) =>
-              if (syntax.userData.contains(MyDsl.variableId))
-                if (
-                  s.elementType.exists(t => t.concept == MyDsl.number || t.concept == MyDsl.value)
-                ) {
-                  mustAddX = true
-                  false
-                } else
-                  false
-              else true
-            case _                           =>
-              true
-          }
-        )
-      if (mustAddX) {
-        res ++ Seq(CompletionProposal(None, "AVarRef(x)", None, None, None))
-      } else
-        res
-    }
+    assertEquals(proposals.map(_.text).distinct, expected)
   }
 
   //   1 "foo" is . <value>
@@ -370,7 +458,9 @@ class PredictionPropagationTest extends FunSuite {
       Seq(
         "ANumberValue(0)",
         "AStringValue()",
-        "AVarRef(x)"
+        "sum (",
+        "AVarRef(x)",
+        "one of"
       )
     )
   }
@@ -383,7 +473,9 @@ class PredictionPropagationTest extends FunSuite {
       text.length,
       Seq(
         "true",
-        "false"
+        "false",
+        "AVarRef(x)",
+        "one of"
       )
     )
   }
@@ -397,6 +489,7 @@ class PredictionPropagationTest extends FunSuite {
       Seq(
         "ANumberValue(0)",
         "AStringValue()",
+        "sum (",
         "AVarRef(x)"
       )
     )
@@ -427,6 +520,7 @@ class PredictionPropagationTest extends FunSuite {
       Seq(
         "ANumberValue(0)",
         "AStringValue()",
+        "sum (",
         "AVarRef(x)"
       )
     )
@@ -440,6 +534,7 @@ class PredictionPropagationTest extends FunSuite {
       text.length,
       Seq(
         "ANumberValue(0)",
+        "sum (",
         "AVarRef(x)"
       )
     )
@@ -455,7 +550,7 @@ class PredictionPropagationTest extends FunSuite {
         "&&",
         "?:",
         "is",
-        "?:"
+        "is one of"
       )
     )
   }
@@ -468,9 +563,65 @@ class PredictionPropagationTest extends FunSuite {
       text.length,
       Seq(
         "is",
+        "is one of",
         "?:",
-        "+",
-        "?:"
+        "+"
+      )
+    )
+  }
+
+  test("predict open brace after is_one_of") {
+    val text = "\"foo\" is one of "
+    assertPredictions(
+      MyDsl.value,
+      text,
+      text.length,
+      Seq(
+        "{"
+      )
+    )
+  }
+
+  test("predict after open brace in literal list") {
+    val text = "\"foo\" is one of { "
+    assertPredictions(
+      MyDsl.value,
+      text,
+      text.length,
+      Seq(
+        "ANumberValue(0)",
+        "AStringValue()",
+        "sum (",
+        "AVarRef(x)"
+      )
+    )
+  }
+
+  test("predict after comma in literal list") {
+    val text = "\"foo\" is one of { \"bar\",  "
+    assertPredictions(
+      MyDsl.value,
+      text,
+      text.length,
+      Seq(
+        "ANumberValue(0)",
+        "AStringValue()",
+        "sum (",
+        "AVarRef(x)"
+      )
+    )
+  }
+
+  test("predict inside literal list") {
+    val text = "sum({ 1,  "
+    assertPredictions(
+      MyDsl.number,
+      text,
+      text.length,
+      Seq(
+        "ANumberValue(0)",
+        "sum (",
+        "AVarRef(x)"
       )
     )
   }
