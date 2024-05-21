@@ -201,7 +201,8 @@ class PredictionPropagationTest extends FunSuite {
         e: DslElement,
         predictionState: PredictionState
       ): Boolean = {
-        val texts = predictionState.textsAt(subIndex)
+        val texts =
+          predictionState.textsAt(subIndex, syntax => !syntax.userData.contains(MyDsl.variableId))
         e.elementType match {
           case Some(ElementType(concept, _)) =>
             texts.exists(t =>
@@ -508,6 +509,16 @@ class PredictionPropagationTest extends FunSuite {
         "false",
         "AVarRef(x)"
       )
+    )
+  }
+
+  test("predict after is with not declared variable") {
+    val text = "foo is "
+    assertPredictions(
+      MyDsl.boolean,
+      text,
+      text.length,
+      Seq()
     )
   }
 
