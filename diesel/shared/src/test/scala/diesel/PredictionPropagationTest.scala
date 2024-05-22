@@ -52,6 +52,7 @@ class PredictionPropagationTest extends FunSuite {
   case class AStringValue(value: String)  extends AString
 
   case class AIs(left: AValue, right: AValue)             extends ABoolean
+  case class AIsNotDefine(left: AValue)                   extends ABoolean
   case class AIsOneOf(left: AValue, right: ListLiteral)   extends ABoolean
   case class AConcat(left: AValue, right: AValue)         extends AString
   case class AElvis(left: AValue, right: AValue)          extends AValue
@@ -104,6 +105,13 @@ class PredictionPropagationTest extends FunSuite {
       value ~ "is" ~ "one" ~ "of" ~ value.multiple[AValue] map {
         case (_, (lhs, _, _, _, rhs)) =>
           AIsOneOf(lhs, rhs.asInstanceOf[ListLiteral])
+      }
+    )
+
+    val isNotDefine: Syntax[ABoolean] = syntax(boolean)(
+      value ~ "is" ~ "not" ~ "define" map {
+        case (_, (lhs, _, _, _)) =>
+          AIsNotDefine(lhs)
       }
     )
 
@@ -212,24 +220,6 @@ class PredictionPropagationTest extends FunSuite {
         }
       }
 
-//      override def initVisit(predictionState: PredictionState): Seq[PredictionState] = {
-//        def isLiteralList(element: DslElement): Boolean = element match {
-//          case DslSyntax(syntax) => syntax.userData.contains(MyDsl.literalListId)
-//          case _                 => false
-//        }
-//
-//        if (predictionState.element.exists(isLiteralList)) {
-//          predictionState.predecessorStates
-//        } else {
-//          val precedingListLiterals =
-//            predictionState.predecessorStates.filter(_.element.exists(isLiteralList))
-//          if (precedingListLiterals.nonEmpty) {
-//            precedingListLiterals
-//          } else
-//            super.initVisit(predictionState)
-//        }
-//      }
-
       def isLiteralList(element: DslElement): Boolean = element match {
         case DslSyntax(syntax) => syntax.userData.contains(MyDsl.literalListId)
         case _                 => false
@@ -243,7 +233,8 @@ class PredictionPropagationTest extends FunSuite {
         } else {
           val accept =
             predictionState.leftSubIndex.forall { i =>
-              val elements        = predictionState.elementsAt(i)
+              val elements        =
+                predictionState.elementsAt(i, syntax => !syntax.userData.contains(MyDsl.variableId))
               val allVariableRefs = elements.forall {
                 case DslSyntax(syntax) => syntax.userData.contains(MyDsl.variableId)
                 case _                 => false
@@ -461,7 +452,8 @@ class PredictionPropagationTest extends FunSuite {
         "AStringValue()",
         "sum (",
         "AVarRef(x)",
-        "one of"
+        "one of",
+        "not define"
       )
     )
   }
@@ -476,7 +468,8 @@ class PredictionPropagationTest extends FunSuite {
         "true",
         "false",
         "AVarRef(x)",
-        "one of"
+        "one of",
+        "not define"
       )
     )
   }
@@ -561,7 +554,8 @@ class PredictionPropagationTest extends FunSuite {
         "&&",
         "?:",
         "is",
-        "is one of"
+        "is one of",
+        "is not define"
       )
     )
   }
@@ -575,6 +569,7 @@ class PredictionPropagationTest extends FunSuite {
       Seq(
         "is",
         "is one of",
+        "is not define",
         "?:",
         "+"
       )
@@ -637,4 +632,19 @@ class PredictionPropagationTest extends FunSuite {
     )
   }
 
+  test("predict and after is not empty, with variable") {
+    val text = "x is not define "
+    assertPredictions(
+      MyDsl.boolean,
+      text,
+      text.length,
+      List(
+        "is",
+        "is one of",
+        "is not define",
+        "?:",
+        "&&"
+      )
+    )
+  }
 }
