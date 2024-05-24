@@ -149,9 +149,8 @@ case class PredictionState(private[diesel] val state: State, private val result:
 
   def element: Option[DslElement] = state.production.getElement
 
-  // TODO returns Option
-  private def toIndex(state: State)(subIndex: Int): Int = {
-    state.production.symbols.zipWithIndex.filter(_._1.isRule).drop(subIndex).head._2
+  private def toIndex(state: State)(subIndex: Int): Option[Int] = {
+    state.production.symbols.zipWithIndex.filter(_._1.isRule).drop(subIndex).headOption.map(_._2)
   }
 
   def predecessorStates: Seq[PredictionState] = {
@@ -180,7 +179,7 @@ case class PredictionState(private[diesel] val state: State, private val result:
   ): Seq[DslElement] =
     elementsAt(
       state,
-      toIndex(state)(subIndex),
+      toIndex(state)(subIndex).get,
       recurse,
       state => recurseAtSubIndex.andThen(toIndex(state))
     )
@@ -189,7 +188,7 @@ case class PredictionState(private[diesel] val state: State, private val result:
     state: State,
     index: Int,
     recurse: Dsl.Syntax[_] => Boolean,
-    atIndex: State => DslElement => Int
+    atIndex: State => DslElement => Option[Int]
   ): Seq[DslElement] =
     if (index < state.dot) {
       elementsAt(result.backPtrsOf(state), index, state.dot, recurse, atIndex)
@@ -201,7 +200,7 @@ case class PredictionState(private[diesel] val state: State, private val result:
     index: Int,
     dot: Int,
     recurse: Dsl.Syntax[_] => Boolean,
-    atIndex: State => DslElement => Int
+    atIndex: State => DslElement => Option[Int]
   ): Seq[DslElement] =
     if (backPtrs.nonEmpty) {
       if (index + 1 == dot) {
@@ -216,10 +215,12 @@ case class PredictionState(private[diesel] val state: State, private val result:
                       else Seq(value)
                     case DslBody(element)     =>
                       val childIndex = atIndex(causal)(element)
-                      if (production.symbols.apply(childIndex).isRule)
-                        elementsAt(causal, childIndex, recurse, atIndex)
-                      else
-                        Seq(element)
+                      childIndex
+                        .map { childIndex =>
+                          elementsAt(causal, childIndex, recurse, atIndex)
+                        }.getOrElse {
+                          Seq(element)
+                        }
                     case _                    => Seq(value)
                   }
                 case None        => elementsAt(causal, 0, recurse, atIndex)
@@ -249,7 +250,7 @@ case class PredictionState(private[diesel] val state: State, private val result:
   ): Seq[String] =
     textsAt(
       state,
-      toIndex(state)(subIndex),
+      toIndex(state)(subIndex).get,
       recurse,
       state => recurseAtSubIndex.andThen(toIndex(state))
     )
@@ -258,7 +259,7 @@ case class PredictionState(private[diesel] val state: State, private val result:
     state: State,
     index: Int,
     recurse: Dsl.Syntax[_] => Boolean,
-    atIndex: State => DslElement => Int
+    atIndex: State => DslElement => Option[Int]
   ): Seq[String] =
     if (index < state.dot) {
       textsAt(result.backPtrsOf(state), index, state.dot, recurse, atIndex)
@@ -270,7 +271,7 @@ case class PredictionState(private[diesel] val state: State, private val result:
     index: Int,
     dot: Int,
     recurse: Dsl.Syntax[_] => Boolean,
-    atIndex: State => DslElement => Int
+    atIndex: State => DslElement => Option[Int]
   ): Seq[String] =
     if (backPtrs.nonEmpty) {
       if (index + 1 == dot) {
@@ -285,10 +286,11 @@ case class PredictionState(private[diesel] val state: State, private val result:
                       else textOf(causal)
                     case DslBody(element)     =>
                       val childIndex = atIndex(causal)(element)
-                      if (production.symbols.apply(childIndex).isRule)
+                      childIndex.map { childIndex =>
                         textsAt(causal, childIndex, recurse, atIndex)
-                      else
+                      }.getOrElse {
                         textOf(causal)
+                      }
                     case _                    =>
                       textOf(causal)
                   }
