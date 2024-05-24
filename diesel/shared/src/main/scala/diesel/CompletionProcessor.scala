@@ -149,8 +149,10 @@ case class PredictionState(private[diesel] val state: State, private val result:
 
   def element: Option[DslElement] = state.production.getElement
 
-  private def toIndex(subIndex: Int): Int =
+  // TODO returns Option
+  private def toIndex(state: State)(subIndex: Int): Int = {
     state.production.symbols.zipWithIndex.filter(_._1.isRule).drop(subIndex).head._2
+  }
 
   def predecessorStates: Seq[PredictionState] = {
     val chart = result.chartAt(state.begin)
@@ -174,15 +176,20 @@ case class PredictionState(private[diesel] val state: State, private val result:
   def elementsAt(
     subIndex: Int,
     recurse: Dsl.Syntax[_] => Boolean = _ => false,
-    atIndex: DslElement => Int = _ => 0
+    recurseAtSubIndex: DslElement => Int = _ => 0
   ): Seq[DslElement] =
-    elementsAt(state, toIndex(subIndex), recurse, atIndex)
+    elementsAt(
+      state,
+      toIndex(state)(subIndex),
+      recurse,
+      state => recurseAtSubIndex.andThen(toIndex(state))
+    )
 
   private def elementsAt(
     state: State,
     index: Int,
     recurse: Dsl.Syntax[_] => Boolean,
-    atIndex: DslElement => Int
+    atIndex: State => DslElement => Int
   ): Seq[DslElement] =
     if (index < state.dot) {
       elementsAt(result.backPtrsOf(state), index, state.dot, recurse, atIndex)
@@ -194,7 +201,7 @@ case class PredictionState(private[diesel] val state: State, private val result:
     index: Int,
     dot: Int,
     recurse: Dsl.Syntax[_] => Boolean,
-    atIndex: DslElement => Int
+    atIndex: State => DslElement => Int
   ): Seq[DslElement] =
     if (backPtrs.nonEmpty) {
       if (index + 1 == dot) {
@@ -208,9 +215,9 @@ case class PredictionState(private[diesel] val state: State, private val result:
                       if (recurse(syntax.syntax)) elementsAt(causal, 0, recurse, atIndex)
                       else Seq(value)
                     case DslBody(element)     =>
-                      val subIndex = atIndex(element)
-                      if (production.symbols.apply(subIndex).isRule)
-                        elementsAt(causal, subIndex, recurse, atIndex)
+                      val childIndex = atIndex(causal)(element)
+                      if (production.symbols.apply(childIndex).isRule)
+                        elementsAt(causal, childIndex, recurse, atIndex)
                       else
                         Seq(element)
                     case _                    => Seq(value)
@@ -238,15 +245,20 @@ case class PredictionState(private[diesel] val state: State, private val result:
   def textsAt(
     subIndex: Int,
     recurse: Dsl.Syntax[_] => Boolean = _ => false,
-    atIndex: DslElement => Int = _ => 0
+    recurseAtSubIndex: DslElement => Int = _ => 0
   ): Seq[String] =
-    textsAt(state, toIndex(subIndex), recurse, atIndex)
+    textsAt(
+      state,
+      toIndex(state)(subIndex),
+      recurse,
+      state => recurseAtSubIndex.andThen(toIndex(state))
+    )
 
   private def textsAt(
     state: State,
     index: Int,
     recurse: Dsl.Syntax[_] => Boolean,
-    atIndex: DslElement => Int
+    atIndex: State => DslElement => Int
   ): Seq[String] =
     if (index < state.dot) {
       textsAt(result.backPtrsOf(state), index, state.dot, recurse, atIndex)
@@ -258,7 +270,7 @@ case class PredictionState(private[diesel] val state: State, private val result:
     index: Int,
     dot: Int,
     recurse: Dsl.Syntax[_] => Boolean,
-    atIndex: DslElement => Int
+    atIndex: State => DslElement => Int
   ): Seq[String] =
     if (backPtrs.nonEmpty) {
       if (index + 1 == dot) {
@@ -272,9 +284,9 @@ case class PredictionState(private[diesel] val state: State, private val result:
                       if (recurse(syntax.syntax)) textsAt(causal, 0, recurse, atIndex)
                       else textOf(causal)
                     case DslBody(element)     =>
-                      val subIndex = atIndex(element)
-                      if (production.symbols.apply(subIndex).isRule)
-                        textsAt(causal, subIndex, recurse, atIndex)
+                      val childIndex = atIndex(causal)(element)
+                      if (production.symbols.apply(childIndex).isRule)
+                        textsAt(causal, childIndex, recurse, atIndex)
                       else
                         textOf(causal)
                     case _                    =>
