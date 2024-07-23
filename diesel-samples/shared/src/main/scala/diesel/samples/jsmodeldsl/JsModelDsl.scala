@@ -184,7 +184,8 @@ case object JsModelDsl extends Dsl with Identifiers with Comments with DynamicLe
                 }
                 .getOrElse(Seq.empty)
             } else if (
-              syntax.name == sAttrName.name || syntax.name == sClassName.name || syntax.name == sDomainName.name
+              syntax.name == sAttrName.name || syntax.name == sClassName.name || syntax
+                .name == sDomainName.name
             ) {
               Seq()
             } else {
