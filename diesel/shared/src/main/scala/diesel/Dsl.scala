@@ -208,7 +208,7 @@ object Dsl {
   }
 
   trait SPOptionalizable[T] { this: SyntaxProduction[T] =>
-    def `?` : SPOpt[T] = SPOpt(this)
+    def `?`: SPOpt[T] = SPOpt(this)
   }
 
   trait SPRepeatable[T] { this: SyntaxProduction[T] =>
