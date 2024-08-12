@@ -18,7 +18,7 @@ package diesel
 
 import diesel.Navigator.Ambiguity
 import diesel.Bnf.{DslElement, Production}
-import diesel.Errors.Ambiguous
+import diesel.Errors.{Ambiguous, Incompatible}
 import diesel.Lexer.Token
 
 import scala.collection.mutable
@@ -665,6 +665,13 @@ class Navigator(
       } else {
         result.tokenAt(state.end - 1).map(tk => tk.offset + tk.text.length).getOrElse(-1) - offset
       }
+    if (
+      state.kind(result) == StateKind.Incompatible && !errors.exists(m =>
+        m.descriptor.kind == Marker.Kind.Syntactic
+      )
+    ) {
+      errors = Seq(Incompatible.apply(offset, length)) ++ errors
+    }
     applyRule(
       state.production,
       children,

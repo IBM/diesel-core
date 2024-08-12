@@ -90,13 +90,20 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
           }
         }
       }
+      context.endChart()
       if (!scanned && !succeed(lexicalValue, context)) {
+//        if (lexicalValue.id == Lexer.Eos) {
+//          if (context.success(index - 1)) {
+//            // errorRecovery(index - 2, context.chartAt(index - 2).token.get, context)
+//            errorRecovery(index - 1, context.chartAt(index - 1).token.get, context)
+//          }
+//        }
         errorRecovery(index, lexicalValue, context)
         if (lexicalValue.id == Lexer.Eos) {
-          while (!context.success) {
+          while (!context.success(index)) {
             val stateCount = context.stateCount()
             errorRecovery(index, lexicalValue, context)
-            if (stateCount == context.stateCount() && !context.success) {
+            if (stateCount == context.stateCount() && !context.success(index)) {
               throw new RuntimeException(
                 "internal error, unable to recover from errors"
               )
@@ -104,7 +111,6 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
           }
         }
       }
-      context.endChart()
 
       index += 1
       if (!context.success) {
@@ -145,7 +151,7 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
   }
 
   private def errorRecovery(index: Int, lexicalValue: Lexer.Token, context: Result): Unit = {
-    context.beginErrorRecovery()
+    context.beginErrorRecovery(index, context)
     if (context.processingQueue.isEmpty)
       throw new RuntimeException(
         "internal error, processing queue is empty while recovering from errors"
@@ -209,7 +215,7 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
         }
       }
     }
-    context.endErrorRecovery()
+    context.endErrorRecovery(context)
   }
 
   private def scanner(
@@ -255,7 +261,7 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
     val candidates = context.chartAt(state.begin).activeRules(state.rule)
     candidates.foreach(candidate => {
       val feature = candidate.feature.merge(candidate.dot, state.feature)
-      if (feature != Constraints.Incompatible) {
+      if (feature != Constraints.Incompatible || errorRecovery) {
         context.addState(
           State(
             candidate.production,
@@ -265,7 +271,8 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
             if (candidate.feature.canPropagate) feature else candidate.feature
           ),
           if (errorRecovery) {
-            StateKind.ErrorRecovery
+            if (feature == Constraints.Incompatible) StateKind.Incompatible
+            else StateKind.ErrorRecovery
           } else {
             StateKind.next(state.kind(context))
           },

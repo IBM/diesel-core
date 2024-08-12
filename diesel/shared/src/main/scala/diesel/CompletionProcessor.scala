@@ -424,7 +424,7 @@ class CompletionProcessor(
             defaultReplace = prefix.map(p => (offset - p.length, p.length))
             node = tree.root.findNodeAtIndex(chart.index)
             chart.notCompletedStates
-              .filterNot(_.kind(result) == StateKind.ErrorRecovery)
+              .filterNot(s => StateKind.errorRecovery(s.kind(result)))
               .filter(s => PredictionState.isPredictionState(s))
               .flatMap { s =>
                 if (beginCompute(PredictionState(s, result))) {

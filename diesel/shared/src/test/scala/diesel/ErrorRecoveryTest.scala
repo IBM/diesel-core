@@ -157,12 +157,23 @@ class ErrorRecoveryTest extends DslTestFunSuite {
   }
 
   test("incompatible") {
-    val ex = intercept[RuntimeException](AstHelpers.parse(dsl, "\"foo\" + 14 - 12"))
-    assert(ex.getMessage == "internal error, unable to recover from errors")
+    assertAst(
+      "\"foo\" + 14 - 12",
+      Seq(Marker(semanticError, 0, 15, IncompatibleMsg))
+    ) {
+      Concat(StringValue("foo"), Sub(NumberValue(14), NumberValue(12)))
+    }
   }
 
   test("incomplete") {
-    val ex = intercept[RuntimeException](AstHelpers.parse(dsl, "\"foo\" + 14 - "))
-    assert(ex.getMessage == "internal error, unable to recover from errors")
+    assertAst(
+      "\"foo\" + 14 - ",
+      Seq(
+        // Marker(semanticError, 0, 12, IncompatibleMsg),
+        Marker(syntacticError, 13, 0, MissingTokenMsg("0"))
+      )
+    ) {
+      Concat(StringValue("foo"), Sub(NumberValue(14), NumberValue(0)))
+    }
   }
 }
