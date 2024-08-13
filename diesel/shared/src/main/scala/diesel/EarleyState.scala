@@ -283,6 +283,8 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
 
   private def successState(length: Int): State = State(axiom.production, 0, length, 1)
 
+  private[diesel] def stateCount(): Int = states.size
+
   private var currentChart: Option[Chart]                             = None
   private val nullableCache: mutable.Map[Bnf.NonTerminal, Set[State]] = mutable.Map()
 

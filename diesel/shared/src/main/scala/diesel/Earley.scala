@@ -94,7 +94,13 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
         errorRecovery(index, lexicalValue, context)
         if (lexicalValue.id == Lexer.Eos) {
           while (!context.success) {
+            val stateCount = context.stateCount()
             errorRecovery(index, lexicalValue, context)
+            if (stateCount == context.stateCount() && !context.success) {
+              throw new RuntimeException(
+                "internal error, unable to recover from errors"
+              )
+            }
           }
         }
       }
