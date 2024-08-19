@@ -156,6 +156,15 @@ class ErrorRecoveryTest extends DslTestFunSuite {
     }
   }
 
+  test("missing operator") {
+    assertAst(
+      "\"foo\" 12",
+      Seq(Marker(syntacticError, 6, 2, InsertedTokenMsg("12")))
+    ) {
+      StringValue("foo")
+    }
+  }
+
   test("incompatible") {
     assertAst(
       "\"foo\" + 14 - 12",
@@ -165,15 +174,54 @@ class ErrorRecoveryTest extends DslTestFunSuite {
     }
   }
 
+  test("incompatible 2") {
+    assertAst(
+      "\"foo\" + 14 - 12 + 10",
+      Seq(Marker(semanticError, 0, 20, IncompatibleMsg))
+    ) {
+      Concat(StringValue("foo"), Add(Sub(NumberValue(14), NumberValue(12)), NumberValue(10)))
+    }
+  }
+
+  test("incompatible 3") {
+    assertAst(
+      "\"foo\" + 14 - 12 + \"bar\"",
+      Seq(Marker(semanticError, 0, 23, IncompatibleMsg))
+    ) {
+      Concat(StringValue("foo"), Concat(Sub(NumberValue(14), NumberValue(12)), StringValue("bar")))
+    }
+  }
+
   test("incomplete") {
     assertAst(
       "\"foo\" + 14 - ",
       Seq(
-        // Marker(semanticError, 0, 12, IncompatibleMsg),
-        Marker(syntacticError, 13, 0, MissingTokenMsg("0"))
+        Marker(syntacticError, 11, 1, InsertedTokenMsg("-"))
       )
     ) {
-      Concat(StringValue("foo"), Sub(NumberValue(14), NumberValue(0)))
+      Concat(StringValue("foo"), NumberValue(14))
+    }
+  }
+
+  test("wrong operator") {
+    assertAst(
+      "\"foo\" + 14 - \"bar\"",
+      Seq(
+        Marker(syntacticError, 11, 1, TokenMutationMsg("-", "+"))
+      )
+    ) {
+      Concat(Concat(StringValue("foo"), NumberValue(14)), StringValue("bar"))
+    }
+  }
+
+  test("empty") {
+    assertAst(
+      "",
+      Seq(
+        Marker(syntacticError, 0, 0, MissingTokenMsg("0"))
+      )
+    ) {
+      NumberValue(0)
     }
   }
 }
