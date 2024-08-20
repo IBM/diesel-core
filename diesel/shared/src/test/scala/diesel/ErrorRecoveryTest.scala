@@ -28,7 +28,9 @@ object ErrorRecoveryTestDsl {
       override def toString: String = f.toString
     }
 
-    case class StringValue(s: String) extends Value
+    case class StringValue(s: String) extends Value {
+      override def toString: String = s
+    }
 
     case class Add(left: Value, right: Value) extends Value
 
@@ -54,7 +56,7 @@ object ErrorRecoveryTestDsl {
       }
 
     val textConcept: Concept[StringValue] =
-      concept("\"[^\"]*\"".r, StringValue(""), parent = Some(stringConcept)) map {
+      concept("\"[^\"]*\"".r, StringValue("\"\""), parent = Some(stringConcept)) map {
         case (_, s) =>
           StringValue(s.text.substring(1, s.text.length - 1))
       }
@@ -222,6 +224,17 @@ class ErrorRecoveryTest extends DslTestFunSuite {
       )
     ) {
       NumberValue(0)
+    }
+  }
+
+  test("foo") {
+    assertAst(
+      "\"foo\" + ",
+      Seq(
+        Marker(syntacticError, 8, 0, MissingTokenMsg("\"\""))
+      )
+    ) {
+      Concat(StringValue("foo"), StringValue(""))
     }
   }
 }

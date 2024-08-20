@@ -287,8 +287,6 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
 
   private[diesel] def stateCount(): Int = states.size
 
-  private[diesel] def stateCount(): Int = states.size
-
   private var currentChart: Option[Chart]                             = None
   private val nullableCache: mutable.Map[Bnf.NonTerminal, Set[State]] = mutable.Map()
 
