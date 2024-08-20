@@ -240,7 +240,7 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
     errorRecovery: Boolean = false,
     backtracking: Boolean = false
   ): Unit = {
-    if (backtracking) {
+    if (backtracking && state.kind(context) == StateKind.ErrorRecovery) {
       rule.productions.sortBy(_.length).take(1).foreach(production =>
         context.addState(
           State(production, state.end, state.end, 0),
