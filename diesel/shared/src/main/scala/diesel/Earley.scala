@@ -90,24 +90,22 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
           }
         }
       }
-      if (!scanned && !succeed(lexicalValue, context)) {
-        errorRecovery(index, lexicalValue, context)
-        if (lexicalValue.id == Lexer.Eos) {
-          while (!context.success) {
-            val stateCount = context.stateCount()
-            errorRecovery(index, lexicalValue, context)
-            if (stateCount == context.stateCount() && !context.success) {
-              throw new RuntimeException(
-                "internal error, unable to recover from errors"
-              )
-            }
+      context.endChart()
+      if (!scanned && !succeed(length, lexicalValue, context)) {
+        errorRecovery(index, lexicalValue, length, backtracking = false, context)
+        if (lexicalValue.id == Lexer.Eos && !context.success(length)) {
+          val backtrack = chart.getStates.minBy(_.begin).begin
+          for (i <- backtrack until index + 1) {
+            errorRecovery(i, context.chartAt(i).token.get, length, backtracking = true, context)
+          }
+          if (!context.success(length)) {
+            throw new RuntimeException("internal error, unable to recover from errors")
           }
         }
       }
-      context.endChart()
 
       index += 1
-      if (!context.success) {
+      if (!succeed(length, lexicalValue, context)) {
         chart = context.beginChart(index)
         lexicalValue = if (dynamicLexer) dynamicScan(input, context) else scan(input, context)
         if (lexicalValue.id != Lexer.Eos)
@@ -140,12 +138,18 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
     scanQueue
   }
 
-  private def succeed(lexicalValue: Lexer.Token, context: Result) = {
-    if (lexicalValue.id == Lexer.Eos) context.success else false
+  private def succeed(index: Int, lexicalValue: Lexer.Token, context: Result): Boolean = {
+    if (lexicalValue.id == Lexer.Eos) context.success(index) else false
   }
 
-  private def errorRecovery(index: Int, lexicalValue: Lexer.Token, context: Result): Unit = {
-    context.beginErrorRecovery()
+  private def errorRecovery(
+    index: Int,
+    lexicalValue: Lexer.Token,
+    length: Int,
+    backtracking: Boolean,
+    context: Result
+  ): Unit = {
+    context.beginErrorRecovery(index, context)
     if (context.processingQueue.isEmpty)
       throw new RuntimeException(
         "internal error, processing queue is empty while recovering from errors"
@@ -154,10 +158,10 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
     while (context.processingQueue.nonEmpty) {
       val state: State = context.processingQueue.dequeue()
       if (state.isCompleted) {
-        if (state == context.successState && lexicalValue.id != Eos) {
+        if ((lexicalValue.id != Eos) && (state == context.successState(length - 1))) {
           // Insertion error hypothesis : ignore all the tokens at the end of right text
           context.addState(
-            State(state.production, state.begin, state.end + 1, state.dot),
+            State(state.production, state.begin, length, state.dot),
             StateKind.ErrorRecovery,
             Some(BackPtr(state, InsertedTokenValue(index, lexicalValue, None)))
           )
@@ -203,13 +207,13 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
             }
 
           case rule: Bnf.Rule =>
-            predictor(state, rule, context, errorRecovery = true)
+            predictor(state, rule, context, errorRecovery = true, backtracking)
 
           case _ => ()
         }
       }
     }
-    context.endErrorRecovery()
+    context.endErrorRecovery(context)
   }
 
   private def scanner(
@@ -233,19 +237,28 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
     state: State,
     rule: Bnf.Rule,
     context: Result,
-    errorRecovery: Boolean = false
+    errorRecovery: Boolean = false,
+    backtracking: Boolean = false
   ): Unit = {
-    rule.productions.foreach(production =>
+    if (backtracking && state.kind(context) == StateKind.ErrorRecovery) {
       context.addState(
-        State(production, state.end, state.end, 0),
-        if (errorRecovery) {
-          StateKind.ErrorRecovery
-        } else {
-          StateKind.next(state.kind(context))
-        },
+        State(rule.productions.minBy(_.length), state.end, state.end, 0),
+        StateKind.ErrorRecovery,
         None
       )
-    )
+    } else {
+      rule.productions.foreach(production =>
+        context.addState(
+          State(production, state.end, state.end, 0),
+          if (errorRecovery) {
+            StateKind.ErrorRecovery
+          } else {
+            StateKind.next(state.kind(context))
+          },
+          None
+        )
+      )
+    }
   }
 
   private def completer(state: State, context: Result, errorRecovery: Boolean = false): Unit = {
@@ -255,7 +268,10 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
     val candidates = context.chartAt(state.begin).activeRules(state.rule)
     candidates.foreach(candidate => {
       val feature = candidate.feature.merge(candidate.dot, state.feature)
-      if (feature != Constraints.Incompatible) {
+      if (
+        feature != Constraints.Incompatible || (errorRecovery && state.syntacticErrors( // apply only when no syntactic errors
+          context) == 0)
+      ) {
         context.addState(
           State(
             candidate.production,
@@ -265,7 +281,8 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
             if (candidate.feature.canPropagate) feature else candidate.feature
           ),
           if (errorRecovery) {
-            StateKind.ErrorRecovery
+            if (feature == Constraints.Incompatible) StateKind.Incompatible
+            else StateKind.ErrorRecovery
           } else {
             StateKind.next(state.kind(context))
           },

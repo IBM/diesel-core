@@ -50,9 +50,9 @@ class SqlTest extends DslTestFunSuite {
 
   test("missing where") {
     withTree("select * from users x") { tree =>
-      assert(tree.markers.size == 3)
+      assert(tree.markers.size == 1)
       val m = tree.markers.head
-      assert(m.message == MissingTokenMsg("where"))
+      assert(m.message == InsertedTokenMsg("x"))
     }
   }
 

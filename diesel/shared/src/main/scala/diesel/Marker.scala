@@ -89,6 +89,11 @@ case object AmbiguousMsg                                                extends 
     DieselI18n.ambiguous()(resolver(locale))
   }
 }
+case object IncompatibleMsg                                             extends InternalMsg {
+  override def format(locale: String): String = {
+    DieselI18n.incompatible()(resolver(locale))
+  }
+}
 
 case class Marker(descriptor: Descriptor, offset: Int, length: Int, message: MarkerMessage) {
   override def toString: String = {
@@ -139,6 +144,13 @@ object Errors {
 
     def apply(offset: Int, length: Int): Marker = {
       Marker(SemanticError, offset, length, AmbiguousMsg)
+    }
+  }
+
+  object Incompatible {
+
+    def apply(offset: Int, length: Int): Marker = {
+      Marker(SemanticError, offset, length, IncompatibleMsg)
     }
   }
 }

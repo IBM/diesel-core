@@ -237,10 +237,12 @@ private[diesel] case class BackPtr(predecessor: State, causal: Item) {
 }
 
 private[diesel] object StateKind extends Enumeration {
-  val Kernel, Processed, ErrorRecovery = Value
+  val Kernel, Processed, Incompatible, ErrorRecovery = Value
 
   def next(value: Value): Value =
-    if (value.id < ErrorRecovery.id) values.iteratorFrom(value).next() else value
+    if (value.id < Incompatible.id) values.iteratorFrom(value).next() else value
+
+  def errorRecovery(value: Value): Boolean = value.id >= Incompatible.id
 }
 
 private[diesel] class StateContext(
@@ -281,7 +283,7 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
 
   val axiomState: State = State(axiom.production, 0, 0, 0)
 
-  private def successState(length: Int): State = State(axiom.production, 0, length, 1)
+  private[diesel] def successState(index: Int): State = State(axiom.production, 0, index, 1)
 
   private[diesel] def stateCount(): Int = states.size
 
@@ -420,17 +422,19 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
     }
   }
 
-  private[diesel] def beginErrorRecovery(): Unit = {
-    currentChart.foreach(chart => chart.toQueue(processingQueue))
+  private[diesel] def beginErrorRecovery(index: Int, context: Result): Unit = {
+    context.beginChart(index)
   }
 
-  private[diesel] def endErrorRecovery(): Unit = {}
+  private[diesel] def endErrorRecovery(context: Result): Unit = {
+    context.endChart()
+  }
 
   private[diesel] def endChart(): Unit = {
     currentChart = None
   }
 
-  private def success(length: Int): Boolean = states.contains(successState(length))
+  private[diesel] def success(length: Int): Boolean = states.contains(successState(length))
 
   def success: Boolean = success(length - 1)
 
@@ -438,7 +442,7 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
 
   def length: Int = charts.size
 
-  private[diesel] def hasNext: Boolean = chartAt(length - 1).size > 0 || !success
+  private[diesel] def hasNext(index: Int): Boolean = chartAt(index).size > 0 || !success(index)
 
   override def toString: String = {
     val builder = new mutable.StringBuilder()

@@ -36,6 +36,14 @@ abstract class DslTestFunSuite extends FunSuite {
     }
   }
 
+  protected def assertAst(text: String, markers: Seq[Marker])(expected: => Ast): Unit = {
+    withTree(text) { tree =>
+      //      println(munitPrint(tree.value))
+      assertEquals(tree.markers, markers)
+      assertEquals(tree.value, expected)
+    }
+  }
+
   protected def assertMarkers(text: String)(expected: => Seq[Marker]): Unit = {
     withTree(text) { tree =>
       assertEquals(tree.markers, expected)
@@ -50,7 +58,7 @@ abstract class DslTestFunSuite extends FunSuite {
   }
 
   private val defaultNavigatorFactory =
-    (r: Result) => Navigator(r, Seq.empty, Navigator.defaultReducer, None);
+    (r: Result) => Navigator(r, Seq.empty, Navigator.defaultReducer, None)
 
   protected def withAsts(
     text: String,

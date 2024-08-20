@@ -26,6 +26,7 @@ object DieselI18n extends Messages {
   val tokenMutation: Msg2[String, String] = msg2
   val unknownToken: Msg1[String]          = msg1
   val ambiguous: Msg0                     = msg0
+  val incompatible: Msg0                  = msg0
 
   override protected def load(): Map[Lang, Map[String, MessageFormat]] =
     I18nFiles.messages

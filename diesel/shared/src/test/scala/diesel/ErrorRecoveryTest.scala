@@ -28,7 +28,9 @@ object ErrorRecoveryTestDsl {
       override def toString: String = f.toString
     }
 
-    case class StringValue(s: String) extends Value
+    case class StringValue(s: String) extends Value {
+      override def toString: String = s
+    }
 
     case class Add(left: Value, right: Value) extends Value
 
@@ -54,7 +56,7 @@ object ErrorRecoveryTestDsl {
       }
 
     val textConcept: Concept[StringValue] =
-      concept("\"[^\"]*\"".r, StringValue(""), parent = Some(stringConcept)) map {
+      concept("\"[^\"]*\"".r, StringValue("\"\""), parent = Some(stringConcept)) map {
         case (_, s) =>
           StringValue(s.text.substring(1, s.text.length - 1))
       }
@@ -156,13 +158,83 @@ class ErrorRecoveryTest extends DslTestFunSuite {
     }
   }
 
+  test("missing operator") {
+    assertAst(
+      "\"foo\" 12",
+      Seq(Marker(syntacticError, 6, 2, InsertedTokenMsg("12")))
+    ) {
+      StringValue("foo")
+    }
+  }
+
   test("incompatible") {
-    val ex = intercept[RuntimeException](AstHelpers.parse(dsl, "\"foo\" + 14 - 12"))
-    assert(ex.getMessage == "internal error, unable to recover from errors")
+    assertAst(
+      "\"foo\" + 14 - 12",
+      Seq(Marker(semanticError, 0, 15, IncompatibleMsg))
+    ) {
+      Concat(StringValue("foo"), Sub(NumberValue(14), NumberValue(12)))
+    }
+  }
+
+  test("incompatible 2") {
+    assertAst(
+      "\"foo\" + 14 - 12 + 10",
+      Seq(Marker(semanticError, 0, 20, IncompatibleMsg))
+    ) {
+      Concat(StringValue("foo"), Add(Sub(NumberValue(14), NumberValue(12)), NumberValue(10)))
+    }
+  }
+
+  test("incompatible 3") {
+    assertAst(
+      "\"foo\" + 14 - 12 + \"bar\"",
+      Seq(Marker(semanticError, 0, 23, IncompatibleMsg))
+    ) {
+      Concat(StringValue("foo"), Concat(Sub(NumberValue(14), NumberValue(12)), StringValue("bar")))
+    }
   }
 
   test("incomplete") {
-    val ex = intercept[RuntimeException](AstHelpers.parse(dsl, "\"foo\" + 14 - "))
-    assert(ex.getMessage == "internal error, unable to recover from errors")
+    assertAst(
+      "\"foo\" + 14 - ",
+      Seq(
+        Marker(syntacticError, 11, 1, InsertedTokenMsg("-"))
+      )
+    ) {
+      Concat(StringValue("foo"), NumberValue(14))
+    }
+  }
+
+  test("wrong operator") {
+    assertAst(
+      "\"foo\" + 14 - \"bar\"",
+      Seq(
+        Marker(syntacticError, 11, 1, TokenMutationMsg("-", "+"))
+      )
+    ) {
+      Concat(Concat(StringValue("foo"), NumberValue(14)), StringValue("bar"))
+    }
+  }
+
+  test("empty") {
+    assertAst(
+      "",
+      Seq(
+        Marker(syntacticError, 0, 0, MissingTokenMsg("0"))
+      )
+    ) {
+      NumberValue(0)
+    }
+  }
+
+  test("foo") {
+    assertAst(
+      "\"foo\" + ",
+      Seq(
+        Marker(syntacticError, 8, 0, MissingTokenMsg("\"\""))
+      )
+    ) {
+      Concat(StringValue("foo"), StringValue(""))
+    }
   }
 }
