@@ -91,8 +91,7 @@ case object AmbiguousMsg                                                extends 
 }
 case object IncompatibleMsg                                             extends InternalMsg {
   override def format(locale: String): String = {
-    // TODO DieselI18n.incompatible()(resolver(locale))
-    "Incompatible sentence, due to incompatible precedence"
+    DieselI18n.incompatible()(resolver(locale))
   }
 }
 
