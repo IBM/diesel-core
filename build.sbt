@@ -3,7 +3,7 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 import scala.sys.process._
 
-val scalaVersion2 = "2.13.14"
+val scalaVersion2 = "2.13.15"
 // val scalaVersion3 = "3.2.1"
 
 lazy val commonSettings = Seq(
