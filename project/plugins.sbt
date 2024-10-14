@@ -3,7 +3,7 @@ addSbtPlugin("org.scala-js"       % "sbt-scalajs"              % "1.17.0")
 addSbtPlugin("org.scalameta"      % "sbt-scalafmt"             % "2.5.2")
 addSbtPlugin("ch.epfl.scala"      % "sbt-scalafix"             % "0.13.0")
 addSbtPlugin("de.heikoseeberger"  % "sbt-header"               % "5.10.0")
-addSbtPlugin("com.github.sbt"     % "sbt-ci-release"           % "1.7.0")
+addSbtPlugin("com.github.sbt"     % "sbt-ci-release"           % "1.8.0")
 
 addSbtPlugin(
   "com.ibm.cloud.diesel" % "diesel-i18n-plugin" % "0.6.0"
