@@ -31,7 +31,7 @@ case class GlslFunc(args: Seq[GlslArg], body: Option[StatementList]) extends Fun
     body
       .map(statements => {
         // create a new scope and add all arguments into it
-        val s = scope.push()
+        val s   = scope.push()
         for ((arg, argIndex) <- args.zipWithIndex) {
           val argVal = arguments(argIndex) match {
             case ERef(name)    =>
@@ -42,7 +42,7 @@ case class GlslFunc(args: Seq[GlslArg], body: Option[StatementList]) extends Fun
           s.declare(arg.name, argVal)
         }
         // invoke function body
-        val e = new GlslEval(s)
+        val e   = new GlslEval(s)
         val res = e.eval(statements)
 
         // post-process out args by setting their
