@@ -48,10 +48,37 @@ class DslifyTest extends FunSuite {
         }
     }
 
-    // test("dump bnf") {
-    //     val bnf = Bnf(MyDsl)
-    //     BnfExplorer.dumpAndOpen(bnf)
-    // }
+    test("dump bnf") {
+        val bnf = Bnf(MyDsl)
+        dumpAxioms(bnf)
+        // BnfExplorer.dumpAndOpen(bnf)
+    }
+
+    def dumpAxioms(bnf: Bnf): Map[String,Double] = 
+        bnf.axioms.foldLeft(Map[String,Double]()) { 
+            case (acc,a) => 
+                println(s"Axiom ${a.name}")
+                val (score, acc2) = dumpProduction(a.production, acc)
+                acc2 + ((a.name, score))
+        }
+
+    def dumpProduction(p: Bnf.Production, scores: Map[String,Double]): (Double,Map[String,Double]) =
+        p.symbols.foreach {
+            case Bnf.Axiom(_) => {
+                throw new RuntimeException("fuck");
+            }
+            case Bnf.Token(name,_,_) => {
+                println(name)
+            }
+            case r: Bnf.Rule => {
+                val (score, scores2) = dumpRule(r, scores)
+                
+
+            }
+        }
+
+    def dumpRule(r: Bnf.Rule, scores: Map[String,Double]): (Double,Map[String,Double]) = ???
+    
 
 
     // test("simple") {
