@@ -76,15 +76,31 @@ class DslifyTest extends FunSuite {
   }
 
   test("list literals in text") {
-    val bnf                    = Bnf(MyDsl)
-    val input                  = new Input("13 multiply 14")
+    val bnf      = Bnf(MyDsl)
+    val text     = "13 multiply 14"
+    val literals = extractLiterals(bnf, text)
+    assertEquals(literals, Seq("13", "14"))
+  }
+
+  def extractLiterals(bnf: Bnf, text: String): Seq[String] = {
+    val input                  = new Input(text)
     val tokens                 = Seq.unfold(bnf.lexer) { lexer =>
       Option(lexer.next(input)).filterNot(_.id == Eos).map((_, lexer))
     }
     val concepts: Set[TokenId] =
       MyDsl.getConcepts.collect { case c: Concept[_] if c.data.isDefined => ConceptId(c) }.toSet
     val literals               = tokens.filter(t => concepts.contains(t.id)).map(_.text)
-    assertEquals(literals, Seq("13", "14"))
+    literals
+  }
+
+  test("score and generate by overlap and fill literals") {
+    val bnf        = Bnf(MyDsl)
+    val input      = "13 multiply 14"
+    val scoringFun = scoreWordsLetters(input);
+    val scores     = scoreAxioms(bnf, scoringFun)
+    val literals   = extractLiterals(bnf, input)
+    val text       = generateDsl(bnf, scores, literals)
+    assertEquals(text, Some("13 mul 14"))
   }
 
   // TODO
@@ -160,30 +176,48 @@ class DslifyTest extends FunSuite {
     (total, scores2)
   }
 
-  def generateDsl(bnf: Bnf, scores: Map[Bnf.Production, Double]): Option[String] = {
+  def generateDsl(
+    bnf: Bnf,
+    scores: Map[Bnf.Production, Double],
+    literals: Seq[String] = Seq()
+  ): Option[String] = {
     val axiom = bnf.axioms.reduceOption[Bnf.Axiom] { case (max, a) =>
       val score1 = scores(max.production)
       val score  = scores(a.production)
       if (score > score1) a else max
     }
-    axiom.map(a => generateProduction(a.production, scores))
+    axiom.map(a => generateProduction(a.production, scores, literals)._1)
   }
 
-  def generateProduction(p: Bnf.Production, scores: Map[Bnf.Production, Double]): String = {
-    p.symbols.flatMap {
-      case r: Bnf.Rule  => generateRule(r, scores)
-      case t: Bnf.Token => Some(t.tokenId.name)
-      case _            => throw new RuntimeException("boom")
-    }.mkString(" ")
+  def generateProduction(
+    p: Bnf.Production,
+    scores: Map[Bnf.Production, Double],
+    literals: Seq[String]
+  ): (String, Seq[String]) = {
+    val (ts, literals1) = p.symbols.foldLeft((Seq.empty[String], literals)) {
+      case ((acc, literals), r: Bnf.Rule)                   =>
+        generateRule(r, scores, literals).map { case (t, literals) => (acc :+ t, literals) }
+          .getOrElse((acc, literals))
+      case ((acc, literals), Bnf.Token(_, _: ConceptId, _)) => literals.headOption.map { t =>
+          (acc :+ t, literals.tail)
+        }.getOrElse((acc, literals))
+      case ((acc, literals), t: Bnf.Token)                  => (acc :+ t.tokenId.name, literals)
+      case _                                                => throw new RuntimeException("boom")
+    }
+    (ts.mkString(" "), literals1)
   }
 
-  def generateRule(r: Bnf.Rule, scores: Map[Bnf.Production, Double]): Option[String] = {
+  def generateRule(
+    r: Bnf.Rule,
+    scores: Map[Bnf.Production, Double],
+    literals: Seq[String]
+  ): Option[(String, Seq[String])] = {
     val p = r.productions.reduceOption[Bnf.Production] { case (max, p) =>
       val score1 = scores(max)
       val score  = scores(p)
       if (score > score1) p else max
     }
-    p.map(p => generateProduction(p, scores))
+    p.map(p => generateProduction(p, scores, literals))
   }
 
   // test("simple") {
