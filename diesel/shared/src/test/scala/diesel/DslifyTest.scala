@@ -48,24 +48,39 @@ class DslifyTest extends FunSuite {
     }
   }
 
-  test("first score and generate") {
-    val bnf    = Bnf(MyDsl)
-    val scores = scoreAxioms(bnf)
-    val text   = generateDsl(bnf, scores)
+  test("first score and generate: add") {
+    val bnf        = Bnf(MyDsl)
+    val scoringFun = (name: String) => if (name == "add") 1d else 0d;
+    val scores     = scoreAxioms(bnf, scoringFun)
+    val text       = generateDsl(bnf, scores)
     assertEquals(text, Some("cInt add cInt"))
   }
 
-  def scoreAxioms(bnf: Bnf): Map[Bnf.Production, Double] =
+  test("score and generate") {
+    val bnf        = Bnf(MyDsl)
+    val scoringFun = scoreWords("13 mul 14");
+    val scores     = scoreAxioms(bnf, scoringFun)
+    val text       = generateDsl(bnf, scores)
+    assertEquals(text, Some("cInt mul cInt"))
+  }
+
+  def scoreWords(text: String): String => Double = {
+    var words = text.split(" ").toSet
+    token => if (words.contains(token)) 1d else 0d
+  }
+
+  def scoreAxioms(bnf: Bnf, scoringFun: String => Double): Map[Bnf.Production, Double] =
     bnf.axioms.foldLeft(Map[Bnf.Production, Double]()) {
       case (acc, a) =>
         println(s"Axiom ${a.name}")
-        val (score, acc2) = scoreProduction(a.production, acc)
+        val (score, acc2) = scoreProduction(a.production, acc, scoringFun)
         acc2 + ((a.production, score))
     }
 
   def scoreProduction(
     p: Bnf.Production,
-    scores: Map[Bnf.Production, Double]
+    scores: Map[Bnf.Production, Double],
+    scoringFun: String => Double
   ): (Double, Map[Bnf.Production, Double]) = {
     val (total, scores2) = p.symbols.foldLeft((0d, scores)) {
       case (_, Bnf.Axiom(_))                         => {
@@ -73,27 +88,28 @@ class DslifyTest extends FunSuite {
       }
       case ((total, scores), Bnf.Token(name, id, _)) => {
         println(name)
-        val score = scoreToken(id)
+        val score = scoringFun(id.name)
         (total + score, scores)
       }
       case ((total, scores), r: Bnf.Rule)            => {
-        val (score, scores2) = scoreRule(r, scores)
+        val (score, scores2) = scoreRule(r, scores, scoringFun)
         (total + score, scores2)
       }
     }
     (total / p.symbols.length, scores2)
   }
 
-  def scoreToken(id: TokenId): Double = if (id.name == "add") 1d else 0d
+//   def scoreToken(id: TokenId): Double = if (id.name == "add") 1d else 0d
 
   def scoreRule(
     r: Bnf.Rule,
-    scores: Map[Bnf.Production, Double]
+    scores: Map[Bnf.Production, Double],
+    scoringFun: String => Double
   ): (Double, Map[Bnf.Production, Double]) = {
     val (total, scores2) = r.productions.foldLeft((0d, scores)) {
       case ((total, scores), p) => {
         // TODO stop recursion
-        val (score, scores2) = scoreProduction(p, scores)
+        val (score, scores2) = scoreProduction(p, scores, scoringFun)
         (Math.max(total, score), scores2 + ((p, score)))
       }
     }
