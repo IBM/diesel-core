@@ -17,6 +17,14 @@ class DslifyTest extends FunSuite {
     case class Mul(a: Number, b: Number) extends Operation
   }
 
+  object Ast2 {
+    trait Expr
+    case class Number(v: String)     extends Expr
+    sealed trait Operation           extends Expr
+    case class Add(a: Expr, b: Expr) extends Operation
+    case class Mul(a: Expr, b: Expr) extends Operation
+  }
+
   import Ast._
 
   object MyDsl extends Dsl {
@@ -38,6 +46,29 @@ class DslifyTest extends FunSuite {
     val a: Axiom[Operation] = axiom(cOp)
   }
 
+  object MyDsl2 extends Dsl {
+    import Ast2._
+
+    val cExpr: Concept[Expr]  = concept[Expr]
+    val cInt: Concept[Number] = concept("\\d+".r, Number("0"), Some(cExpr)) map { case (_, t) =>
+      Number(t.text)
+    }
+
+    val cOp: Concept[Operation] = concept(cExpr)
+
+    val sAdd: Syntax[Operation] = syntax(cOp)(cExpr ~ "add".leftAssoc(1) ~ cExpr map {
+      case (_, (l, _, r)) =>
+        Add(l, r)
+    })
+
+    val sMul: Syntax[Operation] = syntax(cOp)(cExpr ~ "mul".leftAssoc(2) ~ cExpr map {
+      case (_, (l, _, r)) =>
+        Mul(l, r)
+    })
+
+    val a: Axiom[Operation] = axiom(cOp)
+  }
+
   test("parse") {
     AstHelpers.withAst(MyDsl)("1 add 2") {
       t =>
@@ -51,12 +82,34 @@ class DslifyTest extends FunSuite {
     }
   }
 
+  test("parse 2") {
+    import Ast2._
+    AstHelpers.withAst(MyDsl2)("1 add 2 mul 3") {
+      t =>
+        {
+          AstHelpers.assertNoMarkers(t)
+          assertEquals(
+            t.value,
+            Add(Number("1"), Mul(Number("2"), Number("3")))
+          )
+        }
+    }
+  }
+
   test("first score and generate: add") {
     val bnf        = Bnf(MyDsl)
     val scoringFun = (name: String) => if (name == "add") 1d else 0d;
     val scores     = scoreAxioms(bnf, scoringFun)
     val text       = generateDsl(bnf, scores)
     assertEquals(text, Some("cInt add cInt"))
+  }
+
+  test("MyDsl2: first score and generate: add") {
+    val bnf        = Bnf(MyDsl2)
+    val scoringFun = (name: String) => if (name == "add") 1d else 0d;
+    val scores     = scoreAxioms(bnf, scoringFun)
+    val text       = generateDsl(bnf, scores, Seq("13", "14"))
+    assertEquals(text, Some("13 add 14 and ?"))
   }
 
   test("score and generate") {
@@ -83,13 +136,14 @@ class DslifyTest extends FunSuite {
   }
 
   def extractLiterals(bnf: Bnf, text: String): Seq[String] = {
-    val input                  = new Input(text)
-    val tokens                 = Seq.unfold(bnf.lexer) { lexer =>
+    val input                 = new Input(text)
+    val tokens                = Seq.unfold(bnf.lexer) { lexer =>
       Option(lexer.next(input)).filterNot(_.id == Eos).map((_, lexer))
     }
-    val concepts: Set[TokenId] =
-      MyDsl.getConcepts.collect { case c: Concept[_] if c.data.isDefined => ConceptId(c) }.toSet
-    val literals               = tokens.filter(t => concepts.contains(t.id)).map(_.text)
+    val concepts: Set[String] =
+      MyDsl.getConcepts.collect { case c: Concept[_] if c.data.isDefined => ConceptId(c).name }.toSet
+    val literals              = tokens.filter(t => concepts.contains(t.id.name)).map(_.text)
+    println("FW", concepts, tokens.map(_.id.name))
     literals
   }
 
@@ -103,9 +157,20 @@ class DslifyTest extends FunSuite {
     assertEquals(text, Some("13 mul 14"))
   }
 
+  test("MyDsl2: score and generate: add/mul") {
+    val bnf        = Bnf(MyDsl2)
+    val input      = "13 add 14 mul 15"
+    val scoringFun = scoreWordsLetters(input);
+    val scores     = scoreAxioms(bnf, scoringFun)
+    val literals   = extractLiterals(bnf, input)
+    assertEquals(literals, Seq("13", "14", "15"))
+    val text       = generateDsl(bnf, scores, literals)
+    assertEquals(text, Some("13 mul 14 mul 15 mul ?"))
+  }
+
   // TODO
+  // - OK fill literals into concepts
   // - recursivive grammar
-  // - fill literals into concepts
   // - grammar with precedences / associativity
 
 //   test("fw") {
@@ -147,7 +212,7 @@ class DslifyTest extends FunSuite {
         throw new RuntimeException("fuck");
       }
       case ((total, scores), Bnf.Token(name, id, _)) => {
-        println(name)
+        // println(name)
         val score = scoringFun(id.name)
         (total + score, scores)
       }
@@ -159,8 +224,6 @@ class DslifyTest extends FunSuite {
     (total / p.symbols.length, scores2)
   }
 
-//   def scoreToken(id: TokenId): Double = if (id.name == "add") 1d else 0d
-
   def scoreRule(
     r: Bnf.Rule,
     scores: Map[Bnf.Production, Double],
@@ -168,9 +231,12 @@ class DslifyTest extends FunSuite {
   ): (Double, Map[Bnf.Production, Double]) = {
     val (total, scores2) = r.productions.foldLeft((0d, scores)) {
       case ((total, scores), p) => {
-        // TODO stop recursion
-        val (score, scores2) = scoreProduction(p, scores, scoringFun)
-        (Math.max(total, score), scores2 + ((p, score)))
+        scores.get(p).map { score =>
+          (Math.max(total, score), scores)
+        }.getOrElse {
+          val (score, scores2) = scoreProduction(p, scores + ((p, -1d)), scoringFun)
+          (Math.max(total, score), scores2 + ((p, score)))
+        }
       }
     }
     (total, scores2)
@@ -186,17 +252,21 @@ class DslifyTest extends FunSuite {
       val score  = scores(a.production)
       if (score > score1) a else max
     }
-    axiom.map(a => generateProduction(a.production, scores, literals)._1)
+    axiom.map(a => generateProduction(a.production, scores, literals, Set())._1)
   }
 
   def generateProduction(
     p: Bnf.Production,
     scores: Map[Bnf.Production, Double],
-    literals: Seq[String]
+    literals: Seq[String],
+    dejaVue: Set[Bnf.Production]
   ): (String, Seq[String]) = {
     val (ts, literals1) = p.symbols.foldLeft((Seq.empty[String], literals)) {
+      case ((acc, Seq()), r: Bnf.Rule)                      => (acc :+ "?", literals)
       case ((acc, literals), r: Bnf.Rule)                   =>
-        generateRule(r, scores, literals).map { case (t, literals) => (acc :+ t, literals) }
+        generateRule(r, scores, literals, dejaVue + p).map { case (t, literals) =>
+          (acc :+ t, literals)
+        }
           .getOrElse((acc, literals))
       case ((acc, literals), Bnf.Token(_, _: ConceptId, _)) => literals.headOption.map { t =>
           (acc :+ t, literals.tail)
@@ -210,14 +280,16 @@ class DslifyTest extends FunSuite {
   def generateRule(
     r: Bnf.Rule,
     scores: Map[Bnf.Production, Double],
-    literals: Seq[String]
+    literals: Seq[String],
+    dejaVue: Set[Bnf.Production]
   ): Option[(String, Seq[String])] = {
-    val p = r.productions.reduceOption[Bnf.Production] { case (max, p) =>
-      val score1 = scores(max)
-      val score  = scores(p)
-      if (score > score1) p else max
+    val p = r.productions.filterNot(p => dejaVue.contains(p)).reduceOption[Bnf.Production] {
+      case (max, p) =>
+        val score1 = scores(max)
+        val score  = scores(p)
+        if (score > score1) p else max
     }
-    p.map(p => generateProduction(p, scores, literals))
+    p.map(p => generateProduction(p, scores, literals, dejaVue + p))
   }
 
   // test("simple") {
