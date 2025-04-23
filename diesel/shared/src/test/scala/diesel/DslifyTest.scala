@@ -4,6 +4,9 @@ import diesel.Dsl._
 import diesel.AstHelpers
 import diesel.Bnf
 import diesel.Lexer.TokenId
+import diesel.Lexer.Input
+import diesel.Lexer.Eos
+import diesel.Lexer.ConceptId
 
 class DslifyTest extends FunSuite {
 
@@ -62,6 +65,47 @@ class DslifyTest extends FunSuite {
     val scores     = scoreAxioms(bnf, scoringFun)
     val text       = generateDsl(bnf, scores)
     assertEquals(text, Some("cInt mul cInt"))
+  }
+
+  test("score and generate by overlap") {
+    val bnf        = Bnf(MyDsl)
+    val scoringFun = scoreWordsLetters("13 multiply 14");
+    val scores     = scoreAxioms(bnf, scoringFun)
+    val text       = generateDsl(bnf, scores)
+    assertEquals(text, Some("cInt mul cInt"))
+  }
+
+  test("list literals in text") {
+    val bnf                    = Bnf(MyDsl)
+    val input                  = new Input("13 multiply 14")
+    val tokens                 = Seq.unfold(bnf.lexer) { lexer =>
+      Option(lexer.next(input)).filterNot(_.id == Eos).map((_, lexer))
+    }
+    val concepts: Set[TokenId] =
+      MyDsl.getConcepts.collect { case c: Concept[_] if c.data.isDefined => ConceptId(c) }.toSet
+    val literals               = tokens.filter(t => concepts.contains(t.id)).map(_.text)
+    assertEquals(literals, Seq("13", "14"))
+  }
+
+  // TODO
+  // - recursivive grammar
+  // - fill literals into concepts
+  // - grammar with precedences / associativity
+
+//   test("fw") {
+//     val bnf        = Bnf(MyDsl)
+//     val scoringFun = scoreWordsLetters("13 mult 14 add 15");
+//     val scores     = scoreAxioms(bnf, scoringFun)
+//     val text       = generateDsl(bnf, scores)
+//     assertEquals(text, Some("cInt mul cInt add cInt"))
+//   }
+
+  def scoreWordsLetters(text: String): String => Double = {
+    var letterSets = text.split(" ").map(_.toCharArray().toSet)
+    token =>
+      val letters    = token.toCharArray().toSet
+      val maxOverlap = letterSets.map(ls => ls.intersect(letters).size).max
+      (0d + maxOverlap) / token.size
   }
 
   def scoreWords(text: String): String => Double = {
