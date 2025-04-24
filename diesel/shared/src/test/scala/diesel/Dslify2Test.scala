@@ -128,7 +128,7 @@ class Dslify2Test extends FunSuite {
     assert(grammar.contains("| the age of expr[cPerson,SINGLE,_,_,_].default"))
     assert(grammar.contains("| the weight of expr[cPerson,SINGLE,_,_,_].default"))
     // val bnf_     = stemBnf(bnf)
-    val bnf_     = stemBnf2(bnf)
+    val bnf_     = stemBnf(bnf)
     val grammar_ = dumpGrammar(bnf_)
     // assertEquals(grammar_, "")
     assert(grammar_.contains("| age expr[cPerson,SINGLE,_,_,_].default"))
@@ -195,36 +195,36 @@ class Dslify2Test extends FunSuite {
     (f(a), b)
   }
 
-  def stemBnf2(bnf: Bnf): Bnf = {
-    val stem       = Stem.sequence(bnf.rules.map(Stem.unit).map(Stem.flatMap(_, stemNonTerminal2)))
+  def stemBnf(bnf: Bnf): Bnf = {
+    val stem       = Stem.sequence(bnf.rules.map(Stem.unit).map(Stem.flatMap(_, stemNonTerminal)))
     val (rules, _) = stem(StemState(Map()))
     Bnf(bnf.lexer, rules)
   }
 
-  def stemNonTerminal2(nt: Bnf.NonTerminal): Stem[Bnf.NonTerminal] = {
+  def stemNonTerminal(nt: Bnf.NonTerminal): Stem[Bnf.NonTerminal] = {
     Stem.unit(nt)
     nt match {
-      case Bnf.Axiom(r) => Stem.map(stemRule2(r), Bnf.Axiom(_))
-      case r: Rule      => stemRule2(r)
+      case Bnf.Axiom(r) => Stem.map(stemRule(r), Bnf.Axiom(_))
+      case r: Rule      => stemRule(r)
     }
   }
 
-  def stemRule2(rule: Bnf.Rule): Stem[Bnf.Rule] = state =>
+  def stemRule(rule: Bnf.Rule): Stem[Bnf.Rule] = state =>
     state.getStemmedRule(rule)
       //   .filterNot(_ == rule)
       .map((_, state))
       .getOrElse {
         val state1                = state.setStemmedRule(rule, rule)
         val stem                  =
-          Stem.sequence(rule.productions.map(Stem.unit).map(Stem.flatMap(_, stemProduction2)))
+          Stem.sequence(rule.productions.map(Stem.unit).map(Stem.flatMap(_, stemProduction)))
         val (productions, state_) = stem(state1)
         val stemmed               = Bnf.Rule(rule.name, productions)
         (stemmed, state_.setStemmedRule(rule, stemmed))
       }
 
-  def stemProduction2(p: Bnf.Production): Stem[Bnf.Production] = { state =>
+  def stemProduction(p: Bnf.Production): Stem[Bnf.Production] = { state =>
     val stem               =
-      Stem.sequence(p.symbols.toSeq.map(Stem.unit).map(Stem.flatMap(_, stemSymbol2)))
+      Stem.sequence(p.symbols.toSeq.map(Stem.unit).map(Stem.flatMap(_, stemSymbol)))
     val (symbols, state_)  = stem(state)
     val action: Bnf.Action = (_, _) => {
       13
@@ -232,66 +232,11 @@ class Dslify2Test extends FunSuite {
     (new Bnf.Production(p.rule, symbols.flatten, action, p.element, p.feature), state_)
   }
 
-  def stemSymbol2(s: Bnf.Symbol): Stem[Option[Bnf.Symbol]] = {
+  def stemSymbol(s: Bnf.Symbol): Stem[Option[Bnf.Symbol]] = {
     s match {
       case Bnf.Axiom(rule) => throw new RuntimeException("boom")
-      case r: Rule         => Stem.map(stemRule2(r), (r: Bnf.Symbol) => Some(r))
+      case r: Rule         => Stem.map(stemRule(r), (r: Bnf.Symbol) => Some(r))
       case t: Token        => Stem.unit(stemToken(t))
-    }
-  }
-
-  def stemBnf(bnf: Bnf): Bnf = {
-    val (rules, _) =
-      bnf.rules.foldLeft((Seq.empty[Bnf.NonTerminal], StemState(Map()))) {
-        case ((nts, state), nt) =>
-          val (nt_, state_) = stemNonTerminal(nt, state)
-          (nts :+ nt_, state_)
-      }
-    Bnf(bnf.lexer, rules)
-  }
-
-  def stemNonTerminal(nt: Bnf.NonTerminal, state: StemState): (Bnf.NonTerminal, StemState) = {
-    nt match {
-      case Bnf.Axiom(rule) => map1(stemRule(rule, state), Bnf.Axiom(_))
-      case r: Rule         => stemRule(r, state)
-    }
-  }
-
-  def stemRule(rule: Bnf.Rule, state: StemState): (Bnf.Rule, StemState) = {
-    state.getStemmedRule(rule)
-      //   .filterNot(_ == rule)
-      .map((_, state))
-      .getOrElse {
-        val state1                = state.setStemmedRule(rule, rule)
-        val (productions, state_) =
-          rule.productions.foldLeft((Seq.empty[Bnf.Production], state1)) {
-            case ((ps, state), p) =>
-              val (p_, state_) = stemProduction(p, state)
-              (ps :+ p_, state_)
-          }
-        val stemmed               = Bnf.Rule(rule.name, productions)
-        (stemmed, state_.setStemmedRule(rule, stemmed))
-      }
-  }
-
-  def stemProduction(p: Bnf.Production, state: StemState): (Bnf.Production, StemState) = {
-    val (symbols, state_)  =
-      p.symbols.foldLeft((Seq.empty[Bnf.Symbol], state)) {
-        case ((vs, state), v) =>
-          val (v_, state_) = stemSymbol(v, state)
-          v_.map(v => (vs :+ v, state_)).getOrElse((vs, state_))
-      }
-    val action: Bnf.Action = (_, _) => {
-      13
-    }
-    (new Bnf.Production(p.rule, symbols, action, p.element, p.feature), state_)
-  }
-
-  def stemSymbol(s: Bnf.Symbol, state: StemState): (Option[Bnf.Symbol], StemState) = {
-    s match {
-      case Bnf.Axiom(rule) => throw new RuntimeException("boom")
-      case r: Rule         => map1(stemRule(r, state), (r: Bnf.Symbol) => Some(r))
-      case t: Token        => (stemToken(t), state)
     }
   }
 
