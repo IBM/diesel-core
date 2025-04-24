@@ -28,6 +28,8 @@ import munit.FunSuite
 
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
+import diesel.GenericNode
+import diesel.GenericTerminal
 
 class Dslify2Test extends FunSuite {
 
@@ -194,10 +196,11 @@ class Dslify2Test extends FunSuite {
     // val tree = parseWithGrammar(bnf, input)
     // assertEquals(tree, null)
 
-    val input_ = stemming(input)
-    val bnf_   = stemBnf(bnf)
-    val tree_  = parseWithGrammar(bnf_, input_)
-    assertEquals(tree_, null)
+    val input_  = stemming(input)
+    val bnf_    = stemBnf(bnf)
+    val tree_   = parseWithGrammar(bnf_, input_)
+    val printed = printTree(tree_)
+    assertEquals(printed, "age 'Bob' add 1")
   }
 
   def dumpGrammar(bnf: Bnf): String = {
@@ -348,6 +351,17 @@ class Dslify2Test extends FunSuite {
     val result         = parser.parse(new Lexer.Input(text), a)
     val navigator      = Navigator(result)
     navigator.next()
+  }
+
+  def printTree(tree: GenericTree): String = {
+    printNode(tree.root)
+  }
+
+  def printNode(node: GenericNode): String = {
+    node.getChildren.map {
+      case t: GenericTerminal => t.token.text
+      case n: GenericNode     => printNode(n)
+    }.mkString(" ")
   }
 
   // the age of Bob add 1 mul 2
