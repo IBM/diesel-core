@@ -188,7 +188,7 @@ class Dslify2Test extends FunSuite {
   }
 
   test("parse stemmed") {
-    val input = "the age of 'Bob'"
+    val input = "the age of 'Bob' add 1"
     val bnf   = Bnf(MyDsl)
 
     // val tree = parseWithGrammar(bnf, input)
@@ -259,8 +259,8 @@ class Dslify2Test extends FunSuite {
 
   def fixRecursions(nts: Seq[Bnf.NonTerminal], state: StemState): Unit = {
     nts.foreach {
-      case Bnf.Axiom(r) => fixRecursionsInRule(r, state)
-      case r: Rule      => fixRecursionsInRule(r, state)
+      case r: Rule => fixRecursionsInRule(r, state)
+      case _       =>
     }
   }
 
@@ -276,6 +276,14 @@ class Dslify2Test extends FunSuite {
         case _            => None
       }
       updates.foreach { case (r, i) => p.symbols.update(i, r) }
+      p.rule match {
+        case Some(r: Bnf.Rule) =>
+          val stemmed = state.getStemmedRule(r)
+          if (stemmed.nonEmpty) {
+            p.rule = stemmed
+          }
+        case _                 =>
+      }
     }
   }
 
@@ -303,13 +311,18 @@ class Dslify2Test extends FunSuite {
 
   def stemProduction(p: Bnf.Production): Stem[Bnf.Production] = {
     val stem = Stem.mapAll(p.symbols.toSeq, stemSymbol)
-    Stem.map(
+    Stem.flatMap(
       stem,
-      { symbols: Seq[Option[Bnf.Symbol]] =>
+      { symbols: Seq[Option[Bnf.Symbol]] => state =>
         val action: Bnf.Action = (_, _) => {
           13
         }
-        new Bnf.Production(p.rule, symbols.flatten, action, p.element, p.feature)
+        val rule               = p.rule match {
+          case Some(r: Bnf.Rule) => state.getStemmedRule(r)
+          case Some(nt)          => Some(nt) // TODO exists? replace, too?
+          case None              => None
+        }
+        (new Bnf.Production(rule, symbols.flatten, action, p.element, p.feature), state)
       }
     )
   }
