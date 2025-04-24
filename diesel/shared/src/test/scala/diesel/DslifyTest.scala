@@ -3,7 +3,6 @@ import diesel.Dsl
 import diesel.Dsl._
 import diesel.AstHelpers
 import diesel.Bnf
-import diesel.Lexer.TokenId
 import diesel.Lexer.Input
 import diesel.Lexer.Eos
 import diesel.Lexer.ConceptId
@@ -100,7 +99,7 @@ class DslifyTest extends FunSuite {
     val bnf        = Bnf(MyDsl)
     val scoringFun = (name: String) => if (name == "add") 1d else 0d;
     val scores     = scoreAxioms(bnf, scoringFun)
-    val text       = generateDsl(bnf, scores)
+    val text       = generateDsl(bnf, scores, Seq("cInt", "cInt"))
     assertEquals(text, Some("cInt add cInt"))
   }
 
@@ -109,14 +108,14 @@ class DslifyTest extends FunSuite {
     val scoringFun = (name: String) => if (name == "add") 1d else 0d;
     val scores     = scoreAxioms(bnf, scoringFun)
     val text       = generateDsl(bnf, scores, Seq("13", "14"))
-    assertEquals(text, Some("13 add 14 and ?"))
+    assertEquals(text, Some("13 add 14 add ?"))
   }
 
   test("score and generate") {
     val bnf        = Bnf(MyDsl)
     val scoringFun = scoreWords("13 mul 14");
     val scores     = scoreAxioms(bnf, scoringFun)
-    val text       = generateDsl(bnf, scores)
+    val text       = generateDsl(bnf, scores, Seq("cInt", "cInt"))
     assertEquals(text, Some("cInt mul cInt"))
   }
 
@@ -124,7 +123,7 @@ class DslifyTest extends FunSuite {
     val bnf        = Bnf(MyDsl)
     val scoringFun = scoreWordsLetters("13 multiply 14");
     val scores     = scoreAxioms(bnf, scoringFun)
-    val text       = generateDsl(bnf, scores)
+    val text       = generateDsl(bnf, scores, Seq("cInt", "cInt"))
     assertEquals(text, Some("cInt mul cInt"))
   }
 
@@ -167,19 +166,6 @@ class DslifyTest extends FunSuite {
     val text       = generateDsl(bnf, scores, literals)
     assertEquals(text, Some("13 mul 14 mul 15 mul ?"))
   }
-
-  // TODO
-  // - OK fill literals into concepts
-  // - recursivive grammar
-  // - grammar with precedences / associativity
-
-//   test("fw") {
-//     val bnf        = Bnf(MyDsl)
-//     val scoringFun = scoreWordsLetters("13 mult 14 add 15");
-//     val scores     = scoreAxioms(bnf, scoringFun)
-//     val text       = generateDsl(bnf, scores)
-//     assertEquals(text, Some("cInt mul cInt add cInt"))
-//   }
 
   def scoreWordsLetters(text: String): String => Double = {
     var letterSets = text.split(" ").map(_.toCharArray().toSet)
@@ -283,13 +269,18 @@ class DslifyTest extends FunSuite {
     literals: Seq[String],
     dejaVue: Set[Bnf.Production]
   ): Option[(String, Seq[String])] = {
-    val p = r.productions.filterNot(p => dejaVue.contains(p)).reduceOption[Bnf.Production] {
-      case (max, p) =>
-        val score1 = scores(max)
-        val score  = scores(p)
-        if (score > score1) p else max
+    var candidates = r.productions.filterNot(p => dejaVue.contains(p))
+    if (candidates.size == 1) {
+      candidates.headOption.map(p => generateProduction(p, scores, literals, dejaVue))
+    } else {
+      val p = candidates.reduceOption[Bnf.Production] {
+        case (max, p) =>
+          val score1 = scores(max)
+          val score  = scores(p)
+          if (score > score1) p else max
+      }
+      p.map(p => generateProduction(p, scores, literals, dejaVue))
     }
-    p.map(p => generateProduction(p, scores, literals, dejaVue + p))
   }
 
   // test("simple") {
