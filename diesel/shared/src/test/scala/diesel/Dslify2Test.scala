@@ -127,7 +127,8 @@ class Dslify2Test extends FunSuite {
     val grammar  = dumpGrammar(bnf)
     assert(grammar.contains("| the age of expr[cPerson,SINGLE,_,_,_].default"))
     assert(grammar.contains("| the weight of expr[cPerson,SINGLE,_,_,_].default"))
-    val bnf_     = stemBnf(bnf)
+    // val bnf_     = stemBnf(bnf)
+    val bnf_     = stemBnf2(bnf)
     val grammar_ = dumpGrammar(bnf_)
     // assertEquals(grammar_, "")
     assert(grammar_.contains("| age expr[cPerson,SINGLE,_,_,_].default"))
@@ -141,8 +142,9 @@ class Dslify2Test extends FunSuite {
     val tree = parseWithGrammar(bnf, input)
     // assertEquals(tree, null)
 
-    val bnf_  = stemBnf(bnf)
-    val tree_ = parseWithGrammar(bnf_, input)
+    val input_ = stemming(input)
+    val bnf_   = stemBnf(bnf)
+    val tree_  = parseWithGrammar(bnf_, input_)
     assertEquals(tree_, null)
   }
 
@@ -161,16 +163,6 @@ class Dslify2Test extends FunSuite {
     bos.toString()
   }
 
-  def stemBnf(bnf: Bnf): Bnf = {
-    val (rules, _) =
-      bnf.rules.foldLeft((Seq.empty[Bnf.NonTerminal], StemState(Map()))) {
-        case ((nts, state), nt) =>
-          val (nt_, state_) = stemNonTerminal(nt, state)
-          (nts :+ nt_, state_)
-      }
-    Bnf(bnf.lexer, rules)
-  }
-
   case class StemState(rules: Map[Bnf.Rule, Bnf.Rule]) {
     def getStemmedRule(rule: Bnf.Rule): Option[Bnf.Rule] =
       rules.get(rule)
@@ -179,9 +171,83 @@ class Dslify2Test extends FunSuite {
       this.copy(rules = rules + ((rule, stemmed)))
   }
 
+  type Stem[T] = StemState => (T, StemState)
+  object Stem {
+    def unit[A](v: A): Stem[A] = state => (v, state)
+
+    def map[A, B](stem: Stem[A], f: A => B): Stem[B] = { state =>
+      map1(stem(state), f)
+    }
+
+    def flatMap[A, B](stem: Stem[A], f: A => Stem[B]): Stem[B] = { state =>
+      val (v, state_) = stem(state)
+      f(v)(state_)
+    }
+
+    def sequence[A](stems: Seq[Stem[A]]): Stem[Seq[A]] =
+      stems.foldLeft(Stem.unit(Seq.empty[A])) { case (acc, v) =>
+        Stem.flatMap(acc, (acc: Seq[A]) => Stem.map(v, (v: A) => acc :+ v))
+      }
+  }
+
   def map1[A, B, C](t: (A, B), f: A => C): (C, B) = {
     val (a, b) = t
     (f(a), b)
+  }
+
+  def stemBnf2(bnf: Bnf): Bnf = {
+    val stem       = Stem.sequence(bnf.rules.map(Stem.unit).map(Stem.flatMap(_, stemNonTerminal2)))
+    val (rules, _) = stem(StemState(Map()))
+    Bnf(bnf.lexer, rules)
+  }
+
+  def stemNonTerminal2(nt: Bnf.NonTerminal): Stem[Bnf.NonTerminal] = {
+    Stem.unit(nt)
+    nt match {
+      case Bnf.Axiom(r) => Stem.map(stemRule2(r), Bnf.Axiom(_))
+      case r: Rule      => stemRule2(r)
+    }
+  }
+
+  def stemRule2(rule: Bnf.Rule): Stem[Bnf.Rule] = state =>
+    state.getStemmedRule(rule)
+      //   .filterNot(_ == rule)
+      .map((_, state))
+      .getOrElse {
+        val state1                = state.setStemmedRule(rule, rule)
+        val stem                  =
+          Stem.sequence(rule.productions.map(Stem.unit).map(Stem.flatMap(_, stemProduction2)))
+        val (productions, state_) = stem(state1)
+        val stemmed               = Bnf.Rule(rule.name, productions)
+        (stemmed, state_.setStemmedRule(rule, stemmed))
+      }
+
+  def stemProduction2(p: Bnf.Production): Stem[Bnf.Production] = { state =>
+    val stem               =
+      Stem.sequence(p.symbols.toSeq.map(Stem.unit).map(Stem.flatMap(_, stemSymbol2)))
+    val (symbols, state_)  = stem(state)
+    val action: Bnf.Action = (_, _) => {
+      13
+    }
+    (new Bnf.Production(p.rule, symbols.flatten, action, p.element, p.feature), state_)
+  }
+
+  def stemSymbol2(s: Bnf.Symbol): Stem[Option[Bnf.Symbol]] = {
+    s match {
+      case Bnf.Axiom(rule) => throw new RuntimeException("boom")
+      case r: Rule         => Stem.map(stemRule2(r), (r: Bnf.Symbol) => Some(r))
+      case t: Token        => Stem.unit(stemToken(t))
+    }
+  }
+
+  def stemBnf(bnf: Bnf): Bnf = {
+    val (rules, _) =
+      bnf.rules.foldLeft((Seq.empty[Bnf.NonTerminal], StemState(Map()))) {
+        case ((nts, state), nt) =>
+          val (nt_, state_) = stemNonTerminal(nt, state)
+          (nts :+ nt_, state_)
+      }
+    Bnf(bnf.lexer, rules)
   }
 
   def stemNonTerminal(nt: Bnf.NonTerminal, state: StemState): (Bnf.NonTerminal, StemState) = {
