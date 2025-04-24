@@ -188,6 +188,9 @@ class Dslify2Test extends FunSuite {
       stems.foldLeft(Stem.unit(Seq.empty[A])) { case (acc, v) =>
         Stem.flatMap(acc, (acc: Seq[A]) => Stem.map(v, (v: A) => acc :+ v))
       }
+
+    def mapAll[A, B](vs: Seq[A], f: A => Stem[B]): Stem[Seq[B]] =
+      Stem.sequence(vs.map(Stem.unit).map(Stem.flatMap(_, f)))
   }
 
   def map1[A, B, C](t: (A, B), f: A => C): (C, B) = {
@@ -196,7 +199,7 @@ class Dslify2Test extends FunSuite {
   }
 
   def stemBnf(bnf: Bnf): Bnf = {
-    val stem       = Stem.sequence(bnf.rules.map(Stem.unit).map(Stem.flatMap(_, stemNonTerminal)))
+    val stem       = Stem.mapAll(bnf.rules, stemNonTerminal)
     val (rules, _) = stem(StemState(Map()))
     Bnf(bnf.lexer, rules)
   }
@@ -215,21 +218,23 @@ class Dslify2Test extends FunSuite {
       .map((_, state))
       .getOrElse {
         val state1                = state.setStemmedRule(rule, rule)
-        val stem                  =
-          Stem.sequence(rule.productions.map(Stem.unit).map(Stem.flatMap(_, stemProduction)))
+        val stem                  = Stem.mapAll(rule.productions, stemProduction)
         val (productions, state_) = stem(state1)
         val stemmed               = Bnf.Rule(rule.name, productions)
         (stemmed, state_.setStemmedRule(rule, stemmed))
       }
 
-  def stemProduction(p: Bnf.Production): Stem[Bnf.Production] = { state =>
-    val stem               =
-      Stem.sequence(p.symbols.toSeq.map(Stem.unit).map(Stem.flatMap(_, stemSymbol)))
-    val (symbols, state_)  = stem(state)
-    val action: Bnf.Action = (_, _) => {
-      13
-    }
-    (new Bnf.Production(p.rule, symbols.flatten, action, p.element, p.feature), state_)
+  def stemProduction(p: Bnf.Production): Stem[Bnf.Production] = {
+    val stem = Stem.mapAll(p.symbols.toSeq, stemSymbol)
+    Stem.map(
+      stem,
+      { symbols: Seq[Option[Bnf.Symbol]] =>
+        val action: Bnf.Action = (_, _) => {
+          13
+        }
+        new Bnf.Production(p.rule, symbols.flatten, action, p.element, p.feature)
+      }
+    )
   }
 
   def stemSymbol(s: Bnf.Symbol): Stem[Option[Bnf.Symbol]] = {
