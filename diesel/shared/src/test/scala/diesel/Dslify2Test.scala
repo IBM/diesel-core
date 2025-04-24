@@ -127,7 +127,6 @@ class Dslify2Test extends FunSuite {
     val grammar  = dumpGrammar(bnf)
     assert(grammar.contains("| the age of expr[cPerson,SINGLE,_,_,_].default"))
     assert(grammar.contains("| the weight of expr[cPerson,SINGLE,_,_,_].default"))
-    // val bnf_     = stemBnf(bnf)
     val bnf_     = stemBnf(bnf)
     val grammar_ = dumpGrammar(bnf_)
     // assertEquals(grammar_, "")
@@ -139,7 +138,7 @@ class Dslify2Test extends FunSuite {
     val input = "the age of 'Bob' add 1"
     val bnf   = Bnf(MyDsl)
 
-    val tree = parseWithGrammar(bnf, input)
+    // val tree = parseWithGrammar(bnf, input)
     // assertEquals(tree, null)
 
     val input_ = stemming(input)
@@ -199,9 +198,27 @@ class Dslify2Test extends FunSuite {
   }
 
   def stemBnf(bnf: Bnf): Bnf = {
-    val stem       = Stem.mapAll(bnf.rules, stemNonTerminal)
-    val (rules, _) = stem(StemState(Map()))
+    val stem            = Stem.mapAll(bnf.rules, stemNonTerminal)
+    val (rules, state_) = stem(StemState(Map()))
+    fixRecursions(rules, state_)
     Bnf(bnf.lexer, rules)
+  }
+
+  def fixRecursions(nts: Seq[Bnf.NonTerminal], state: StemState): Unit = {
+    nts.foreach {
+      case Bnf.Axiom(r) => fixRecursionsInRule(r, state)
+      case r: Rule      => fixRecursionsInRule(r, state)
+    }
+  }
+
+  def fixRecursionsInRule(r: Bnf.Rule, state: StemState): Unit = {
+    r.productions.foreach { p =>
+      var updates = p.symbols.zipWithIndex.flatMap {
+        case (r: Rule, i) => state.getStemmedRule(r).map((_, i))
+        case _            => None
+      }
+      updates.foreach { case (r, i) => p.symbols.update(i, r) }
+    }
   }
 
   def stemNonTerminal(nt: Bnf.NonTerminal): Stem[Bnf.NonTerminal] = {
@@ -215,7 +232,9 @@ class Dslify2Test extends FunSuite {
   def stemRule(rule: Bnf.Rule): Stem[Bnf.Rule] = state =>
     state.getStemmedRule(rule)
       //   .filterNot(_ == rule)
-      .map((_, state))
+      .map(r =>
+        (r, state)
+      )
       .getOrElse {
         val state1                = state.setStemmedRule(rule, rule)
         val stem                  = Stem.mapAll(rule.productions, stemProduction)
