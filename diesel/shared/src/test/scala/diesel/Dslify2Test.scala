@@ -86,8 +86,58 @@ class Dslify2Test extends FunSuite {
     val a: Axiom[Operation] = axiom(cOp)
   }
 
+  object MyDslStemmed extends Dsl {
+
+    val cPerson: Concept[Person] = concept[Person]
+
+    val cExpr: Concept[Expr]  = concept[Expr]
+    val cInt: Concept[Number] = concept("\\d+".r, Number("0"), Some(cExpr)) map { case (_, t) =>
+      Number(t.text)
+    }
+
+    val cOp: Concept[Operation] = concept(cExpr)
+    val sAge                    = syntax(cInt)("age" ~ cPerson map {
+      case (_, _) =>
+        Number("13")
+    })
+    val sWeight                 = syntax(cInt)("weight" ~ cPerson map {
+      case (_, _) =>
+        Number("42")
+    })
+
+    val sBob = syntax(cPerson)(SPStr("'Bob'") map {
+      case (_, _) =>
+        Bob
+    })
+
+    val sAdd: Syntax[Operation] = syntax(cOp)(cExpr ~ "add".leftAssoc(1) ~ cExpr map {
+      case (_, (l, _, r)) =>
+        Add(l, r)
+    })
+
+    val sMul: Syntax[Operation] = syntax(cOp)(cExpr ~ "mul".leftAssoc(2) ~ cExpr map {
+      case (_, (l, _, r)) =>
+        Mul(l, r)
+    })
+
+    val a: Axiom[Operation] = axiom(cOp)
+  }
+
   test("parse") {
     AstHelpers.withAst(MyDsl)("the age of 'Bob' add 1") {
+      t =>
+        {
+          AstHelpers.assertNoMarkers(t)
+          assertEquals(
+            t.value,
+            Add(Number("13"), Number("1"))
+          )
+        }
+    }
+  }
+
+  test("parse 2") {
+    AstHelpers.withAst(MyDslStemmed)("age 'Bob' add 1") {
       t =>
         {
           AstHelpers.assertNoMarkers(t)
@@ -123,19 +173,22 @@ class Dslify2Test extends FunSuite {
 
   test("stemmed grammar") {
     // System.setProperty("diesel.dumpbnf", "true")
-    val bnf      = Bnf(MyDsl)
-    val grammar  = dumpGrammar(bnf)
+    val bnf     = Bnf(MyDsl)
+    val grammar = dumpGrammar(bnf)
     assert(grammar.contains("| the age of expr[cPerson,SINGLE,_,_,_].default"))
     assert(grammar.contains("| the weight of expr[cPerson,SINGLE,_,_,_].default"))
+    assert(grammar.contains("| 'Bob'"))
+
     val bnf_     = stemBnf(bnf)
     val grammar_ = dumpGrammar(bnf_)
     // assertEquals(grammar_, "")
     assert(grammar_.contains("| age expr[cPerson,SINGLE,_,_,_].default"))
     assert(grammar_.contains("| weight expr[cPerson,SINGLE,_,_,_].default"))
+    assert(grammar_.contains("| 'Bob'"))
   }
 
   test("parse stemmed") {
-    val input = "the age of 'Bob' add 1"
+    val input = "the age of 'Bob'"
     val bnf   = Bnf(MyDsl)
 
     // val tree = parseWithGrammar(bnf, input)
@@ -211,10 +264,15 @@ class Dslify2Test extends FunSuite {
     }
   }
 
-  def fixRecursionsInRule(r: Bnf.Rule, state: StemState): Unit = {
+  def fixRecursionsInRule(r: Bnf.Rule, state: StemState, dejaVue: Set[Bnf.Rule] = Set()): Unit = {
     r.productions.foreach { p =>
       var updates = p.symbols.zipWithIndex.flatMap {
-        case (r: Rule, i) => state.getStemmedRule(r).map((_, i))
+        case (r: Rule, i) =>
+          val stemmed = state.getStemmedRule(r)
+          if (stemmed.isEmpty && !dejaVue.contains(r)) {
+            fixRecursionsInRule(r, state, dejaVue + r)
+          }
+          stemmed.map((_, i))
         case _            => None
       }
       updates.foreach { case (r, i) => p.symbols.update(i, r) }
@@ -288,5 +346,8 @@ class Dslify2Test extends FunSuite {
   // - stemmed bnf: bnf'
   // - parse using bnf' into tree'
   // - print text for tree' using bnf
+
+  // Next Approach
+  // - stem Dsl directly and generate stemmed Bnf from there
 
 }
