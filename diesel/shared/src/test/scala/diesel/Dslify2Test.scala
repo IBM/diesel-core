@@ -16,17 +16,18 @@
 
 import diesel.AstHelpers
 import diesel.Bnf
-import diesel.Dsl
-import diesel.Dsl._
-import diesel.Lexer.ConceptId
-import diesel.Lexer.Eos
-import diesel.Lexer.Input
-import munit.FunSuite
-import diesel.BnfHtml
 import diesel.Bnf.Rule
 import diesel.Bnf.Token
-import java.io.PrintStream
+import diesel.Dsl
+import diesel.Dsl._
+import diesel.Earley
+import diesel.GenericTree
+import diesel.Lexer
+import diesel.Navigator
+import munit.FunSuite
+
 import java.io.ByteArrayOutputStream
+import java.io.PrintStream
 
 class Dslify2Test extends FunSuite {
 
@@ -133,6 +134,18 @@ class Dslify2Test extends FunSuite {
     assert(grammar_.contains("| weight expr[cPerson,SINGLE,_,_,_].default"))
   }
 
+  test("parse stemmed") {
+    val input = "the age of 'Bob' add 1"
+    val bnf   = Bnf(MyDsl)
+
+    val tree = parseWithGrammar(bnf, input)
+    // assertEquals(tree, null)
+
+    val bnf_  = stemBnf(bnf)
+    val tree_ = parseWithGrammar(bnf_, input)
+    assertEquals(tree_, null)
+  }
+
   def dumpGrammar(bnf: Bnf): String = {
     val bos = new ByteArrayOutputStream()
     val ps  = new PrintStream(bos)
@@ -196,13 +209,16 @@ class Dslify2Test extends FunSuite {
   }
 
   def stemProduction(p: Bnf.Production, state: StemState): (Bnf.Production, StemState) = {
-    val (symbols, state_) =
+    val (symbols, state_)  =
       p.symbols.foldLeft((Seq.empty[Bnf.Symbol], state)) {
         case ((vs, state), v) =>
           val (v_, state_) = stemSymbol(v, state)
           v_.map(v => (vs :+ v, state_)).getOrElse((vs, state_))
       }
-    (new Bnf.Production(p.rule, symbols, p.action, p.element, p.feature), state_)
+    val action: Bnf.Action = (_, _) => {
+      13
+    }
+    (new Bnf.Production(p.rule, symbols, action, p.element, p.feature), state_)
   }
 
   def stemSymbol(s: Bnf.Symbol, state: StemState): (Option[Bnf.Symbol], StemState) = {
@@ -215,6 +231,17 @@ class Dslify2Test extends FunSuite {
 
   def stemToken(t: Bnf.Token): Option[Bnf.Token] = {
     stemToken(t.name).map(stemmed => t.copy(name = stemmed))
+  }
+
+  def parseWithGrammar(
+    bnf: Bnf,
+    text: String
+  ): GenericTree = {
+    val parser: Earley = Earley(bnf)
+    val a              = AstHelpers.getBnfAxiomOrThrow(bnf, None)
+    val result         = parser.parse(new Lexer.Input(text), a)
+    val navigator      = Navigator(result)
+    navigator.next()
   }
 
   // the age of Bob add 1 mul 2
