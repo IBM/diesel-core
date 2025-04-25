@@ -21,15 +21,16 @@ import diesel.Bnf.Token
 import diesel.Dsl
 import diesel.Dsl._
 import diesel.Earley
+import diesel.GenericNode
+import diesel.GenericTerminal
 import diesel.GenericTree
 import diesel.Lexer
+import diesel.Lexer.ConceptId
 import diesel.Navigator
 import munit.FunSuite
 
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
-import diesel.GenericNode
-import diesel.GenericTerminal
 
 class Dslify2Test extends FunSuite {
 
@@ -47,7 +48,7 @@ class Dslify2Test extends FunSuite {
   import Ast._
 
   // TODO
-  // - the age of <>
+  // - OK the age of <>
   // - variable with ''
   // -
 
@@ -181,8 +182,8 @@ class Dslify2Test extends FunSuite {
     assert(grammar.contains("| the weight of expr[cPerson,SINGLE,_,_,_].default"))
     assert(grammar.contains("| 'Bob'"))
 
-    val bnf_     = stemBnf(bnf)
-    val grammar_ = dumpGrammar(bnf_)
+    val (bnf_, _) = stemBnf(bnf)
+    val grammar_  = dumpGrammar(bnf_)
     // assertEquals(grammar_, "")
     assert(grammar_.contains("| age expr[cPerson,SINGLE,_,_,_].default"))
     assert(grammar_.contains("| weight expr[cPerson,SINGLE,_,_,_].default"))
@@ -196,11 +197,28 @@ class Dslify2Test extends FunSuite {
     // val tree = parseWithGrammar(bnf, input)
     // assertEquals(tree, null)
 
-    val input_  = stemming(input)
-    val bnf_    = stemBnf(bnf)
-    val tree_   = parseWithGrammar(bnf_, input_)
-    val printed = printTree(tree_)
+    val input_    = stemming(input)
+    val (bnf_, _) = stemBnf(bnf)
+    val tree_     = parseWithGrammar(bnf_, input_)
+    val printed   = printTree(tree_)
     assertEquals(printed, "age 'Bob' add 1")
+  }
+
+  test("unstemm parse stemmed") {
+    val input = "the age of 'Bob' add 1"
+    val bnf   = Bnf(MyDsl)
+
+    // val tree = parseWithGrammar(bnf, input)
+    // assertEquals(tree, null)
+
+    val input_        = stemming(input)
+    val (bnf_, state) = stemBnf(bnf)
+    val tree_         = parseWithGrammar(bnf_, input_)
+    val printed_      = printTree(tree_)
+    assertEquals(printed_, "age 'Bob' add 1")
+
+    val unstemmed = tree_.root.value.asInstanceOf[Unstemmed].s.mkString(" ")
+    assertEquals(unstemmed, "the age of 'Bob' add 1")
   }
 
   def dumpGrammar(bnf: Bnf): String = {
@@ -253,11 +271,11 @@ class Dslify2Test extends FunSuite {
     (f(a), b)
   }
 
-  def stemBnf(bnf: Bnf): Bnf = {
+  def stemBnf(bnf: Bnf): (Bnf, StemState) = {
     val stem            = Stem.mapAll(bnf.rules, stemNonTerminal)
     val (rules, state_) = stem(StemState(Map()))
     fixRecursions(rules, state_)
-    Bnf(bnf.lexer, rules)
+    (Bnf(bnf.lexer, rules), state_)
   }
 
   def fixRecursions(nts: Seq[Bnf.NonTerminal], state: StemState): Unit = {
@@ -317,8 +335,8 @@ class Dslify2Test extends FunSuite {
     Stem.flatMap(
       stem,
       { symbols: Seq[Option[Bnf.Symbol]] => state =>
-        val action: Bnf.Action = (_, _) => {
-          13
+        val action: Bnf.Action = (ctx, vs) => {
+          unstem(p.symbols.toSeq, vs)
         }
         val rule               = p.rule match {
           case Some(r: Bnf.Rule) => state.getStemmedRule(r)
@@ -328,6 +346,35 @@ class Dslify2Test extends FunSuite {
         (new Bnf.Production(rule, symbols.flatten, action, p.element, p.feature), state)
       }
     )
+  }
+
+  case class Unstemmed(s: Seq[String])
+
+  def unstem(symbols: Seq[Bnf.Symbol], vs: Seq[Any]): Unstemmed = {
+    def go(symbols: List[Bnf.Symbol], vs: List[Any], current: Unstemmed): Unstemmed = {
+      symbols match {
+        case (t: Bnf.Token) :: next =>
+          t.tokenId match {
+            case ConceptId(c) => vs match {
+                case Lexer.Token(_, text, _) :: vrest =>
+                  go(next, vrest, Unstemmed(current.s :+ text))
+                case _ :: vrest                       => go(symbols, vrest, current)
+                case _                                => go(next, List(), Unstemmed(current.s :+ "?"))
+              }
+            case _            => go(next, vs, Unstemmed(current.s :+ t.name))
+          }
+        case (r: Rule) :: next      =>
+          vs match {
+            case Unstemmed(s) :: vrest => go(next, vrest, Unstemmed(current.s ++ s))
+            // case Token(s) :: vrest     => go(next, vrest, Unstemmed(current.s ++ s))
+            case _ :: vrest            => go(symbols, vrest, current)
+            case _                     => go(next, List(), Unstemmed(current.s :+ "?"))
+          }
+        case _                      => current
+      }
+    }
+
+    go(symbols.toList, vs.toList, Unstemmed(Seq()))
   }
 
   def stemSymbol(s: Bnf.Symbol): Stem[Option[Bnf.Symbol]] = {
