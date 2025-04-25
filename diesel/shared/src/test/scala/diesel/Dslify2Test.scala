@@ -221,6 +221,21 @@ class Dslify2Test extends FunSuite {
     assertEquals(unstemmed, "the age of 'Bob' add 1")
   }
 
+  test("fix out of order") {
+    // order!
+    val input = "the 'Bob' age add 1"
+
+    val bnf           = Bnf(MyDsl)
+    val input_        = stemming(input)
+    val (bnf_, state) = stemBnf(bnf)
+    val trees         = parseWithGrammarAll(bnf_, input_)
+    val printed       = trees.map(printTree).toList
+    assertEquals(printed, Seq("age 'Bob' add 1"))
+
+    val unstemmed = trees.map(_.root.value.asInstanceOf[Unstemmed].s.mkString(" "))
+    assertEquals(unstemmed, Seq("the age of 'Bob' add 1"))
+  }
+
   def dumpGrammar(bnf: Bnf): String = {
     val bos = new ByteArrayOutputStream()
     val ps  = new PrintStream(bos)
@@ -398,6 +413,17 @@ class Dslify2Test extends FunSuite {
     val result         = parser.parse(new Lexer.Input(text), a)
     val navigator      = Navigator(result)
     navigator.next()
+  }
+
+  def parseWithGrammarAll(
+    bnf: Bnf,
+    text: String
+  ): Seq[GenericTree] = {
+    val parser: Earley = Earley(bnf)
+    val a              = AstHelpers.getBnfAxiomOrThrow(bnf, None)
+    val result         = parser.parse(new Lexer.Input(text), a)
+    val navigator      = Navigator(result)
+    LazyList.from(navigator.toIterator)
   }
 
   def printTree(tree: GenericTree): String = {
