@@ -236,6 +236,21 @@ class Dslify2Test extends FunSuite {
     assertEquals(unstemmed, Seq("the age of 'Bob' add 1"))
   }
 
+  test("fix out typo") {
+    // typo! (prefix of correct?)
+    val input = "agee 'Bob' add 1"
+
+    val bnf           = Bnf(MyDsl)
+    val input_        = stemming(input)
+    val (bnf_, state) = stemBnf(bnf)
+    val trees         = parseWithGrammarAll(bnf_, input_)
+    val printed       = trees.map(printTree).toList
+    assertEquals(printed, Seq("age 'Bob' add 1"))
+
+    val unstemmed = trees.map(_.root.value.asInstanceOf[Unstemmed].s.mkString(" "))
+    assertEquals(unstemmed, Seq("the age of 'Bob' add 1"))
+  }
+
   def dumpGrammar(bnf: Bnf): String = {
     val bos = new ByteArrayOutputStream()
     val ps  = new PrintStream(bos)
