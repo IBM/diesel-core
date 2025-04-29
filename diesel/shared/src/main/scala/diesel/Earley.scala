@@ -18,11 +18,13 @@ package diesel
 
 import diesel.Bnf.Constraints
 import diesel.Lexer.Eos
+import diesel.Bnf.DslElement
 
 case class Earley(
   bnf: Bnf,
   dynamicLexer: Boolean = false,
-  closeEnough: Option[(String, String) => Boolean] = None
+  closeEnough: Option[(String, String) => Boolean] = None,
+  refuseToken: Option[(Bnf.Token, Lexer.Token, Option[DslElement]) => Boolean] = None
 ) {
 
   private def lexer = bnf.lexer
@@ -234,7 +236,11 @@ case class Earley(
     tokenValue: Lexer.Token,
     context: Result
   ): Boolean = {
-    if (lexer.accept(token, tokenValue)) {
+    if (
+      lexer.accept(token, tokenValue) && !refuseToken.map(f =>
+        f(token, tokenValue, state.production.element)
+      ).getOrElse(false)
+    ) {
       context.addState(
         State(state.production, state.begin, state.end + 1, state.dot + 1),
         StateKind.Kernel,

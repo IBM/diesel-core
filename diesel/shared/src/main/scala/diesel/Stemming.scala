@@ -4,6 +4,7 @@ import diesel.Bnf.Rule
 import diesel.Bnf.Token
 import diesel.Lexer.ConceptId
 import scala.annotation.tailrec
+import diesel.Lexer.IdentifierOrKeywordToken
 
 object Stemming {
   def stemming(text: String): String =
@@ -70,7 +71,7 @@ object Stemming {
     def go(
       rules: Seq[Bnf.Rule],
       state: StemState,
-      collect: Seq[Bnf.Rule] = Seq()
+      collect: Set[Bnf.Rule] = Set()
     ): Seq[Bnf.Rule] = {
       val subrules = rules.flatMap(_.productions).flatMap { p =>
         p.symbols.flatMap {
@@ -83,9 +84,9 @@ object Stemming {
         }
       }
       if (subrules.nonEmpty) go(subrules, state, collect ++ rules ++ subrules)
-      else collect
+      else collect.toSeq
     }
-    val all = go(Seq(r), state, Seq())
+    val all = go(Seq(r), state, Set())
     all.foreach { r =>
       r.productions.foreach { p =>
         var updates = p.symbols.zipWithIndex.flatMap {
@@ -154,13 +155,19 @@ object Stemming {
       symbols match {
         case (t: Bnf.Token) :: next =>
           t.tokenId match {
-            case ConceptId(c) => vs match {
+            case ConceptId(c)                    => vs match {
                 case Lexer.Token(_, text, _) :: vrest =>
                   go(next, vrest, Unstemmed(current.s :+ text))
                 case _ :: vrest                       => go(symbols, vrest, current)
                 case _                                => go(next, List(), Unstemmed(current.s :+ "?"))
               }
-            case _            => go(next, vs, Unstemmed(current.s :+ t.name))
+            case id: IdentifierOrKeywordToken[_] => vs match {
+                case Lexer.Token(_, text, _) :: vrest =>
+                  go(next, vrest, Unstemmed(current.s :+ text))
+                case _ :: vrest                       => go(symbols, vrest, current)
+                case _                                => go(next, List(), Unstemmed(current.s :+ "?"))
+              }
+            case _                               => go(next, vs, Unstemmed(current.s :+ t.name))
           }
         case (r: Rule) :: next      =>
           vs match {

@@ -43,6 +43,7 @@ class Dslify2Test extends FunSuite {
 
     trait Person
     case object Bob extends Person
+    case object Var extends Person
   }
 
   import Ast._
@@ -78,41 +79,9 @@ class Dslify2Test extends FunSuite {
         Bob
     })
 
-    val sAdd: Syntax[Operation] = syntax(cOp)(cExpr ~ "add".leftAssoc(1) ~ cExpr map {
-      case (_, (l, _, r)) =>
-        Add(l, r)
-    })
-
-    val sMul: Syntax[Operation] = syntax(cOp)(cExpr ~ "mul".leftAssoc(2) ~ cExpr map {
-      case (_, (l, _, r)) =>
-        Mul(l, r)
-    })
-
-    val a: Axiom[Expr] = axiom(cExpr)
-  }
-
-  object MyDslStemmed extends Dsl {
-
-    val cPerson: Concept[Person] = concept[Person]
-
-    val cExpr: Concept[Expr]  = concept[Expr]
-    val cInt: Concept[Number] = concept("\\d+".r, Number("0"), Some(cExpr)) map { case (_, t) =>
-      Number(t.text)
-    }
-
-    val cOp: Concept[Operation] = concept(cExpr)
-    val sAge                    = syntax(cInt)("age" ~ cPerson map {
+    val sVar = syntax(cPerson)(idOrKeyword map {
       case (_, _) =>
-        Number("13")
-    })
-    val sWeight                 = syntax(cInt)("weight" ~ cPerson map {
-      case (_, _) =>
-        Number("42")
-    })
-
-    val sBob = syntax(cPerson)(SPStr("'Bob'") map {
-      case (_, _) =>
-        Bob
+        Var
     })
 
     val sAdd: Syntax[Operation] = syntax(cOp)(cExpr ~ "add".leftAssoc(1) ~ cExpr map {
@@ -130,19 +99,6 @@ class Dslify2Test extends FunSuite {
 
   test("parse") {
     AstHelpers.withAst(MyDsl)("the age of 'Bob' add 1") {
-      t =>
-        {
-          AstHelpers.assertNoMarkers(t)
-          assertEquals(
-            t.value,
-            Add(Number("13"), Number("1"))
-          )
-        }
-    }
-  }
-
-  test("parse 2") {
-    AstHelpers.withAst(MyDslStemmed)("age 'Bob' add 1") {
       t =>
         {
           AstHelpers.assertNoMarkers(t)
@@ -228,6 +184,21 @@ class Dslify2Test extends FunSuite {
     assertEquals(unstemmed, Seq("the age of 'Bob' add 1"))
   }
 
+  test("fix out of order John".ignore) {
+    // order!
+    val input = "the John age add 1"
+
+    val bnf           = Bnf(MyDsl)
+    val input_        = stemming(input)
+    val (bnf_, state) = stemBnf(bnf)
+    val trees         = parseWithGrammarAll(bnf_, input_)
+    val printed       = trees.map(printTree).toList
+    assertEquals(printed, Seq("age John add 1"))
+
+    val unstemmed = trees.map(_.root.value.asInstanceOf[Unstemmed].s.mkString(" "))
+    assertEquals(unstemmed, Seq("the age of John add 1"))
+  }
+
   test("fix first typo") {
     // typo! (prefix of correct?)
     val input = "agee 'Bob' add 1"
@@ -255,6 +226,34 @@ class Dslify2Test extends FunSuite {
 
     val unstemmed = trees.map(_.root.value.asInstanceOf[Unstemmed].s.mkString(" "))
     assertEquals(unstemmed, Seq("the age of 'Bob' add the weight of 'Bob'"))
+  }
+
+  test("variable John") {
+    val input = "age John"
+
+    val bnf           = Bnf(MyDsl)
+    val input_        = stemming(input)
+    val (bnf_, state) = stemBnf(bnf)
+    val trees         = parseWithGrammarAll(bnf_, input_)
+    val printed       = trees.map(printTree).toList
+    assertEquals(printed, Seq("age John"))
+
+    val unstemmed = trees.map(_.root.value.asInstanceOf[Unstemmed].s.mkString(" "))
+    assertEquals(unstemmed, Seq("the age of John"))
+  }
+
+  test("variable John with typo") {
+    val input = "weigt John"
+
+    val bnf           = Bnf(MyDsl)
+    val input_        = stemming(input)
+    val (bnf_, state) = stemBnf(bnf)
+    val trees         = parseWithGrammarAll(bnf_, input_)
+    val printed       = trees.map(printTree).toList
+    assertEquals(printed, Seq("weight John"))
+
+    val unstemmed = trees.map(_.root.value.asInstanceOf[Unstemmed].s.mkString(" "))
+    assertEquals(unstemmed, Seq("the weight of John"))
   }
 
   test("fix typo") {
@@ -336,11 +335,23 @@ class Dslify2Test extends FunSuite {
     calcDistance(a, b) > 0.75
   }
 
+  private def refuseToken(
+    t: Bnf.Token,
+    lt: Lexer.Token,
+    element: Option[Bnf.DslElement]
+  ): Boolean = {
+    element match {
+      case Some(Bnf.DslBody(Bnf.DslSyntax(s))) if s.name == MyDsl.sVar.name => lt.text != "John"
+      case _                                                                => false
+    }
+  }
+
   def parseWithGrammarAll(
     bnf: Bnf,
     text: String
   ): Seq[GenericTree] = {
-    val parser: Earley = Earley(bnf, closeEnough = Some(closeEnough))
+    val parser: Earley =
+      Earley(bnf, closeEnough = Some(closeEnough), refuseToken = Some(refuseToken))
     val a              = AstHelpers.getBnfAxiomOrThrow(bnf, None)
     val result         = parser.parse(new Lexer.Input(text), a)
     val navigator      = Navigator(result)
