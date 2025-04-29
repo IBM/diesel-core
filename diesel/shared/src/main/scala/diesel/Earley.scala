@@ -178,19 +178,21 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
                   StateKind.ErrorRecovery,
                   Some(BackPtr(state, InsertedTokenValue(index, lexicalValue, None)))
                 )
-                context.addState(
-                  State(state.production, state.begin, state.end + 1, state.dot + 1),
-                  StateKind.ErrorRecovery,
-                  Some(BackPtr(
-                    state,
-                    MutationTokenValue(
-                      index,
-                      Lexer.Token(lexicalValue.offset, token.defaultValue, token.tokenId),
-                      lexicalValue,
-                      token.style
-                    )
-                  ))
-                )
+                if (isCloseEnough(token)(lexicalValue)) {
+                  context.addState(
+                    State(state.production, state.begin, state.end + 1, state.dot + 1),
+                    StateKind.ErrorRecovery,
+                    Some(BackPtr(
+                      state,
+                      MutationTokenValue(
+                        index,
+                        Lexer.Token(lexicalValue.offset, token.defaultValue, token.tokenId),
+                        lexicalValue,
+                        token.style
+                      )
+                    ))
+                  )
+                }
               }
               context.addState(
                 State(state.production, state.begin, state.end, state.dot + 1),
@@ -290,5 +292,13 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
         )
       }
     })
+  }
+
+  private def isCloseEnough(candidate: Bnf.Token)(errored: Lexer.Token): Boolean =
+    calcDistance(candidate.name, errored.text) > 0.75
+
+  private def calcDistance(a: String, b: String): Float = {
+    val d = (a.toSet.intersect(b.toSet).size + 0f) / a.size
+    d
   }
 }

@@ -52,7 +52,9 @@ class Dslify2Test extends FunSuite {
   // - variable with ''
   // -
 
-  object MyDsl extends Dsl {
+  object MyDsl extends Dsl with Identifiers {
+
+    override def identScanner: Lexer.Scanner = "[a-zA-Z][a-zA-Z0-9]*".r
 
     val cPerson: Concept[Person] = concept[Person]
 
@@ -86,7 +88,7 @@ class Dslify2Test extends FunSuite {
         Mul(l, r)
     })
 
-    val a: Axiom[Operation] = axiom(cOp)
+    val a: Axiom[Expr] = axiom(cExpr)
   }
 
   object MyDslStemmed extends Dsl {
@@ -123,7 +125,7 @@ class Dslify2Test extends FunSuite {
         Mul(l, r)
     })
 
-    val a: Axiom[Operation] = axiom(cOp)
+    val a: Axiom[Expr] = axiom(cExpr)
   }
 
   test("parse") {
@@ -263,6 +265,21 @@ class Dslify2Test extends FunSuite {
 
     val unstemmed = trees.map(_.root.value.asInstanceOf[Unstemmed].s.mkString(" "))
     assertEquals(unstemmed, Seq("the age of 'Bob' add the weight of 'Bob'"))
+  }
+
+  test("fix typo") {
+    // typo!
+    val input = "weigttt 'Bob'"
+
+    val bnf           = Bnf(MyDsl)
+    val input_        = stemming(input)
+    val (bnf_, state) = stemBnf(bnf)
+    val trees         = parseWithGrammarAll(bnf_, input_)
+    val printed       = trees.map(printTree).toList
+    assertEquals(printed, Seq("weight 'Bob'"))
+
+    val unstemmed = trees.map(_.root.value.asInstanceOf[Unstemmed].s.mkString(" "))
+    assertEquals(unstemmed, Seq("the weight of 'Bob'"))
   }
 
   def dumpGrammar(bnf: Bnf): String = {
