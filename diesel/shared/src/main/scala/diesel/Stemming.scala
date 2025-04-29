@@ -3,6 +3,7 @@ package diesel
 import diesel.Bnf.Rule
 import diesel.Bnf.Token
 import diesel.Lexer.ConceptId
+import scala.annotation.tailrec
 
 object Stemming {
   def stemming(text: String): String =
@@ -64,25 +65,44 @@ object Stemming {
     }
   }
 
-  def fixRecursionsInRule(r: Bnf.Rule, state: StemState, dejaVue: Set[Bnf.Rule] = Set()): Unit = {
-    r.productions.foreach { p =>
-      var updates = p.symbols.zipWithIndex.flatMap {
-        case (r: Rule, i) =>
-          val stemmed = state.getStemmedRule(r)
-          if (stemmed.isEmpty && !dejaVue.contains(r)) {
-            fixRecursionsInRule(r, state, dejaVue + r)
-          }
-          stemmed.map((_, i))
-        case _            => None
+  def fixRecursionsInRule(r: Bnf.Rule, state: StemState): Unit = {
+    @tailrec
+    def go(
+      rules: Seq[Bnf.Rule],
+      state: StemState,
+      collect: Seq[Bnf.Rule] = Seq()
+    ): Seq[Bnf.Rule] = {
+      val subrules = rules.flatMap(_.productions).flatMap { p =>
+        p.symbols.flatMap {
+          case r: Rule =>
+            val stemmed = state.getStemmedRule(r)
+            if (stemmed.isEmpty && !collect.contains(r)) {
+              Some(r)
+            } else None
+          case _       => None
+        }
       }
-      updates.foreach { case (r, i) => p.symbols.update(i, r) }
-      p.rule match {
-        case Some(r: Bnf.Rule) =>
-          val stemmed = state.getStemmedRule(r)
-          if (stemmed.nonEmpty) {
-            p.rule = stemmed
-          }
-        case _                 =>
+      if (subrules.nonEmpty) go(subrules, state, collect ++ rules ++ subrules)
+      else collect
+    }
+    val all = go(Seq(r), state, Seq())
+    all.foreach { r =>
+      r.productions.foreach { p =>
+        var updates = p.symbols.zipWithIndex.flatMap {
+          case (r: Rule, i) =>
+            val stemmed = state.getStemmedRule(r)
+            stemmed.map((_, i))
+          case _            => None
+        }
+        updates.foreach { case (r, i) => p.symbols.update(i, r) }
+        p.rule match {
+          case Some(r: Bnf.Rule) =>
+            val stemmed = state.getStemmedRule(r)
+            if (stemmed.nonEmpty) {
+              p.rule = stemmed
+            }
+          case _                 =>
+        }
       }
     }
   }
