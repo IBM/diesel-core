@@ -294,6 +294,7 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
     })
   }
 
+  // TODO make it configurable
   private def isCloseEnough(candidate: Bnf.Token)(errored: Lexer.Token): Boolean =
     calcDistance(candidate.name, errored.text) > 0.75
 
