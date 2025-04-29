@@ -491,11 +491,19 @@ class Dslify2Test extends FunSuite {
     navigator.next()
   }
 
+  private def calcDistance(a: String, b: String): Float = {
+    (a.toSet.intersect(b.toSet).size + 0f) / a.size
+  }
+
+  private def closeEnough(a: String, b: String): Boolean = {
+    calcDistance(a, b) > 0.75
+  }
+
   def parseWithGrammarAll(
     bnf: Bnf,
     text: String
   ): Seq[GenericTree] = {
-    val parser: Earley = Earley(bnf)
+    val parser: Earley = Earley(bnf, closeEnough = Some(closeEnough))
     val a              = AstHelpers.getBnfAxiomOrThrow(bnf, None)
     val result         = parser.parse(new Lexer.Input(text), a)
     val navigator      = Navigator(result)

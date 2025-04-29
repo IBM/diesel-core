@@ -19,9 +19,16 @@ package diesel
 import diesel.Bnf.Constraints
 import diesel.Lexer.Eos
 
-case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
+case class Earley(
+  bnf: Bnf,
+  dynamicLexer: Boolean = false,
+  closeEnough: Option[(String, String) => Boolean] = None
+) {
 
   private def lexer = bnf.lexer
+
+  private val isCloseEnoughFun: (String, String) => Boolean =
+    closeEnough.map(f => (a, b) => f(a, b)).getOrElse((_, _) => true)
 
   def parse(input: Lexer.Input, axiom: Bnf.Axiom): Result = {
     buildCharts(input, axiom)
@@ -142,6 +149,9 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
     if (lexicalValue.id == Lexer.Eos) context.success(index) else false
   }
 
+  private def isCloseEnough(candidate: Bnf.Token, errored: Lexer.Token): Boolean =
+    isCloseEnoughFun(candidate.name, errored.text)
+
   private def errorRecovery(
     index: Int,
     lexicalValue: Lexer.Token,
@@ -178,7 +188,7 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
                   StateKind.ErrorRecovery,
                   Some(BackPtr(state, InsertedTokenValue(index, lexicalValue, None)))
                 )
-                if (isCloseEnough(token)(lexicalValue)) {
+                if (isCloseEnough(token, lexicalValue)) {
                   context.addState(
                     State(state.production, state.begin, state.end + 1, state.dot + 1),
                     StateKind.ErrorRecovery,
@@ -294,12 +304,4 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
     })
   }
 
-  // TODO make it configurable
-  private def isCloseEnough(candidate: Bnf.Token)(errored: Lexer.Token): Boolean =
-    calcDistance(candidate.name, errored.text) > 0.75
-
-  private def calcDistance(a: String, b: String): Float = {
-    val d = (a.toSet.intersect(b.toSet).size + 0f) / a.size
-    d
-  }
 }
