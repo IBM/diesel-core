@@ -184,14 +184,16 @@ class Dslify2Test extends FunSuite {
     assertEquals(unstemmed, Seq("the age of 'Bob' add 1"))
   }
 
-  test("fix out of order John".ignore) {
+  test("fix out of order John") {
     // order!
     val input = "the John age add 1"
 
     val bnf           = Bnf(MyDsl)
     val input_        = stemming(input)
     val (bnf_, state) = stemBnf(bnf)
-    val trees         = parseWithGrammarAll(bnf_, input_)
+    // start in error recovery:
+    val input__       = "X " + input_
+    val trees         = parseWithGrammarAll(bnf_, input__)
     val printed       = trees.map(printTree).toList
     assertEquals(printed, Seq("age John add 1"))
 
