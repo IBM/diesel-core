@@ -36,6 +36,10 @@ case class Earley(
     buildCharts(input, axiom)
   }
 
+  def parseFixing(input: Lexer.Input, axiom: Bnf.Axiom): Result = {
+    buildChartsFixing(input, axiom)
+  }
+
   private def scan(input: Lexer.Input, context: Result): Lexer.Token = {
     scan(input, Seq(), context)
   }
@@ -111,6 +115,74 @@ case class Earley(
             throw new RuntimeException("internal error, unable to recover from errors")
           }
         }
+      }
+
+      index += 1
+      if (!succeed(length, lexicalValue, context)) {
+        chart = context.beginChart(index)
+        lexicalValue = if (dynamicLexer) dynamicScan(input, context) else scan(input, context)
+        if (lexicalValue.id != Lexer.Eos)
+          length += 1
+      }
+    }
+    context
+  }
+
+  private def buildChartsFixing(input: Lexer.Input, axiom: Bnf.Axiom): Result = {
+    val context      = new Result(bnf, axiom)
+    var index        = 0
+    var chart        = context.beginChart(index)
+    var lexicalValue = if (dynamicLexer) dynamicScan(input, context) else scan(input, context)
+    var length       = if (lexicalValue.id == Lexer.Eos) 0 else 1
+    while (index <= length) {
+      var scanned = false
+      context.resetNullable()
+      chart.setToken(lexicalValue)
+      while (context.processingQueue.nonEmpty) {
+        val state: State = context.processingQueue.dequeue()
+        if (state.isCompleted)
+          completer(state, context)
+        else {
+          val next: Bnf.Symbol = state.nextSymbol
+          next match {
+            case token: Bnf.Token =>
+              if (scanner(state, token, lexicalValue, context)) {
+                scanned = true
+              } else {
+                context.addState(
+                  State(state.production, state.begin, state.end, state.dot + 1),
+                  StateKind.ErrorRecovery,
+                  Some(BackPtr(
+                    state,
+                    DeletedTokenValue(
+                      index,
+                      Lexer.Token(lexicalValue.offset, token.defaultValue, token.tokenId),
+                      token.style
+                    )
+                  ))
+                )
+                // scanned = true
+              }
+
+            case rule: Bnf.Rule =>
+              predictor(state, rule, context)
+
+            case _ => ()
+          }
+        }
+      }
+      context.endChart()
+      if (!scanned && !succeed(length, lexicalValue, context)) {
+        // errorRecovery(index, lexicalValue, length, backtracking = false, context)
+        // if (lexicalValue.id == Lexer.Eos && !context.success(length)) {
+        //   val backtrack = chart.getStates.minBy(_.begin).begin
+        //   for (i <- backtrack until index + 1) {
+        //     errorRecovery(i, context.chartAt(i).token.get, length, backtracking = true, context)
+        //   }
+        //   if (!context.success(length)) {
+        //     throw new RuntimeException("internal error, unable to recover from errors")
+        //   }
+        // }
       }
 
       index += 1

@@ -201,6 +201,21 @@ class Dslify2Test extends FunSuite {
     assertEquals(unstemmed, Seq("the age of John add 1"))
   }
 
+  test("fix out of order John: fixing mode".ignore) {
+    // order!
+    val input = "the John age add 1"
+
+    val bnf           = Bnf(MyDsl)
+    val input_        = stemming(input)
+    val (bnf_, state) = stemBnf(bnf)
+    val trees         = parseFixingWithGrammarAll(bnf_, input_)
+    val printed       = trees.map(printTree).toList
+    assertEquals(printed, Seq("age John add 1"))
+
+    val unstemmed = trees.map(_.root.value.asInstanceOf[Unstemmed].s.mkString(" "))
+    assertEquals(unstemmed, Seq("the age of John add 1"))
+  }
+
   test("fix first typo") {
     // typo! (prefix of correct?)
     val input = "agee 'Bob' add 1"
@@ -356,6 +371,18 @@ class Dslify2Test extends FunSuite {
       Earley(bnf, closeEnough = Some(closeEnough), refuseToken = Some(refuseToken))
     val a              = AstHelpers.getBnfAxiomOrThrow(bnf, None)
     val result         = parser.parse(new Lexer.Input(text), a)
+    val navigator      = Navigator(result)
+    LazyList.from(navigator.toIterator)
+  }
+
+  def parseFixingWithGrammarAll(
+    bnf: Bnf,
+    text: String
+  ): Seq[GenericTree] = {
+    val parser: Earley =
+      Earley(bnf, closeEnough = Some(closeEnough), refuseToken = Some(refuseToken))
+    val a              = AstHelpers.getBnfAxiomOrThrow(bnf, None)
+    val result         = parser.parseFixing(new Lexer.Input(text), a)
     val navigator      = Navigator(result)
     LazyList.from(navigator.toIterator)
   }
