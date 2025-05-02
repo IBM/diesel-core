@@ -201,7 +201,7 @@ class Dslify2Test extends FunSuite {
     assertEquals(unstemmed, Seq("the age of John add 1"))
   }
 
-  test("fix out of order John: fixing mode") {
+  test("fix out of order John's age: fixing mode") {
     // order!
     val input = "the John age add 1"
 
@@ -214,6 +214,21 @@ class Dslify2Test extends FunSuite {
 
     val unstemmed = trees.map(_.root.value.asInstanceOf[Unstemmed].s.mkString(" "))
     assertEquals(unstemmed, Seq("the age of John add 1"))
+  }
+
+    test("fix out of order John's weight: fixing mode.ignore") {
+    // order!
+    val input = "the John weight add 1"
+
+    val bnf           = Bnf(MyDsl)
+    val input_        = stemming(input)
+    val (bnf_, state) = stemBnf(bnf)
+    val trees         = parseFixingWithGrammarAll(bnf_, input_)
+    val printed       = trees.map(printTree).toList
+    assertEquals(printed, Seq("age John add 1"))
+
+    val unstemmed = trees.map(_.root.value.asInstanceOf[Unstemmed].s.mkString(" "))
+    assertEquals(unstemmed, Seq("the weight of John add 1"))
   }
 
   test("fix first typo") {
