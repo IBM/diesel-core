@@ -201,7 +201,7 @@ class Dslify2Test extends FunSuite {
     assertEquals(unstemmed, Seq("the age of John add 1"))
   }
 
-  test("fix out of order John: fixing mode".ignore) {
+  test("fix out of order John: fixing mode") {
     // order!
     val input = "the John age add 1"
 
@@ -383,11 +383,16 @@ class Dslify2Test extends FunSuite {
       Earley(bnf, closeEnough = Some(closeEnough), refuseToken = Some(refuseToken))
     val a              = AstHelpers.getBnfAxiomOrThrow(bnf, None)
     val result         = parser.parseFixing(new Lexer.Input(text), a)
+    //result.getStates.foreach { s =>
+    //  print(s)
+    //  println(s.syntacticErrors(result))
+    //}
     val navigator      = Navigator(result)
     LazyList.from(navigator.toIterator)
   }
 
   def printTree(tree: GenericTree): String = {
+    println(tree.markers)
     printNode(tree.root)
   }
 

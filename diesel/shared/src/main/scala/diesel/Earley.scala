@@ -19,6 +19,7 @@ package diesel
 import diesel.Bnf.Constraints
 import diesel.Lexer.Eos
 import diesel.Bnf.DslElement
+import diesel.StateKind.ErrorRecovery
 
 case class Earley(
   bnf: Bnf,
@@ -135,20 +136,40 @@ case class Earley(
     var lexicalValue = if (dynamicLexer) dynamicScan(input, context) else scan(input, context)
     var length       = if (lexicalValue.id == Lexer.Eos) 0 else 1
     while (index <= length) {
-      var scanned = false
       context.resetNullable()
       chart.setToken(lexicalValue)
       while (context.processingQueue.nonEmpty) {
         val state: State = context.processingQueue.dequeue()
-        if (state.isCompleted)
-          completer(state, context)
+        if (state.isCompleted) {
+          completer(state, context, state.kind(context) == ErrorRecovery)
+        }
         else {
           val next: Bnf.Symbol = state.nextSymbol
           next match {
             case token: Bnf.Token =>
-              if (scanner(state, token, lexicalValue, context)) {
-                scanned = true
-              } else {
+              if (!scanner(state, token, lexicalValue, context)) {
+                if (lexicalValue.id != Lexer.Eos) {
+                  context.addState(
+                    State(state.production, state.begin, state.end + 1, state.dot),
+                    StateKind.ErrorRecovery,
+                    Some(BackPtr(state, InsertedTokenValue(index, lexicalValue, None)))
+                  )
+                  if (isCloseEnough(token, lexicalValue)) { //  && !refuseToken.map(f => f(token, lexicalValue, state.production.element)).getOrElse(false)
+                    context.addState(
+                      State(state.production, state.begin, state.end + 1, state.dot + 1),
+                      StateKind.ErrorRecovery,
+                      Some(BackPtr(
+                        state,
+                        MutationTokenValue(
+                          index,
+                          Lexer.Token(lexicalValue.offset, token.defaultValue, token.tokenId),
+                          lexicalValue,
+                          token.style
+                        )
+                      ))
+                    )
+                  }
+                }
                 context.addState(
                   State(state.production, state.begin, state.end, state.dot + 1),
                   StateKind.ErrorRecovery,
@@ -161,30 +182,16 @@ case class Earley(
                     )
                   ))
                 )
-                // scanned = true
               }
 
             case rule: Bnf.Rule =>
-              predictor(state, rule, context)
+              predictor(state, rule, context, state.kind(context) == ErrorRecovery)
 
             case _ => ()
           }
         }
       }
       context.endChart()
-      if (!scanned && !succeed(length, lexicalValue, context)) {
-        // errorRecovery(index, lexicalValue, length, backtracking = false, context)
-        // if (lexicalValue.id == Lexer.Eos && !context.success(length)) {
-        //   val backtrack = chart.getStates.minBy(_.begin).begin
-        //   for (i <- backtrack until index + 1) {
-        //     errorRecovery(i, context.chartAt(i).token.get, length, backtracking = true, context)
-        //   }
-        //   if (!context.success(length)) {
-        //     throw new RuntimeException("internal error, unable to recover from errors")
-        //   }
-        // }
-      }
-
       index += 1
       if (!succeed(length, lexicalValue, context)) {
         chart = context.beginChart(index)
@@ -359,8 +366,7 @@ case class Earley(
     candidates.foreach(candidate => {
       val feature = candidate.feature.merge(candidate.dot, state.feature)
       if (
-        feature != Constraints.Incompatible || (errorRecovery && state.syntacticErrors( // apply only when no syntactic errors
-          context) == 0)
+        feature != Constraints.Incompatible || (errorRecovery && state.syntacticErrors(context) == 0) // apply only when no syntactic errors
       ) {
         context.addState(
           State(

@@ -22,6 +22,7 @@ import diesel.Lexer.{Eos, Token}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.LinkedHashSet
 
 private[diesel] sealed trait Item {
 
@@ -105,7 +106,7 @@ private[diesel] object State {
     State(production, begin, end, dot, production.feature)
 }
 
-private[diesel] case class State(
+private[diesel] case class State (
   production: Bnf.Production,
   begin: Int,
   end: Int,
@@ -124,7 +125,7 @@ private[diesel] case class State(
   }
 
   override def syntacticErrors(ctx: Result): Int =
-    ctx.contextOf(this).map(_.syntacticErrors).getOrElse(0)
+    ctx.contextOf(this).map(_.syntacticErrors(ctx)).getOrElse(0)
 
   private[diesel] def kind(ctx: Result): StateKind.Value =
     ctx.contextOf(this).map(_.kind).getOrElse(StateKind.Kernel)
@@ -247,10 +248,27 @@ private[diesel] object StateKind extends Enumeration {
 
 private[diesel] class StateContext(
   val id: Int,
+  val end: Int,
   var kind: StateKind.Value,
-  var syntacticErrors: Int,
-  val backPtrs: ArrayBuffer[BackPtr] = ArrayBuffer()
+  val backPtrs: LinkedHashSet[BackPtr] = LinkedHashSet()
 ) {
+
+  var _syntacticErrors : Option[Int] = None
+
+  def syntacticErrors(ctx: Result): Int = 
+    _syntacticErrors match {
+      case Some(value) => value
+      case None => 
+        if (backPtrs.size == 0) 0 
+        else if (backPtrs.size > 1) 0
+        else {
+          val value = backPtrs.head.syntacticErrors(ctx)
+          if (end < ctx.currentChartIndex()) {
+            _syntacticErrors = Some(value)
+          }
+          value
+        }
+    }
 
   def mergeBackPtr(kind: StateKind.Value, backPtr: BackPtr, ctx: Result): StateContext = {
     if (this.kind != kind) {
@@ -258,17 +276,18 @@ private[diesel] class StateContext(
         this.kind = kind;
       }
     }
-    val syntacticErrors = backPtr.syntacticErrors(ctx)
     if (backPtrs.isEmpty) {
-      this.syntacticErrors = syntacticErrors
       backPtrs += backPtr
-    } else if (syntacticErrors < this.syntacticErrors) {
-      this.syntacticErrors = syntacticErrors
-      backPtrs.clear()
-      backPtrs += backPtr
-    } else if (syntacticErrors == this.syntacticErrors && syntacticErrors == 0) {
-      if (!backPtrs.contains(backPtr)) // TODO: use better implementation O(n)
+    } else {
+      val syntacticErrors = backPtr.syntacticErrors(ctx)
+      val actualSyntacticErrors = this.syntacticErrors(ctx)
+      if (syntacticErrors < actualSyntacticErrors) {
+        backPtrs.clear()
         backPtrs += backPtr
+      } else if (syntacticErrors == actualSyntacticErrors && syntacticErrors == 0) {
+        if (!backPtrs.contains(backPtr))
+          backPtrs += backPtr
+      }
     }
     this
   }
@@ -317,6 +336,12 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
     currentChart = Some(chart)
     chart
   }
+
+  private[diesel] def currentChartIndex(): Int = 
+    currentChart match {
+      case Some(chart) => chart.index
+      case None => -1
+    }
 
   private def getTokenPrefix(offset: Int, token: Token): String = {
     val diff = token.offset + token.length - offset
@@ -396,7 +421,7 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
   ): Unit = {
     val ctx = states.getOrElseUpdate(
       state, {
-        val res = new StateContext(states.size, kind, if (state.dot == 0) 0 else Int.MaxValue)
+        val res = new StateContext(states.size, state.end, kind)
         states.put(state, res)
         enqueue(state)
         res
@@ -415,7 +440,7 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
       state.nextSymbol match {
         case rule: Bnf.NonTerminal =>
           if (bnf.emptyRules.contains(rule)) {
-            nullableCache.get(rule).foreach(_.foreach(processingQueue.enqueue))
+            nullableCache.get(rule).foreach(_.foreach(s => processingQueue.enqueue(s)))
           }
         case _                     =>
       }
