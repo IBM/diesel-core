@@ -216,7 +216,7 @@ class Dslify2Test extends FunSuite {
     assertEquals(unstemmed, Seq("the age of John add 1"))
   }
 
-    test("fix out of order John's weight: fixing mode".ignore) {
+  test("fix out of order John's weight: fixing mode".ignore) {
     // order!
     val input = "the John weight add 1"
 
@@ -363,8 +363,9 @@ class Dslify2Test extends FunSuite {
     (a.toSet.intersect(b.toSet).size + 0f) / a.size
   }
 
-  private def closeEnough(a: String, b: String): Boolean = {
-    calcDistance(a, b) > 0.75
+  private def distanceBetween(a: String, b: String): Float = {
+    val distance = calcDistance(a, b)
+    if (distance > 0.75) distance else 0.0f
   }
 
   private def refuseToken(
@@ -383,7 +384,7 @@ class Dslify2Test extends FunSuite {
     text: String
   ): Seq[GenericTree] = {
     val parser: Earley =
-      Earley(bnf, closeEnough = Some(closeEnough), refuseToken = Some(refuseToken))
+      Earley(bnf, distanceBetween = Some(distanceBetween), refuseToken = Some(refuseToken))
     val a              = AstHelpers.getBnfAxiomOrThrow(bnf, None)
     val result         = parser.parse(new Lexer.Input(text), a)
     val navigator      = Navigator(result)
@@ -395,13 +396,13 @@ class Dslify2Test extends FunSuite {
     text: String
   ): Seq[GenericTree] = {
     val parser: Earley =
-      Earley(bnf, closeEnough = Some(closeEnough), refuseToken = Some(refuseToken))
+      Earley(bnf, distanceBetween = Some(distanceBetween), refuseToken = Some(refuseToken))
     val a              = AstHelpers.getBnfAxiomOrThrow(bnf, None)
     val result         = parser.parseFixing(new Lexer.Input(text), a)
-    //result.getStates.foreach { s =>
+    // result.getStates.foreach { s =>
     //  print(s)
     //  println(s.syntacticErrors(result))
-    //}
+    // }
     val navigator      = Navigator(result)
     LazyList.from(navigator.toIterator)
   }

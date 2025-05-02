@@ -26,7 +26,7 @@ import scala.collection.mutable.LinkedHashSet
 
 private[diesel] sealed trait Item {
 
-  def syntacticErrors(ctx: Result): Int
+  def syntacticErrors(ctx: Result): Float
 }
 
 private[diesel] trait TerminalItem extends Item {
@@ -43,7 +43,7 @@ private[diesel] trait TerminalItem extends Item {
 
   def isErrorRecovery: Boolean = false
 
-  override def syntacticErrors(ctx: Result): Int = if (isErrorRecovery) 1 else 0
+  override def syntacticErrors(ctx: Result): Float = if (isErrorRecovery) 1.0f else 0.0f
 
   def reportErrors(): Seq[Marker]
 }
@@ -91,12 +91,15 @@ private[diesel] case class MutationTokenValue(
   index: Int,
   override val token: Token,
   actualToken: Token,
+  distance: Float,
   override val style: Option[Style]
 ) extends TerminalItem {
 
   override def begin: Int = index
 
   override def isErrorRecovery: Boolean = true
+
+  override def syntacticErrors(ctx: Result): Float = distance
 
   override def reportErrors(): Seq[Marker] = Seq(TokenMutation(token.offset, actualToken, token))
 }
@@ -106,7 +109,7 @@ private[diesel] object State {
     State(production, begin, end, dot, production.feature)
 }
 
-private[diesel] case class State (
+private[diesel] case class State(
   production: Bnf.Production,
   begin: Int,
   end: Int,
@@ -124,8 +127,8 @@ private[diesel] case class State (
     toString(Map.empty)
   }
 
-  override def syntacticErrors(ctx: Result): Int =
-    ctx.contextOf(this).map(_.syntacticErrors(ctx)).getOrElse(0)
+  override def syntacticErrors(ctx: Result): Float =
+    ctx.contextOf(this).map(_.syntacticErrors(ctx)).getOrElse(0.0f)
 
   private[diesel] def kind(ctx: Result): StateKind.Value =
     ctx.contextOf(this).map(_.kind).getOrElse(StateKind.Kernel)
@@ -232,7 +235,7 @@ private[diesel] class Chart(
 }
 
 private[diesel] case class BackPtr(predecessor: State, causal: Item) {
-  def syntacticErrors(ctx: Result): Int = {
+  def syntacticErrors(ctx: Result): Float = {
     predecessor.syntacticErrors(ctx) + causal.syntacticErrors(ctx)
   }
 }
@@ -248,22 +251,22 @@ private[diesel] object StateKind extends Enumeration {
 
 private[diesel] class StateContext(
   val id: Int,
-  val end: Int,
+  val endIndex: Int,
   var kind: StateKind.Value,
   val backPtrs: LinkedHashSet[BackPtr] = LinkedHashSet()
 ) {
 
-  var _syntacticErrors : Option[Int] = None
+  var _syntacticErrors: Option[Float] = None
 
-  def syntacticErrors(ctx: Result): Int = 
+  def syntacticErrors(ctx: Result): Float =
     _syntacticErrors match {
       case Some(value) => value
-      case None => 
-        if (backPtrs.size == 0) 0 
+      case None        =>
+        if (backPtrs.size == 0) 0
         else if (backPtrs.size > 1) 0
         else {
           val value = backPtrs.head.syntacticErrors(ctx)
-          if (end < ctx.currentChartIndex()) {
+          if (endIndex < ctx.currentChartIndex()) {
             _syntacticErrors = Some(value)
           }
           value
@@ -279,7 +282,7 @@ private[diesel] class StateContext(
     if (backPtrs.isEmpty) {
       backPtrs += backPtr
     } else {
-      val syntacticErrors = backPtr.syntacticErrors(ctx)
+      val syntacticErrors       = backPtr.syntacticErrors(ctx)
       val actualSyntacticErrors = this.syntacticErrors(ctx)
       if (syntacticErrors < actualSyntacticErrors) {
         backPtrs.clear()
@@ -337,10 +340,10 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
     chart
   }
 
-  private[diesel] def currentChartIndex(): Int = 
+  private[diesel] def currentChartIndex(): Int =
     currentChart match {
       case Some(chart) => chart.index
-      case None => -1
+      case None        => -1
     }
 
   private def getTokenPrefix(offset: Int, token: Token): String = {

@@ -24,14 +24,14 @@ import diesel.StateKind.ErrorRecovery
 case class Earley(
   bnf: Bnf,
   dynamicLexer: Boolean = false,
-  closeEnough: Option[(String, String) => Boolean] = None,
+  distanceBetween: Option[(String, String) => Float] = None,
   refuseToken: Option[(Bnf.Token, Lexer.Token, Option[DslElement]) => Boolean] = None
 ) {
 
   private def lexer = bnf.lexer
 
-  private val isCloseEnoughFun: (String, String) => Boolean =
-    closeEnough.map(f => (a, b) => f(a, b)).getOrElse((_, _) => true)
+  private val distanceBetweenFun: (String, String) => Float =
+    distanceBetween.map(f => (a, b) => f(a, b)).getOrElse((_, _) => 1.0f)
 
   def parse(input: Lexer.Input, axiom: Bnf.Axiom): Result = {
     buildCharts(input, axiom)
@@ -142,8 +142,7 @@ case class Earley(
         val state: State = context.processingQueue.dequeue()
         if (state.isCompleted) {
           completer(state, context, state.kind(context) == ErrorRecovery)
-        }
-        else {
+        } else {
           val next: Bnf.Symbol = state.nextSymbol
           next match {
             case token: Bnf.Token =>
@@ -154,7 +153,8 @@ case class Earley(
                     StateKind.ErrorRecovery,
                     Some(BackPtr(state, InsertedTokenValue(index, lexicalValue, None)))
                   )
-                  if (isCloseEnough(token, lexicalValue)) { //  && !refuseToken.map(f => f(token, lexicalValue, state.production.element)).getOrElse(false)
+                  val distance = distanceBetween(token, lexicalValue)
+                  if (distance > 0.0f) { //  && !refuseToken.map(f => f(token, lexicalValue, state.production.element)).getOrElse(false)
                     context.addState(
                       State(state.production, state.begin, state.end + 1, state.dot + 1),
                       StateKind.ErrorRecovery,
@@ -164,6 +164,7 @@ case class Earley(
                           index,
                           Lexer.Token(lexicalValue.offset, token.defaultValue, token.tokenId),
                           lexicalValue,
+                          distance,
                           token.style
                         )
                       ))
@@ -230,8 +231,8 @@ case class Earley(
     if (lexicalValue.id == Lexer.Eos) context.success(index) else false
   }
 
-  private def isCloseEnough(candidate: Bnf.Token, errored: Lexer.Token): Boolean =
-    isCloseEnoughFun(candidate.name, errored.text)
+  private def distanceBetween(candidate: Bnf.Token, errored: Lexer.Token): Float =
+    distanceBetweenFun(candidate.name, errored.text)
 
   private def errorRecovery(
     index: Int,
@@ -269,7 +270,8 @@ case class Earley(
                   StateKind.ErrorRecovery,
                   Some(BackPtr(state, InsertedTokenValue(index, lexicalValue, None)))
                 )
-                if (isCloseEnough(token, lexicalValue)) {
+                val distance = distanceBetween(token, lexicalValue)
+                if (distance > 0.0f) {
                   context.addState(
                     State(state.production, state.begin, state.end + 1, state.dot + 1),
                     StateKind.ErrorRecovery,
@@ -279,6 +281,7 @@ case class Earley(
                         index,
                         Lexer.Token(lexicalValue.offset, token.defaultValue, token.tokenId),
                         lexicalValue,
+                        distance,
                         token.style
                       )
                     ))
@@ -366,7 +369,9 @@ case class Earley(
     candidates.foreach(candidate => {
       val feature = candidate.feature.merge(candidate.dot, state.feature)
       if (
-        feature != Constraints.Incompatible || (errorRecovery && state.syntacticErrors(context) == 0) // apply only when no syntactic errors
+        feature != Constraints.Incompatible || (errorRecovery && state.syntacticErrors(
+          context
+        ) == 0) // apply only when no syntactic errors
       ) {
         context.addState(
           State(
