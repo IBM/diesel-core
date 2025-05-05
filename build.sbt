@@ -121,6 +121,9 @@ lazy val diesel = crossProject(JSPlatform, JVMPlatform)
   .settings(sharedSettings_test)
   .settings(sharedSettings_lint)
   .jsSettings(sharedJsSettings)
+  .jvmSettings(
+    libraryDependencies ++= Seq("org.apache.opennlp" % "opennlp-tools" % "2.5.4")
+  )
 
 lazy val samples = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
