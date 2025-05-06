@@ -2,6 +2,7 @@ package diesel.infer
 
 trait TypeExpr
 
+case class Signature(r: TypeExpr, args: Seq[TypeExpr])
 object TypeExpr {
   case object Any                          extends TypeExpr
   case object Nothing                      extends TypeExpr
@@ -27,7 +28,9 @@ object TypeExpr {
       case Or(Any, b)              => b
       case Or(a, Any)              => a
       case And(a: Exact, b: Exact) =>
-        if (isSubType(a.c, b.c)) {
+        if (a == b) {
+          a
+        } else if (isSubType(a.c, b.c)) {
           b
         } else if (isSubType(b.c, a.c)) {
           a
@@ -51,4 +54,21 @@ object TypeExpr {
       case _                       => e
     }
   }
+
+  def infer(vs: Seq[TypeExpr], signature: Signature)(implicit isSubType: IsSubTypeOf): TypeExpr = {
+    if (vs.size == signature.args.size) {
+      val applied    = vs.zip(signature.args).map { case (a, b) => and(a, b) }
+      println("FW", vs, signature.args)
+      println("FW", applied)
+      val applicable = applied.forall(_ != TypeExpr.Nothing)
+      if (applicable) {
+        signature.r
+      } else {
+        TypeExpr.Nothing
+      }
+    } else {
+      TypeExpr.Nothing
+    }
+  }
+
 }

@@ -129,6 +129,16 @@ class TypeExprTest extends FunSuite {
     )
   }
 
+  test("normalize same and") {
+    assertEquals(
+      TypeExpr.and(
+        TypeExpr.exact("gnu"),
+        TypeExpr.exact("gnu")
+      ),
+      TypeExpr.exact("gnu")
+    )
+  }
+
   test("normalize same or") {
     assertEquals(
       TypeExpr.or(
@@ -161,7 +171,20 @@ class TypeExprTest extends FunSuite {
         TypeExpr.or(TypeExpr.exact("bar"), TypeExpr.exact("gnu"))
       )
     )
+  }
 
+  test("infer from signature") {
+    val args      = Seq(TypeExpr.exact("gnu"))
+    val signature = Signature(TypeExpr.exact("foo"), Seq(TypeExpr.exact("gnu")))
+    val inferred  = TypeExpr.infer(args, signature)
+    assertEquals(inferred, TypeExpr.exact("foo"))
+  }
+
+  test("infer from signature mismatch") {
+    val args      = Seq(TypeExpr.exact("bar"))
+    val signature = Signature(TypeExpr.exact("foo"), Seq(TypeExpr.exact("gnu")))
+    val inferred  = TypeExpr.infer(args, signature)
+    assertEquals(inferred, TypeExpr.Nothing)
   }
 
 }
