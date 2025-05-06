@@ -213,6 +213,9 @@ object Bnf {
   case class Rule(name: String, var productions: Seq[Production] = Seq()) extends NonTerminal {
     override def isRule: Boolean = true
 
+    // common ancestor if any
+    def elementType: Option[ElementType] = ???
+
     def dump(ps: PrintStream): Unit = {
       ps.print(name)
       ps.print(" => ")

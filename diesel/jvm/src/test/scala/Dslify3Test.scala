@@ -165,7 +165,7 @@ class Dslify3Test extends FunSuite {
                     findProductions(bnf, p)
                 )
             case Some(concept) =>
-                VariableNode(p.getCoveredText(), concept)
+                VariableNode(p.getCoveredText(), Bnf.ElementType(concept, false))
             }
         )
     } else {
@@ -200,6 +200,8 @@ class Dslify3Test extends FunSuite {
         }
   }
 
+  def productionType(p: Bnf.Production): Option[Bnf.ElementType] = p.element.flatMap(e => e.elementType)
+
   sealed trait InferNode {
     def resolve: Option[Template]
   }
@@ -207,22 +209,22 @@ class Dslify3Test extends FunSuite {
     override def resolve: Option[Template] = {
         if (prods.size > 0) {
             val prod = prods(0)
-            val parts = prod.symbols.map {
-                case Bnf.Axiom(rule) => 
-                    PlaceholderPart
-                case Rule(name, productions) =>
-                    PlaceholderPart
+            val parts = prod.symbols.toSeq.map {
+                case a:Bnf.Axiom => 
+                    PlaceholderPart(productionType(a.production))
+                case r:Rule =>
+                    PlaceholderPart(r.elementType)
                 case Token(name, tokenId, style) =>
                     StringPart(name)
             }
-            Some(UncompletedTemplate(parts))
+            Some(UncompletedTemplate(parts, productionType(prod)))
         } else {
             throw new RuntimeException("no production found")
         } 
     }
   }
-  case class VariableNode(name: String, concept: Concept[_]) extends InferNode {
-    override def resolve: Option[Template] = Some(CompletedTemplate(name))
+  case class VariableNode(name: String, elementType: Bnf.ElementType) extends InferNode {
+    override def resolve: Option[Template] = Some(CompletedTemplate(name, Some(elementType)))
   }
   case class IntermediateNode(children: Seq[InferNode]) extends InferNode {
     override def resolve: Option[Template] = {
@@ -246,21 +248,23 @@ class Dslify3Test extends FunSuite {
     }
   }
 
-  sealed trait Template
-  case class CompletedTemplate(s: String) extends Template
-  case class UncompletedTemplate(parts: Seq[Part]) extends Template {
+  sealed trait Template {
+    def elementType: Option[Bnf.ElementType]
+  }
+  case class CompletedTemplate(s: String, elementType: Option[Bnf.ElementType]) extends Template 
+  case class UncompletedTemplate(parts: Seq[Part], elementType: Option[Bnf.ElementType]) extends Template {
     
-    private def nbPlaceholders = parts.count(_ == PlaceholderPart)
+    private def nbPlaceholders = parts.count(_.isInstanceOf[PlaceholderPart])
 
     def fill(values: Seq[CompletedTemplate]): Option[CompletedTemplate] = {
         if (values.size == nbPlaceholders) {
             val (str, _) = parts.foldLeft(("", values)) {
                 case ((str,values), StringPart(s)) => 
                     (str + " " + s, values)
-                case ((str,values), PlaceholderPart) => 
+                case ((str,values), PlaceholderPart(elementType)) => 
                     (str + " " + values.head.s, values.tail)
             }
-            Some(CompletedTemplate(str))
+            Some(CompletedTemplate(str, elementType))
         } else {
             throw new RuntimeException("invalid values : " + values)
         }
@@ -269,7 +273,7 @@ class Dslify3Test extends FunSuite {
   
   sealed trait Part
   case class StringPart(s: String) extends Part
-  case object PlaceholderPart extends Part
+  case class PlaceholderPart(elementType: Option[Bnf.ElementType]) extends Part
 
   private def doParse(s: String): Seq[Parse] = {
     val modelIn = new FileInputStream("/home/remi/Downloads/en-parser-chunking.bin")
