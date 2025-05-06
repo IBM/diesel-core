@@ -17,30 +17,20 @@
 import diesel.AstHelpers
 import diesel.Bnf
 import diesel.Bnf.Rule
+import diesel.Bnf.Token
 import diesel.Dsl
 import diesel.Dsl._
-import diesel.Earley
-import diesel.GenericNode
-import diesel.GenericTerminal
-import diesel.GenericTree
 import diesel.Lexer
-import diesel.Navigator
-import diesel.Stemming._
-import diesel.Stemming.stemming
 import munit.FunSuite
-
-import java.io.ByteArrayOutputStream
-import java.io.PrintStream
-import java.io.FileInputStream
-import opennlp.tools.parser.ParserModel
-import java.io.IOException
-import scala.util.Try
 import opennlp.tools.cmdline.parser.ParserTool
-import opennlp.tools.parser.ParserFactory
-import scala.util.Success
-import scala.util.Failure
 import opennlp.tools.parser.Parse
-import diesel.Bnf.Token
+import opennlp.tools.parser.ParserFactory
+import opennlp.tools.parser.ParserModel
+
+import java.io.FileInputStream
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 
 class Dslify3Test extends FunSuite {
 
@@ -75,6 +65,7 @@ class Dslify3Test extends FunSuite {
     }
 
     val cOp: Concept[Operation] = concept(cExpr)
+    
     val sMaxAge                 = syntax(cInt)("the" ~ "maximum" ~ "age" ~ "of" ~ cPerson map {
       case (_, _) =>
         Number("13")
@@ -145,7 +136,6 @@ class Dslify3Test extends FunSuite {
   }
 
   test("the age of john") {
-
     val vars      = Map("john" -> MyDsl.cPerson)
     val bnf       = Bnf(MyDsl)
     val topParses = doParse("the age of john")
@@ -174,7 +164,6 @@ class Dslify3Test extends FunSuite {
   }
 
   test("the maximum age of john") {
-
     val vars      = Map("john" -> MyDsl.cPerson)
     val bnf       = Bnf(MyDsl)
     val topParses = doParse("the maximum age of john")
@@ -204,17 +193,23 @@ class Dslify3Test extends FunSuite {
 
   private def inferTypes(p: Parse, vars: Map[String, Concept[_]], bnf: Bnf): Option[InferNode] = {
     val children = p.getChildren().toSeq.flatMap(p2 => inferTypes(p2, vars, bnf))
-    if (Set("NN", "JJ").contains(p.getType())) {
-      Some(
+    val significantParts = p.getChildren().toSeq.filter(p2 => Set("NN", "JJ").contains(p2.getType())).map(_.getCoveredText())
+    if (significantParts.nonEmpty) {
+      if (significantParts.size == 1) {
         vars.get(p.getCoveredText()) match {
-          case None          =>
-            ProductionNode(
-              findProductions(bnf, p)
-            )
+          case None => 
+            val w = findProductions(bnf, significantParts)
+            if (w.nonEmpty) Some(ProductionNode(w)) else None
           case Some(concept) =>
-            VariableNode(p.getCoveredText(), Bnf.ElementType(concept, false))
+            val v = VariableNode(p.getCoveredText(), Bnf.ElementType(concept, false))
+            val w = findProductions(bnf, significantParts)
+            if (w.nonEmpty) Some(IntermediateNode(Seq(v, ProductionNode(w))))
+            else Some(v)
         }
-      )
+      } else {
+        val w = findProductions(bnf, significantParts)
+        if (w.nonEmpty) Some(ProductionNode(w)) else None
+      }
     } else {
       children.toList match {
         case Nil         =>
@@ -227,7 +222,7 @@ class Dslify3Test extends FunSuite {
     }
   }
 
-  def findProductions(bnf: Bnf, p: Parse): Seq[Bnf.Production] = {
+  def findProductions(bnf: Bnf, parts: Seq[String]): Seq[(Bnf.Production, Float)] = {
     bnf.rules
       .flatMap {
         case a: Bnf.Axiom            =>
@@ -235,15 +230,17 @@ class Dslify3Test extends FunSuite {
         case Rule(name, productions) =>
           productions
       }
-      .filter { production =>
-        production.symbols.exists {
-          case Bnf.Axiom(rule)             =>
-            false
-          case Rule(name, productions)     =>
-            false
-          case Token(name, tokenId, style) =>
-            name == p.getCoveredText()
-        }
+      .flatMap { production =>
+        val tokens = production.symbols.flatMap {
+          case Token(name, tokenId, style) => Some(name)
+          case _ => None
+        }.toSet        
+        val matchCount = tokens.intersect(parts.toSet).size
+        val score = matchCount.toFloat / tokens.size
+        if (matchCount == parts.size && score > 0.0) {
+          Some((production, score))
+        } 
+        else None
       }
   }
 
@@ -253,10 +250,10 @@ class Dslify3Test extends FunSuite {
   sealed trait InferNode {
     def resolve(isSuperOf: IsSuperOf): Option[Template]
   }
-  case class ProductionNode(prods: Seq[Bnf.Production])               extends InferNode {
+  case class ProductionNode(prods: Seq[(Bnf.Production, Float)]) extends InferNode {
     override def resolve(isSuperOf: IsSuperOf): Option[Template] = {
       if (prods.size > 0) {
-        val prod  = prods(0)
+        val prod  = prods.sortBy(_._2).last._1
         val parts = prod.symbols.toSeq.map {
           case a: Bnf.Axiom                =>
             PlaceholderPart(productionType(a.production))
@@ -272,10 +269,12 @@ class Dslify3Test extends FunSuite {
       }
     }
   }
+
   case class VariableNode(name: String, elementType: Bnf.ElementType) extends InferNode {
     override def resolve(isSuperOf: IsSuperOf): Option[Template] =
       Some(CompletedTemplate(name, Some(elementType)))
   }
+  
   case class IntermediateNode(children: Seq[InferNode])               extends InferNode {
     override def resolve(isSuperOf: IsSuperOf): Option[Template] = {
       val templates   = children.flatMap(_.resolve(isSuperOf))
