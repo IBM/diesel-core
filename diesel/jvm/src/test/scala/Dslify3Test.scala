@@ -141,22 +141,46 @@ class Dslify3Test extends FunSuite {
     val topParses = doParse("the age of john")
     assertEquals(1, topParses.length)
     val p = topParses(0)
+    printParse(p)
     val inferred = inferTypes(p, vars, bnf)
+
+    println("inferred")
+    println(munitPrint(inferred))
+
+    val resolved = inferred.flatMap(_.resolve)
+
+    println("resolved")
+    println(munitPrint(resolved))
+
     assertEquals(inferred, null)
   }
 
-  private def inferTypes(p: Parse, vars: Map[String,Concept[_]], bnf: Bnf): InferNode = {
-    val children = p.getChildren().toSeq.map(p2 => inferTypes(p2, vars, bnf))    
-    val prods = 
-        if (p.getType() == "NN") {
-            findProductions(bnf, p, children)
-        } else {
-            Seq()
+  private def inferTypes(p: Parse, vars: Map[String,Concept[_]], bnf: Bnf): Option[InferNode] = {
+    val children = p.getChildren().toSeq.flatMap(p2 => inferTypes(p2, vars, bnf))
+    if (p.getType() == "NN") {
+        Some(
+            vars.get(p.getCoveredText()) match {
+            case None => 
+                ProductionNode(
+                    findProductions(bnf, p)
+                )
+            case Some(concept) =>
+                VariableNode(p.getCoveredText(), concept)
+            }
+        )
+    } else {
+        children.toList match {
+            case Nil => 
+                None
+            case head :: Nil => 
+                Some(head)
+            case _ => 
+                Some(IntermediateNode(children))            
         }
-    InferNode(children, prods)
+    }
   }
 
-  def findProductions(bnf: Bnf, p: Parse, children: Seq[InferNode]): Seq[Bnf.Production] = {
+  def findProductions(bnf: Bnf, p: Parse): Seq[Bnf.Production] = {
     bnf.rules
         .flatMap {
             case a:Bnf.Axiom => 
@@ -176,7 +200,76 @@ class Dslify3Test extends FunSuite {
         }
   }
 
-  case class InferNode(children: Seq[InferNode], prods: Seq[Bnf.Production]) {}
+  sealed trait InferNode {
+    def resolve: Option[Template]
+  }
+  case class ProductionNode(prods: Seq[Bnf.Production]) extends InferNode {
+    override def resolve: Option[Template] = {
+        if (prods.size > 0) {
+            val prod = prods(0)
+            val parts = prod.symbols.map {
+                case Bnf.Axiom(rule) => 
+                    PlaceholderPart
+                case Rule(name, productions) =>
+                    PlaceholderPart
+                case Token(name, tokenId, style) =>
+                    StringPart(name)
+            }
+            Some(UncompletedTemplate(parts))
+        } else {
+            throw new RuntimeException("no production found")
+        } 
+    }
+  }
+  case class VariableNode(name: String, concept: Concept[_]) extends InferNode {
+    override def resolve: Option[Template] = Some(CompletedTemplate(name))
+  }
+  case class IntermediateNode(children: Seq[InferNode]) extends InferNode {
+    override def resolve: Option[Template] = {
+        val templates = children.flatMap(_.resolve)
+        val completed = templates.flatMap {
+            case c:CompletedTemplate => 
+                Some(c)
+            case _ =>
+                None
+        }
+        val uncompleted = templates.flatMap {
+            case u:UncompletedTemplate => 
+                Some(u)
+            case _ =>
+                None
+        }
+        val matching = uncompleted.flatMap { u =>
+            u.fill(completed)
+        }
+        matching.headOption
+    }
+  }
+
+  sealed trait Template
+  case class CompletedTemplate(s: String) extends Template
+  case class UncompletedTemplate(parts: Seq[Part]) extends Template {
+    
+    private def nbPlaceholders = parts.count(_ == PlaceholderPart)
+
+    def fill(values: Seq[CompletedTemplate]): Option[CompletedTemplate] = {
+        if (values.size == nbPlaceholders) {
+            val (str, _) = parts.foldLeft(("", values)) {
+                case ((str,values), StringPart(s)) => 
+                    (str + " " + s, values)
+                case ((str,values), PlaceholderPart) => 
+                    (str + " " + values.head.s, values.tail)
+            }
+            Some(CompletedTemplate(str))
+        } else {
+            throw new RuntimeException("invalid values : " + values)
+        }
+    }
+  }
+  
+  sealed trait Part
+  case class StringPart(s: String) extends Part
+  case object PlaceholderPart extends Part
 
   private def doParse(s: String): Seq[Parse] = {
     val modelIn = new FileInputStream("/home/remi/Downloads/en-parser-chunking.bin")
