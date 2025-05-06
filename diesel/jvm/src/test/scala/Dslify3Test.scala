@@ -86,7 +86,7 @@ class Dslify3Test extends FunSuite {
         Number("42")
     })
 
-    val sBob = syntax(cPerson)(SPStr("Bob") map {
+    val sBob = syntax(cPerson)(SPStr("'Bob'") map {
       case (_, _) =>
         Bob
     })
@@ -156,7 +156,13 @@ class Dslify3Test extends FunSuite {
     println("resolved")
     println(munitPrint(resolved))
 
-    assertEquals(inferred, null)
+    assertEquals(
+      resolved.flatMap {
+        case CompletedTemplate(s, _) => Some(s)
+        case _                       => None
+      },
+      Some(" the age of john")
+    )
   }
 
   private def inferTypes(p: Parse, vars: Map[String, Concept[_]], bnf: Bnf): Option[InferNode] = {
@@ -283,12 +289,11 @@ class Dslify3Test extends FunSuite {
   case class StringPart(s: String)                                 extends Part
   case class PlaceholderPart(elementType: Option[Bnf.ElementType]) extends Part
 
-  private def doParse(s: String): Seq[Parse] = {
+  private def doParse(sentence: String): Seq[Parse] = {
     val modelIn = new FileInputStream("./en-parser-chunking.bin")
     Try(new ParserModel(modelIn)) match {
       case Success(parserModel) =>
-        val parser   = ParserFactory.create(parserModel)
-        val sentence = "the age of john"
+        val parser = ParserFactory.create(parserModel)
         ParserTool.parseLine(sentence, parser, 1).toSeq
       case Failure(exception)   =>
         throw new RuntimeException(exception)
