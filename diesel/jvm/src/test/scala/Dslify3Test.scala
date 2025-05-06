@@ -41,8 +41,6 @@ import scala.util.Success
 import scala.util.Failure
 import opennlp.tools.parser.Parse
 import diesel.Bnf.Token
-import opennlp.tools.models.simple.SimpleClassPathModelFinder
-import opennlp.tools.models.ClassPathModelLoader
 
 class Dslify3Test extends FunSuite {
 
@@ -77,14 +75,24 @@ class Dslify3Test extends FunSuite {
     }
 
     val cOp: Concept[Operation] = concept(cExpr)
+    val sMaxAge                 = syntax(cInt)("the" ~ "maximum" ~ "age" ~ "of" ~ cPerson map {
+      case (_, _) =>
+        Number("13")
+    })
     val sAge                    = syntax(cInt)("the" ~ "age" ~ "of" ~ cPerson map {
       case (_, _) =>
         Number("13")
     })
+    
     val sWeight                 = syntax(cInt)("the" ~ "weight" ~ "of" ~ cPerson map {
       case (_, _) =>
         Number("42")
     })
+    val sMaxWeight              = syntax(cInt)("the" ~ "maximum" ~ "weight" ~ "of" ~ cPerson map {
+      case (_, _) =>
+        Number("42")
+    })
+
 
     val sBob = syntax(cPerson)(SPStr("'Bob'") map {
       case (_, _) =>
@@ -136,7 +144,7 @@ class Dslify3Test extends FunSuite {
     }
   }
 
-  test("type inference") {
+  test("the age of john") {
 
     val vars      = Map("john" -> MyDsl.cPerson)
     val bnf       = Bnf(MyDsl)
@@ -165,9 +173,38 @@ class Dslify3Test extends FunSuite {
     )
   }
 
+  test("the maximum age of john") {
+
+    val vars      = Map("john" -> MyDsl.cPerson)
+    val bnf       = Bnf(MyDsl)
+    val topParses = doParse("the maximum age of john")
+    assertEquals(1, topParses.length)
+    val p         = topParses(0)
+    printParse(p)
+    val inferred  = inferTypes(p, vars, bnf)
+
+    println("inferred")
+    println(munitPrint(inferred))
+
+    implicit val dslSuper: IsSuperOf =
+      (a, b) => a.multiple == b.multiple && MyDsl.isSubtypeOf(a.concept, b.concept)
+    val resolved                     = inferred.flatMap(_.resolve(dslSuper))
+
+    println("resolved")
+    println(munitPrint(resolved))
+
+    assertEquals(
+      resolved.flatMap {
+        case CompletedTemplate(s, _) => Some(s)
+        case _                       => None
+      },
+      Some(" the maximum age of john")
+    )
+  }
+
   private def inferTypes(p: Parse, vars: Map[String, Concept[_]], bnf: Bnf): Option[InferNode] = {
     val children = p.getChildren().toSeq.flatMap(p2 => inferTypes(p2, vars, bnf))
-    if (p.getType() == "NN") {
+    if (Set("NN", "JJ").contains(p.getType())) {
       Some(
         vars.get(p.getCoveredText()) match {
           case None          =>
