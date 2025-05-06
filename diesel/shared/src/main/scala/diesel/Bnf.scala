@@ -214,7 +214,7 @@ object Bnf {
     override def isRule: Boolean = true
 
     // common ancestor if any
-    def elementType: Option[ElementType] = ???
+    // def elementType: Option[ElementType] = ???
 
     def dump(ps: PrintStream): Unit = {
       ps.print(name)
