@@ -284,7 +284,7 @@ class Dslify3Test extends FunSuite {
   case class PlaceholderPart(elementType: Option[Bnf.ElementType]) extends Part
 
   private def doParse(s: String): Seq[Parse] = {
-    val modelIn = new FileInputStream("/home/remi/Downloads/en-parser-chunking.bin")
+    val modelIn = new FileInputStream("./en-parser-chunking.bin")
     Try(new ParserModel(modelIn)) match {
       case Success(parserModel) =>
         val parser   = ParserFactory.create(parserModel)

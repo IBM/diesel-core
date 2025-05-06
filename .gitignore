@@ -17,3 +17,5 @@ diesel-samples/jvm/profile*
 
 *gpcreds.json
 sbt-launch.jar
+
+en-parser-chunking.bin
