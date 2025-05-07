@@ -65,25 +65,24 @@ class Dslify3Test extends FunSuite {
     }
 
     val cOp: Concept[Operation] = concept(cExpr)
-    
-    val sMaxAge                 = syntax(cInt)("the" ~ "maximum" ~ "age" ~ "of" ~ cPerson map {
+
+    val sMaxAge = syntax(cInt)("the" ~ "maximum" ~ "age" ~ "of" ~ cPerson map {
       case (_, _) =>
         Number("13")
     })
-    val sAge                    = syntax(cInt)("the" ~ "age" ~ "of" ~ cPerson map {
+    val sAge    = syntax(cInt)("the" ~ "age" ~ "of" ~ cPerson map {
       case (_, _) =>
         Number("13")
-    })
-    
-    val sWeight                 = syntax(cInt)("the" ~ "weight" ~ "of" ~ cPerson map {
-      case (_, _) =>
-        Number("42")
-    })
-    val sMaxWeight              = syntax(cInt)("the" ~ "maximum" ~ "weight" ~ "of" ~ cPerson map {
-      case (_, _) =>
-        Number("42")
     })
 
+    val sWeight    = syntax(cInt)("the" ~ "weight" ~ "of" ~ cPerson map {
+      case (_, _) =>
+        Number("42")
+    })
+    val sMaxWeight = syntax(cInt)("the" ~ "maximum" ~ "weight" ~ "of" ~ cPerson map {
+      case (_, _) =>
+        Number("42")
+    })
 
     val sBob = syntax(cPerson)(SPStr("'Bob'") map {
       case (_, _) =>
@@ -135,7 +134,7 @@ class Dslify3Test extends FunSuite {
     }
   }
 
-  def dslify(text: String, vars: Map[String, Concept[_]]) : Option[String] = {
+  def dslify(text: String, vars: Map[String, Concept[_]]): Option[String] = {
     val bnf       = Bnf(MyDsl)
     val topParses = doParse(text)
     assertEquals(1, topParses.length)
@@ -153,9 +152,9 @@ class Dslify3Test extends FunSuite {
     println("resolved")
     println(munitPrint(resolved))
     resolved.flatMap {
-        case CompletedTemplate(s, _) => Some(s)
-        case _                       => None
-      }
+      case CompletedTemplate(s, _) => Some(s)
+      case _                       => None
+    }
   }
 
   test("the age of john") {
@@ -174,12 +173,14 @@ class Dslify3Test extends FunSuite {
   }
 
   private def inferTypes(p: Parse, vars: Map[String, Concept[_]], bnf: Bnf): Option[InferNode] = {
-    val children = p.getChildren().toSeq.flatMap(p2 => inferTypes(p2, vars, bnf))
-    val significantParts = p.getChildren().toSeq.filter(p2 => Set("NN", "JJ").contains(p2.getType())).map(_.getCoveredText())
+    val children         = p.getChildren().toSeq.flatMap(p2 => inferTypes(p2, vars, bnf))
+    val significantParts = p.getChildren().toSeq.filter(p2 =>
+      Set("NN", "JJ").contains(p2.getType())
+    ).map(_.getCoveredText())
     if (significantParts.nonEmpty) {
       if (significantParts.size == 1) {
         vars.get(significantParts(0)) match {
-          case None => 
+          case None          =>
             val w = findProductions(bnf, significantParts)
             if (w.nonEmpty) Some(ProductionNode(w)) else None
           case Some(concept) =>
@@ -213,16 +214,15 @@ class Dslify3Test extends FunSuite {
           productions
       }
       .flatMap { production =>
-        val tokens = production.symbols.flatMap {
+        val tokens     = production.symbols.flatMap {
           case Token(name, tokenId, style) => Some(name)
-          case _ => None
-        }.toSet        
+          case _                           => None
+        }.toSet
         val matchCount = tokens.intersect(parts.toSet).size
-        val score = matchCount.toFloat / tokens.size
+        val score      = matchCount.toFloat / tokens.size
         if (matchCount == parts.size && score > 0.0) {
           Some((production, score))
-        } 
-        else None
+        } else None
       }
   }
 
@@ -256,21 +256,17 @@ class Dslify3Test extends FunSuite {
     override def resolve(isSuperOf: IsSuperOf): Option[Template] =
       Some(CompletedTemplate(name, Some(elementType)))
   }
-  
-  case class IntermediateNode(children: Seq[InferNode])               extends InferNode {
+
+  case class IntermediateNode(children: Seq[InferNode]) extends InferNode {
     override def resolve(isSuperOf: IsSuperOf): Option[Template] = {
       val templates   = children.flatMap(_.resolve(isSuperOf))
       val completed   = templates.flatMap {
-        case c: CompletedTemplate =>
-          Some(c)
-        case _                    =>
-          None
+        case c: CompletedTemplate => Some(c)
+        case _                    => None
       }
       val uncompleted = templates.flatMap {
-        case u: UncompletedTemplate =>
-          Some(u)
-        case _                      =>
-          None
+        case u: UncompletedTemplate => Some(u)
+        case _                      => None
       }
       val matching    = uncompleted.flatMap { u =>
         u.fill(completed)
@@ -291,9 +287,17 @@ class Dslify3Test extends FunSuite {
     def fill(values: Seq[CompletedTemplate]): Option[CompletedTemplate] = {
       if (values.size == nbPlaceholders) {
         val (str, _) = parts.foldLeft(("", values)) {
-          case ((str, values), StringPart(s))                =>
+          case ((str, values), StringPart(s))                                        =>
             (str + " " + s, values)
-          case ((str, values), PlaceholderPart(elementType)) =>
+          case ((str, values), PlaceholderPart(elementType)) if elementType.nonEmpty =>
+            val (prefix, rest) = values.span(v => v.elementType != elementType)
+            rest.headOption.map { v =>
+              (str + " " + v.s, prefix ++ rest.tail)
+            }.getOrElse {
+              // Well ...
+              (str + " " + values.head.s, values.tail)
+            }
+          case ((str, values), _: PlaceholderPart)                                   =>
             (str + " " + values.head.s, values.tail)
         }
         Some(CompletedTemplate(str, elementType))
