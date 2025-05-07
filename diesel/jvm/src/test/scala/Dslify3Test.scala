@@ -135,10 +135,9 @@ class Dslify3Test extends FunSuite {
     }
   }
 
-  test("the age of john") {
-    val vars      = Map("john" -> MyDsl.cPerson)
+  def dslify(text: String, vars: Map[String, Concept[_]]) : Option[String] = {
     val bnf       = Bnf(MyDsl)
-    val topParses = doParse("the age of john")
+    val topParses = doParse(text)
     assertEquals(1, topParses.length)
     val p         = topParses(0)
     printParse(p)
@@ -153,42 +152,25 @@ class Dslify3Test extends FunSuite {
 
     println("resolved")
     println(munitPrint(resolved))
-
-    assertEquals(
-      resolved.flatMap {
+    resolved.flatMap {
         case CompletedTemplate(s, _) => Some(s)
         case _                       => None
-      },
-      Some(" the age of john")
-    )
+      }
+  }
+
+  test("the age of john") {
+    val actual = dslify("the age of john", Map("john" -> MyDsl.cPerson))
+    assertEquals(actual, Some(" the age of john"))
   }
 
   test("the maximum age of john") {
-    val vars      = Map("john" -> MyDsl.cPerson)
-    val bnf       = Bnf(MyDsl)
-    val topParses = doParse("the maximum age of john")
-    assertEquals(1, topParses.length)
-    val p         = topParses(0)
-    printParse(p)
-    val inferred  = inferTypes(p, vars, bnf)
+    val actual = dslify("the maximum age of john", Map("john" -> MyDsl.cPerson))
+    assertEquals(actual, Some(" the maximum age of john"))
+  }
 
-    println("inferred")
-    println(munitPrint(inferred))
-
-    implicit val dslSuper: IsSuperOf =
-      (a, b) => a.multiple == b.multiple && MyDsl.isSubtypeOf(a.concept, b.concept)
-    val resolved                     = inferred.flatMap(_.resolve(dslSuper))
-
-    println("resolved")
-    println(munitPrint(resolved))
-
-    assertEquals(
-      resolved.flatMap {
-        case CompletedTemplate(s, _) => Some(s)
-        case _                       => None
-      },
-      Some(" the maximum age of john")
-    )
+  test("the age of john with 'age' var".ignore) {
+    val actual = dslify("the age of john", Map("john" -> MyDsl.cPerson, "age" -> MyDsl.cPerson))
+    assertEquals(actual, Some(" the age of john"))
   }
 
   private def inferTypes(p: Parse, vars: Map[String, Concept[_]], bnf: Bnf): Option[InferNode] = {
@@ -196,12 +178,12 @@ class Dslify3Test extends FunSuite {
     val significantParts = p.getChildren().toSeq.filter(p2 => Set("NN", "JJ").contains(p2.getType())).map(_.getCoveredText())
     if (significantParts.nonEmpty) {
       if (significantParts.size == 1) {
-        vars.get(p.getCoveredText()) match {
+        vars.get(significantParts(0)) match {
           case None => 
             val w = findProductions(bnf, significantParts)
             if (w.nonEmpty) Some(ProductionNode(w)) else None
           case Some(concept) =>
-            val v = VariableNode(p.getCoveredText(), Bnf.ElementType(concept, false))
+            val v = VariableNode(significantParts(0), Bnf.ElementType(concept, false))
             val w = findProductions(bnf, significantParts)
             if (w.nonEmpty) Some(IntermediateNode(Seq(v, ProductionNode(w))))
             else Some(v)
