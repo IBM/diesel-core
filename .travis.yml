@@ -1,5 +1,6 @@
-dist: jammy
+ist: noble
 
+jdk: openjdk17
 language: scala
 scala:
   - 3.2.1
