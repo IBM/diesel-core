@@ -8,7 +8,7 @@ scala:
 before_install:
   # for sbt-dynver
   - git fetch --tags
-  - nvm install lts/gallium
+  - nvm install lts/hydrogen
 
 stages:
   - name: test
