@@ -1,4 +1,4 @@
-ist: noble
+dist: noble
 
 jdk: openjdk17
 language: scala
