@@ -1,4 +1,5 @@
-ist: noble
+#dist: noble
+dist: jammy
 
 jdk: openjdk17
 language: scala
@@ -8,7 +9,7 @@ scala:
 before_install:
   # for sbt-dynver
   - git fetch --tags
-  - nvm install lts/gallium
+  - nvm install lts/hydrogen
 
 stages:
   - name: test
