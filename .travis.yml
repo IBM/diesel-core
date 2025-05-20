@@ -1,4 +1,5 @@
-dist: noble
+#dist: noble
+dist: jammy
 
 jdk: openjdk17
 language: scala
