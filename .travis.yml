@@ -9,7 +9,7 @@ scala:
 before_install:
   # for sbt-dynver
   - git fetch --tags
-  - nvm install lts/hydrogen
+  - nvm install lts/jod
 
 stages:
   - name: test
