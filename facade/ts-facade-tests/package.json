@@ -14,9 +14,9 @@
   },
   "devDependencies": {
     "@diesel-parser/ts-facade": "^0.32.2",
-    "@types/chai": "^4.3.4",
+    "@types/chai": "^5.0.0",
     "@types/mocha": "^10.0.1",
-    "chai": "^4.3.7",
+    "chai": "^5.0.0",
     "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-prettier": "^5.0.0",
     "mocha": "^11.0.0",
