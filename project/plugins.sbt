@@ -6,7 +6,7 @@ addSbtPlugin("de.heikoseeberger"  % "sbt-header"               % "5.10.0")
 addSbtPlugin("com.github.sbt"     % "sbt-ci-release"           % "1.9.3")
 
 addSbtPlugin(
-  "com.ibm.cloud.diesel" % "diesel-i18n-plugin" % "0.6.0"
+  "com.ibm.cloud.diesel" % "diesel-i18n-plugin" % "0.7.0"
 ) // Dependencies.dieselI18nVersion
 
 // until we get Mend/Whitesource to work:
