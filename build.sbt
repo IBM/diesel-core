@@ -6,28 +6,15 @@ import scala.sys.process._
 val scalaVersion2 = "2.13.16"
 // val scalaVersion3 = "3.2.1"
 
-lazy val commonSettings = Seq(
-  organization  := "com.ibm.cloud.diesel",
-  scalaVersion  := scalaVersion2,
-  versionScheme := Some("semver-spec"),
-  description   := "Diesel is a library for creating and using languages easily."
-)
-
-lazy val copyrightSettings = Seq(
+inThisBuild(Seq(
+  organization     := "com.ibm.cloud.diesel",
+  scalaVersion     := scalaVersion2,
+  versionScheme    := Some("semver-spec"),
+  description      := "Diesel is a library for creating and using languages easily.",
   startYear        := Some(2018),
   organizationName := "The Diesel Authors",
   licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt"))
-)
-
-import xerial.sbt.Sonatype._
-lazy val sonatypeSettings = Seq(
-  sonatypeProfileName    := "com.ibm.cloud",
-  sonatypeProjectHosting := Some(
-    GitHubHosting("IBM", "diesel-core", "agilecoderfrank@gmail.com")
-  ),
-  sonatypeCredentialHost := "oss.sonatype.org",
-  sonatypeRepository     := "https://oss.sonatype.org/service/local"
-)
+))
 
 // CI convenience
 addCommandAlias("lint", "fmtCheck;fixCheck;headerCheckAll")
@@ -45,9 +32,6 @@ addCommandAlias("testJS", "all dieselJS/test samplesJS/test")
 lazy val root = project
   .in(file("."))
   .aggregate(diesel.jvm, diesel.js, samples.jvm, samples.js, samplesBundle)
-  .settings(commonSettings)
-  .settings(sonatypeSettings)
-  .settings(copyrightSettings)
   .settings(
     name           := "diesel-core-root",
     publish / skip := true
@@ -102,9 +86,6 @@ lazy val sharedJsSettings = Seq(
 lazy val diesel = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .enablePlugins(I18nPlugin)
-  .settings(commonSettings)
-  .settings(sonatypeSettings)
-  .settings(copyrightSettings)
   .settings(
     name          := "diesel-core",
     i18nDir       := file("./diesel/i18n"),
@@ -125,9 +106,6 @@ lazy val diesel = crossProject(JSPlatform, JVMPlatform)
 lazy val samples = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .in(file("./diesel-samples"))
-  .settings(commonSettings)
-  .settings(copyrightSettings)
-  .settings(sonatypeSettings)
   .settings(
     name := "diesel-core-samples"
   )
@@ -139,6 +117,4 @@ lazy val samples = crossProject(JSPlatform, JVMPlatform)
 
 lazy val samplesBundle = project
   .in(file("./facade/samples-bundle"))
-  .settings(commonSettings)
-  .settings(copyrightSettings)
   .dependsOn(samples.js)
