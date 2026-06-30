@@ -29,7 +29,7 @@ jobs:
         distribution: 'temurin'
         check-latest: true
         cache: 'sbt'
-    - uses: sbt/setup-sbt@v1  
+    - uses: sbt/setup-sbt@v2  
     - name: Set up node lts/jod
       uses: actions/setup-node@v4
       with:
