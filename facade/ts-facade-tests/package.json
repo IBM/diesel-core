@@ -19,7 +19,7 @@
     "chai": "^5.0.0",
     "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-prettier": "^5.0.0",
-    "mocha": "^11.0.0",
+    "mocha": "^11.7.6",
     "prettier": "3.5.3",
     "rimraf": "^6.0.0",
     "ts-node": "^10.9.1",
