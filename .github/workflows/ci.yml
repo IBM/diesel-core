@@ -31,6 +31,7 @@ jobs:
         cache: 'sbt'
     # - uses: sbt/setup-sbt@v1  
     - name: Install sbt
+      run: sudo apt-get update
       run: sudo apt-get install sbt
     - name: Set up node lts/jod
       uses: actions/setup-node@v4
