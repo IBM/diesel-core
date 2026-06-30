@@ -36,7 +36,7 @@ jobs:
         node-version: lts/jod
     - name: Build and tests
       run: ./build.sh
-      env:
+  #    env:
         # see https://stackoverflow.com/questions/69394632/webpack-build-failing-with-err-ossl-evp-unsupported
         #NODE_OPTIONS: "--openssl-legacy-provider"
 
