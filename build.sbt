@@ -13,7 +13,14 @@ inThisBuild(Seq(
   description      := "Diesel is a library for creating and using languages easily.",
   startYear        := Some(2018),
   organizationName := "The Diesel Authors",
-  licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt"))
+  licenses += ("Apache-2.0", url("https://www.apache.org/licenses/LICENSE-2.0.txt")),
+  homepage         := Some(url("https://github.com/IBM/diesel-core")),
+  developers       := List(Developer(
+    "decisions-sonatype",
+    "The Diesel Authors",
+    "decisions-sonatype@ibm.com",
+    url("https://github.com/IBM/diesel-core")
+  ))
 ))
 
 // CI convenience
