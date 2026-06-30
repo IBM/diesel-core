@@ -29,14 +29,16 @@ jobs:
         distribution: 'temurin'
         check-latest: true
         cache: 'sbt'
-    - uses: sbt/setup-sbt@v2  
+    # - uses: sbt/setup-sbt@v1  
+    - name: Install sbt
+      run: sudo apt-get install sbt
     - name: Set up node lts/jod
       uses: actions/setup-node@v4
       with:
-        node-version: lts/jod
+        node-version:
     - name: Build and tests
       run: ./build.sh
-  #    env:
+      # env:
         # see https://stackoverflow.com/questions/69394632/webpack-build-failing-with-err-ossl-evp-unsupported
         #NODE_OPTIONS: "--openssl-legacy-provider"
 
