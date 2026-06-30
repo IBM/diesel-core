@@ -69,12 +69,12 @@ lazy val sharedJsSettings = Seq(
   scalacOptions += {
     val branch        =
       if (version.value.endsWith("SNAPSHOT")) {
-        "develop"
+        "main"
       } else {
         version.value
       }
     val local: String = baseDirectory.value.getParentFile.getParentFile.toURI.toString
-    val remote        = s"https://raw.github.ibm.com/IBM/diesel-core/$branch/"
+    val remote        = s"https://raw.githubusercontent.com/IBM/diesel-core/refs/heads/$branch/"
     println(s"sourceURIs : \nLOCAL:$local\nREMOTE:$remote")
     s"-P:scalajs:mapSourceURI:$local->$remote"
   },
