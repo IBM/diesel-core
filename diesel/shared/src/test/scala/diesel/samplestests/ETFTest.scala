@@ -28,31 +28,31 @@ class ETFTest extends DslTestFunSuite {
   test("binary expression") {
     assertAst("1 + 2") {
       Addition(
-  lhs = NumericLiteral(
-    v = 1
-  ),
-  rhs = NumericLiteral(
-    v = 2
-  )
-)
+        lhs = NumericLiteral(v =
+          1
+        ),
+        rhs = NumericLiteral(v =
+          2
+        )
+      )
     }
   }
 
   test("left assoc") {
     assertAst("1 + 2 + 3") {
       Addition(
-  lhs = Addition(
-    lhs = NumericLiteral(
-      v = 1
-    ),
-    rhs = NumericLiteral(
-      v = 2
-    )
-  ),
-  rhs = NumericLiteral(
-    v = 3
-  )
-)
+        lhs = Addition(
+          lhs = NumericLiteral(v =
+            1
+          ),
+          rhs = NumericLiteral(v =
+            2
+          )
+        ),
+        rhs = NumericLiteral(v =
+          3
+        )
+      )
     }
   }
 

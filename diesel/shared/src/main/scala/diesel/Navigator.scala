@@ -320,16 +320,16 @@ object Navigator {
 }
 
 case class Subtree(stack: Seq[Parsing]) {
-  def concat(other: Subtree): Subtree = 
+  def concat(other: Subtree): Subtree =
     Subtree(stack ++ other.stack)
 
-  @`inline` final def ++ (other: Subtree): Subtree = concat(other)
+  @`inline` final def ++(other: Subtree): Subtree = concat(other)
 }
 
 case class Subtrees(choices: Iterator[Subtree], userData: ContextualUserData) {
   def concat(other: Subtrees): Subtrees = Subtrees(choices ++ other.choices, userData)
 
-  @`inline` final def ++ (other: Subtrees): Subtrees = concat(other)
+  @`inline` final def ++(other: Subtrees): Subtrees = concat(other)
 }
 
 trait Reducer {
@@ -496,15 +496,18 @@ class Navigator(
     def evaluated: Boolean
   }
 
-  private case class ItemFrame(val item: TerminalItem, override val userData: ContextualUserData) 
-    extends Frame {
+  private case class ItemFrame(val item: TerminalItem, override val userData: ContextualUserData)
+      extends Frame {
 
-      override def evaluated: Boolean = true
-    }
+    override def evaluated: Boolean = true
+  }
 
-  private case class StateFrame(val state: State, override val userData: ContextualUserData, 
-                                val successState: Boolean, override val evaluated: Boolean) 
-    extends Frame
+  private case class StateFrame(
+    val state: State,
+    override val userData: ContextualUserData,
+    val successState: Boolean,
+    override val evaluated: Boolean
+  ) extends Frame
 
   private def nonTerminal2(
     state: State,
@@ -512,7 +515,7 @@ class Navigator(
     successState: Boolean = false
   ): Subtrees = {
     var processingStack: Seq[Frame] = Seq.empty
-    var stack: Seq[Subtree] = Seq.empty
+    var stack: Seq[Subtree]         = Seq.empty
 
     def processItem(frame: ItemFrame): Unit = {
       stack = Subtree(Seq(applyToken(frame.item, frame.userData))) +: stack
@@ -523,43 +526,52 @@ class Navigator(
       if (frame.evaluated) {
         if (frame.state.isCompleted) {
           if (backPtrs.isEmpty) {
-            stack = Subtree(Seq(reduceState(frame.state, Subtree(Seq.empty), frame.userData, None))) +: stack
+            stack = Subtree(Seq(reduceState(
+              frame.state,
+              Subtree(Seq.empty),
+              frame.userData,
+              None
+            ))) +: stack
           } else {
             var local: Subtree = Subtree(Seq.empty)
-            var top = stack.head
+            var top            = stack.head
             while (!top.stack.isEmpty) {
               local = local ++ top
               stack = stack.tail
               top = stack.head
             }
             stack = stack.tail
-            
+
             stack = Subtree(Seq(reduceState(frame.state, local, frame.userData, None))) +: stack
           }
         } else {
           if (backPtrs.isEmpty) {
             if (isContextual(frame.state)) {
-              stack = Subtree(Seq.empty) +: stack // Subtrees(sentinel(), ContextualUserData(Some(userData)))
+              stack = Subtree(
+                Seq.empty
+              ) +: stack // Subtrees(sentinel(), ContextualUserData(Some(userData)))
             } else {
               stack = Subtree(Seq.empty) +: stack
             }
           } else {
-            // Do nothing for now ??? 
-            //val top = stack.head
-            //stack = stack.tail
-            //stack = (top ++ stack.head) +: stack.tail
+            // Do nothing for now ???
+            // val top = stack.head
+            // stack = stack.tail
+            // stack = (top ++ stack.head) +: stack.tail
           }
         }
       } else {
-        processingStack = StateFrame(frame.state, frame.userData, frame.successState, true) +: processingStack
+        processingStack =
+          StateFrame(frame.state, frame.userData, frame.successState, true) +: processingStack
         backPtrs.foreach(backPtr => { // TODO choice point ?
           backPtr.causal match {
-            case item: TerminalItem => 
+            case item: TerminalItem =>
               processingStack = ItemFrame(item, frame.userData) +: processingStack
-            case state: State => 
+            case state: State       =>
               processingStack = StateFrame(state, frame.userData, false, false) +: processingStack
           }
-          processingStack = StateFrame(backPtr.predecessor, frame.userData, false, false) +: processingStack
+          processingStack =
+            StateFrame(backPtr.predecessor, frame.userData, false, false) +: processingStack
         })
       }
     }
@@ -569,7 +581,7 @@ class Navigator(
       val frame: Frame = processingStack.head
       processingStack = processingStack.tail
       frame match {
-        case item: ItemFrame => processItem(item)
+        case item: ItemFrame   => processItem(item)
         case state: StateFrame => processState(state)
       }
     }

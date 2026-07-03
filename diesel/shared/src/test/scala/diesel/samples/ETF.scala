@@ -23,13 +23,13 @@ object ETF extends Dsl {
 
   trait Expression
 
-  trait ArithmeticExpression extends Expression
-  case class Addition(lhs: Expression, rhs: Expression) extends ArithmeticExpression
+  trait ArithmeticExpression                                  extends Expression
+  case class Addition(lhs: Expression, rhs: Expression)       extends ArithmeticExpression
   case class Multiplication(lhs: Expression, rhs: Expression) extends ArithmeticExpression
 
   case class NumericLiteral(v: Int) extends Expression
 
-  val numeric_literal: Concept[NumericLiteral]             =
+  val numeric_literal: Concept[NumericLiteral] =
     concept("[0-9]+".r, NumericLiteral(0)) map ((_, t) => NumericLiteral(t.text.toInt))
 
   val factor: Syntax[Expression] = syntax(
@@ -47,11 +47,11 @@ object ETF extends Dsl {
 
   def term: Syntax[Expression] = syntax(
     (multiplication | factor) map {
-        case (_, Left(m))  => m
-        case (_, Right(f)) => f
+      case (_, Left(m))  => m
+      case (_, Right(f)) => f
     }
   )
-  
+
   val addition: Syntax[ArithmeticExpression] = syntax(
     expression ~ "+" ~ term map {
       case (_, (l, _, r)) =>
