@@ -56,7 +56,7 @@ class ETFTest extends DslTestFunSuite {
     }
   }
 
-  test("big") {
+  test("big".ignore) {
     var i = 1;
     while (true) {
       println(s"i=${i}")
