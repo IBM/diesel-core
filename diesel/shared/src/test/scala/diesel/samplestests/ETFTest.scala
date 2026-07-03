@@ -17,32 +17,42 @@
 package diesel.samplestests
 
 import diesel.DslTestFunSuite
-import diesel.samples.Expr
-import diesel.samples.Expr._
+import diesel.samples.ETF
+import diesel.samples.ETF._
 
-class ExprTest extends DslTestFunSuite {
+class ETFTest extends DslTestFunSuite {
 
   type Ast = Expression
-  override def dsl = Expr
+  override def dsl = ETF
 
   test("binary expression") {
     assertAst("1 + 2") {
-      Expression(SEArithmeticExpression(Addition(
-        Expression(SESimpleValue(SVSimpleLiteral(SLNumeric(NumericLiteral(1))))),
-        Expression(SESimpleValue(SVSimpleLiteral(SLNumeric(NumericLiteral(2)))))
-      )))
+      Addition(
+  lhs = NumericLiteral(
+    v = 1
+  ),
+  rhs = NumericLiteral(
+    v = 2
+  )
+)
     }
   }
 
   test("left assoc") {
     assertAst("1 + 2 + 3") {
-      Expression(SEArithmeticExpression(Addition(
-        Expression(SEArithmeticExpression(Addition(
-          Expression(SESimpleValue(SVSimpleLiteral(SLNumeric(NumericLiteral(1))))),
-          Expression(SESimpleValue(SVSimpleLiteral(SLNumeric(NumericLiteral(2)))))
-        ))),
-        Expression(SESimpleValue(SVSimpleLiteral(SLNumeric(NumericLiteral(3)))))
-      )))
+      Addition(
+  lhs = Addition(
+    lhs = NumericLiteral(
+      v = 1
+    ),
+    rhs = NumericLiteral(
+      v = 2
+    )
+  ),
+  rhs = NumericLiteral(
+    v = 3
+  )
+)
     }
   }
 
