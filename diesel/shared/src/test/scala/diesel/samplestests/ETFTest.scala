@@ -57,8 +57,9 @@ class ETFTest extends DslTestFunSuite {
   }
 
   test("big".ignore) {
-    var i = 1;
-    while (true) {
+    var i             = 1;
+    var cont: Boolean = true
+    while (cont) {
       println(s"i=${i}")
       val s     = (0 until i).map(_ => i).mkString("+")
       // println(s)
