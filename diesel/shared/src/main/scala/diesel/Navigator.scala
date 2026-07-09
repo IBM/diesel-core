@@ -64,6 +64,7 @@ private[diesel] class ParsingContext(
 }
 
 private[diesel] case class Parsing(
+
   node: GenericNode,
   value: Any,
   offset: Int,
@@ -278,7 +279,6 @@ class GenericNonTerminal(
   }
 
   override def getElement: Option[DslElement] = production.element
-
 }
 
 class GenericTerminal(override val context: Context, val token: Token)
@@ -315,8 +315,6 @@ object Navigator {
     private[diesel] def ambiguous: Boolean =
       branchCount - abortedBranchCount > 1
   }
-
-  type Filter = Seq[GenericNode] => Seq[GenericNode]
 }
 
 case class Subtree(stack: Seq[Parsing]) {
@@ -490,25 +488,54 @@ class Navigator(
     case None          => false
   }
 
+  private class Stack[T] {
+
+    private var values: Seq[T] = Seq.empty
+
+    def isEmpty: Boolean = values.isEmpty
+
+    def nonEmpty: Boolean = values.nonEmpty
+
+    def top: T = values.head
+
+    def push(value: T): Unit = {
+      values = value +: values
+    }
+
+    def pop(): T = {
+      val top = values.head
+      values = values.tail
+      top
+    }
+
+    def branch(): Stack[T] = {
+      val other = new Stack[T]
+      other.values = values
+      other
+    }
+
+    def toSeq: Seq[T] = values
+  }
+
   private trait Frame {
     def userData: ContextualUserData
 
     def evaluated: Boolean
 
-    def reduceStack: mutable.Stack[Parsing]
+    def reduceStack: Stack[Parsing]
 
-    def stack: mutable.Stack[Parsing]
+    def stack: Stack[Parsing]
   }
 
   private case class ItemFrame(
     val item: TerminalItem,
     override val userData: ContextualUserData,
-    override val reduceStack: mutable.Stack[Parsing]
+    override val reduceStack: Stack[Parsing]
   ) extends Frame {
 
     override def evaluated: Boolean = true
 
-    override def stack: mutable.Stack[Parsing] = new mutable.Stack[Parsing]()
+    override def stack: Stack[Parsing] = new Stack[Parsing]
   }
 
   private case class StateFrame(
@@ -516,20 +543,25 @@ class Navigator(
     override val userData: ContextualUserData,
     val successState: Boolean,
     override val evaluated: Boolean,
-    val reduceStack: mutable.Stack[Parsing],
-    val stack: mutable.Stack[Parsing]
+    override val reduceStack: Stack[Parsing],
+    override val stack: Stack[Parsing],
+    val next: Seq[StateFrame]
   ) extends Frame
 
   private case class ChoiceFrame(
     val frame: StateFrame,
     val backPtr: BackPtr,
-    override val evaluated: Boolean
+    val backPtrs: Seq[BackPtr]
   ) extends Frame {
+    private val s = frame.stack.branch()
+
     def userData: ContextualUserData = frame.userData
 
-    override def reduceStack: mutable.Stack[Parsing] = frame.reduceStack
+    override def reduceStack: Stack[Parsing] = frame.reduceStack
 
-    override def stack: mutable.Stack[Parsing] = frame.stack
+    override def stack: Stack[Parsing] = s
+
+    override def evaluated: Boolean = frame.evaluated
   }
 
   private def nonTerminal2(
@@ -537,47 +569,64 @@ class Navigator(
     userData: ContextualUserData,
     successState: Boolean = false
   ): Subtrees = {
-    var processingStack: Seq[Frame] = Seq.empty
+    var processingStack: Stack[Frame] = new Stack[Frame]
+    
 
     def processItem(frame: ItemFrame): Unit = {
       frame.reduceStack.push(applyToken(frame.item, frame.userData))
     }
 
-    def processBackPtr(frame: Frame, backPtr: BackPtr): Unit = {
+    def processBackPtr(frame: StateFrame, backPtr: BackPtr, backPtrs: Seq[BackPtr], ambiguous: Boolean): Unit = {
+      val newFrame = StateFrame(
+          frame.state,
+          frame.userData,
+          frame.successState,
+          true,
+          frame.reduceStack,
+          frame.stack,
+          frame.next
+        )
+      if (ambiguous) {
+        processingStack.push(ChoiceFrame(newFrame, backPtr, backPtrs))
+      }
+      processingStack.push(newFrame)
+
       backPtr.causal match {
         case item: TerminalItem =>
-          processingStack =
-            ItemFrame(item, frame.userData, frame.reduceStack) +: processingStack
+          processingStack.push(ItemFrame(item, frame.userData, frame.reduceStack))
         case state: State       =>
           if (state.isCompleted) {
-            processingStack = StateFrame(
+            processingStack.push(StateFrame(
               state,
               if (isContextual(state)) ContextualUserData(Some(userData)) else frame.userData,
               false,
               false,
-              new mutable.Stack[Parsing](),
-              frame.reduceStack
-            ) +: processingStack
+              new Stack,
+              frame.reduceStack,
+              Seq.empty
+            ))
           } else {
-            processingStack = StateFrame(
+            processingStack.push(StateFrame(
               state,
               frame.userData,
               false,
               false,
               frame.reduceStack,
-              frame.stack
-            ) +: processingStack
+              frame.stack,
+              Seq.empty
+            ))
           }
       }
-      processingStack =
+      processingStack.push(
         StateFrame(
           backPtr.predecessor,
           frame.userData,
           false,
           false,
           frame.reduceStack,
-          frame.stack
-        ) +: processingStack
+          frame.stack,
+          Seq.empty
+        ))
     }
 
     def processState(frame: StateFrame): Unit = {
@@ -596,42 +645,67 @@ class Navigator(
           }
         }
       } else {
-        processingStack =
-          StateFrame(
-            frame.state,
-            frame.userData,
-            frame.successState,
-            true,
-            frame.reduceStack,
-            frame.stack
-          ) +: processingStack
-
-        backPtrs.foreach(backPtr => {
-          processingStack = ChoiceFrame(
+        if (backPtrs.isEmpty) {
+          processingStack.push(
+            StateFrame(
+              frame.state,
+              frame.userData,
+              frame.successState,
+              true,
+              frame.reduceStack,
+              frame.stack,
+              frame.next
+            ))
+        } else if (backPtrs.tail.isEmpty) {
+          processBackPtr(frame, backPtrs.head, Seq.empty, false)
+        } else {
+          processingStack.push(ChoiceFrame(
             frame,
-            backPtr,
-            false
-          ) +: processingStack
-        })
+            backPtrs.head,
+            backPtrs.tail
+          ))
+        }
       }
     }
 
     def processChoice(choice: ChoiceFrame): Unit = {
-      processBackPtr(choice.frame, choice.backPtr)
+      if (choice.evaluated) {
+        if (choice.backPtrs.nonEmpty) {
+          val newFrame = StateFrame(
+            choice.frame.state, 
+            choice.frame.userData, 
+            choice.frame.successState, 
+            false, 
+            new Stack, 
+            choice.stack, 
+            choice.frame +: choice.frame.next)
+          processingStack.push(ChoiceFrame(
+              newFrame,
+              choice.backPtrs.head,
+              choice.backPtrs.tail
+            ))
+        } else {
+          // Try to filter ???
+          println(choice)
+        }
+      } else {
+        processBackPtr(choice.frame, choice.backPtr, choice.backPtrs, true)
+      }
     }
 
-    val stack = new mutable.Stack[Parsing]()
-    processingStack = StateFrame(
+    val stack = new Stack[Parsing]
+    processingStack.push(StateFrame(
       state,
       userData,
       successState,
       false,
-      new mutable.Stack[Parsing](),
-      stack
-    ) +: processingStack
+      new Stack,
+      stack,
+      Seq.empty
+    ))
+    
     while (processingStack.nonEmpty) {
-      val frame: Frame = processingStack.head
-      processingStack = processingStack.tail
+      val frame = processingStack.pop()
       frame match {
         case item: ItemFrame     => processItem(item)
         case state: StateFrame   => processState(state)
