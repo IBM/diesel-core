@@ -21,7 +21,8 @@ import diesel.Bnf.{DslElement, Production}
 import diesel.Errors.{Ambiguous, Incompatible}
 import diesel.Lexer.Token
 
-import scala.collection.mutable
+import scala.collection.mutable.Queue
+import scala.collection.mutable.StringBuilder
 
 private[diesel] class ParsingContext(
   val begin: Int,
@@ -89,7 +90,7 @@ object GenericTree {
     roots: Seq[GenericNode],
     descendants: Boolean
   ): Iterator[GenericNode] with Object {} = {
-    val processingQueue: mutable.Queue[GenericNode] = mutable.Queue()
+    val processingQueue: Queue[GenericNode] = Queue()
     roots.foreach(child => processingQueue.enqueue(child))
     new Iterator[GenericNode] {
       override def hasNext: Boolean = processingQueue.nonEmpty
@@ -150,7 +151,7 @@ case class GenericTree(
 }
 
 abstract class GenericNode(var parent: Option[GenericNode], val context: Context, val value: Any) {
-  private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder
+  private[diesel] def toString(buf: StringBuilder): StringBuilder
 
   def offset: Int = context.offset
 
@@ -167,7 +168,7 @@ abstract class GenericNode(var parent: Option[GenericNode], val context: Context
   def wasAmbiguous: Boolean = false
 
   override def toString: String = {
-    val buf = new mutable.StringBuilder
+    val buf = new StringBuilder
     toString(buf)
     buf.toString()
   }
@@ -265,7 +266,7 @@ class GenericNonTerminal(
       case _                 => false
     }
 
-  private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder = {
+  private[diesel] def toString(buf: StringBuilder): StringBuilder = {
     // TODO useful for debugging?
 //    buf.append("[").append(production.element.getOrElse("?")).append("]")
     buf.append(production.rule.get.name).append("(")
@@ -283,7 +284,7 @@ class GenericNonTerminal(
 class GenericTerminal(override val context: Context, val token: Token)
     extends GenericNode(None, context, token) {
 
-  private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder = {
+  private[diesel] def toString(buf: StringBuilder): StringBuilder = {
     buf.append(token.id.name).append("(").append(token.text).append(")")
   }
 }
@@ -314,6 +315,114 @@ object Navigator {
     private[diesel] def ambiguous: Boolean =
       branchCount - abortedBranchCount > 1
   }
+}
+
+trait TreePart {
+
+  def isSentinel: Boolean
+
+  def isAmbiguous: Boolean
+
+  def subtrees: Seq[Parsing]
+}
+
+object TreePart {
+
+  def sentinel: TreePart = Sentinel()
+
+  def nonAmbiguous(parts: Seq[TreePart]): Boolean = 
+    parts.filter(p => p.isAmbiguous).isEmpty
+
+  def isAmbiguous(parts: Seq[TreePart]): Boolean = 
+    parts.filter(p => p.isAmbiguous).nonEmpty
+
+  def sizeOf(parts: Seq[TreePart]): Int =
+    parts.foldLeft(1) { (count, part) =>
+      part match {
+        case MultiplePart(values) => count * values.size
+        case SinglePart(_)        => count
+      }
+    }
+
+  /**
+   * Returns an iterator over all possible `Seq[Parsing]` combinations produced
+   * by the cartesian product of the given `TreePart` sequence.
+   *
+   * - `SinglePart`   contributes exactly one fixed `Parsing` slot (no branching).
+   * - `MultiplePart` contributes N slots — one per alternative — so all N are
+   *   enumerated across the product.
+   * - `Sentinel`     values must be excluded by the caller before passing in.
+   *
+   * The iteration order is "last part cycles fastest" (left-to-right odometer).
+   */
+  def cartesian(parts: Seq[TreePart]): Iterator[Seq[Parsing]] = {
+    if (parts.isEmpty) return Iterator.single(Seq.empty)
+
+    // Pre-materialise the choices per slot; SinglePart always has exactly 1 choice.
+    val slots: Array[Array[Parsing]] = parts.map(_.subtrees.toArray).toArray
+    val sizes: Array[Int]            = slots.map(_.length)
+    val total: Long                  = sizes.foldLeft(1L)(_ * _)
+
+    if (total == 0L) return Iterator.empty
+
+    // Odometer indices, one per slot.
+    val indices: Array[Int] = Array.fill(slots.length)(0)
+    var remaining: Long     = total
+
+    new Iterator[Seq[Parsing]] {
+      override def hasNext: Boolean = remaining > 0L
+
+      override def next(): Seq[Parsing] = {
+        if (!hasNext) throw new NoSuchElementException()
+
+        // Snapshot the current combination.
+        val result = Array.tabulate(slots.length)(i => slots(i)(indices(i)))
+
+        // Advance the odometer: increment rightmost slot, carry left.
+        var carry = true
+        var i     = slots.length - 1
+        while (carry && i >= 0) {
+          indices(i) += 1
+          if (indices(i) < sizes(i)) {
+            carry = false
+          } else {
+            indices(i) = 0
+            i -= 1
+          }
+        }
+
+        remaining -= 1
+        result.toSeq
+      }
+    }
+  }
+}
+
+case class Sentinel() extends TreePart {
+
+  override def isSentinel: Boolean = true
+
+  override def isAmbiguous: Boolean = false
+
+  override def subtrees: Seq[Parsing] = Seq.empty
+}
+
+case class SinglePart(val value: Parsing) extends TreePart {
+
+  override def isSentinel: Boolean = false
+
+  override def isAmbiguous: Boolean = false
+
+  override def subtrees: Seq[Parsing] = Seq(value)
+}
+
+case class MultiplePart(val values: Seq[Parsing]) extends TreePart {
+
+  override def isSentinel: Boolean = false
+
+  override def isAmbiguous: Boolean = true
+
+  override def subtrees: Seq[Parsing] = values
 }
 
 case class Subtree(stack: Seq[Parsing]) {
@@ -554,14 +663,13 @@ class Navigator(
     val first: Boolean,
     val backPtr: BackPtr,
     val backPtrs: Seq[BackPtr],
-    val stack: Stack[Option[Parsing]]
+    val stack: Stack[TreePart],
+    val collected: Seq[TreePart] = Seq.empty
   ) extends Frame {
     def userData: ContextualUserData = frame.userData
 
     override def evaluated: Boolean = frame.evaluated
   }
-
-  import scala.collection.mutable.Queue
 
   private def nonTerminal2(
     state: State,
@@ -569,10 +677,10 @@ class Navigator(
     successState: Boolean = false
   ): Subtrees = {
     val processingQueue: Queue[Frame] = new Queue
-    var stack: Stack[Option[Parsing]] = new Stack[Option[Parsing]]
+    var stack: Stack[TreePart] = new Stack[TreePart]
 
     def processItem(frame: ItemFrame): Unit = {
-      stack.push(Some(applyToken(frame.item, frame.userData)))
+      stack.push(SinglePart(applyToken(frame.item, frame.userData)))
     }
 
     def processBackPtr(
@@ -581,7 +689,8 @@ class Navigator(
       backPtr: BackPtr,
       backPtrs: Seq[BackPtr],
       ambiguous: Boolean,
-      stack: Stack[Option[Parsing]]
+      stack: Stack[TreePart],
+      collected: Seq[TreePart]
     ): Unit = {
       val newFrame = StateFrame(
         frame.state,
@@ -590,7 +699,7 @@ class Navigator(
         true
       )
       if (ambiguous) {
-        processingQueue.prepend(ChoiceFrame(newFrame, first, backPtr, backPtrs, stack))
+        processingQueue.prepend(ChoiceFrame(newFrame, first, backPtr, backPtrs, stack, collected))
       }
       processingQueue.prepend(newFrame)
 
@@ -629,23 +738,44 @@ class Navigator(
       if (frame.evaluated) {
         if (frame.state.isCompleted) {
           if (backPtrs.isEmpty) {
-            stack.push(Some(reduceState(frame.state, Subtree(Seq.empty), frame.userData, None)))
+            stack.push(SinglePart(reduceState(frame.state, Subtree(Seq.empty), frame.userData, None)))
           } else {
-            var values: Seq[Parsing] = Seq.empty
-            while (stack.top.isDefined) {
-              values = stack.pop().get +: values
+            var parts: Seq[TreePart] = Seq.empty
+            while (!stack.top.isSentinel) {
+              parts = stack.pop() +: parts
             }
-            stack.pop()
-            stack.push(Some(reduceState(
-              frame.state,
-              Subtree(values.reverse),
-              frame.userData,
-              None
-            )))
+            stack.pop() // consume the sentinel
+            val size = TreePart.sizeOf(parts)
+            // Generate all Seq[Parsing] combinations from the collected parts, taking
+            // the cartesian product across any MultiplePart slots.
+            if (size > 1) {
+              if (frame.successState || frame.state.production.isDslElement) {
+                val ambiguity = Some(new Ambiguity(size))
+                val combinations = TreePart.cartesian(parts.reverse).map(values =>
+                  reduceState(frame.state, Subtree(values), frame.userData, ambiguity)
+                ).toSeq
+                if (combinations.size > 1) {
+                  val survivors = filterSubtrees(combinations.map(p => Subtree(Seq(p))), ambiguity)
+                  stack.push(MultiplePart(survivors.map(s => s.stack.head)))
+                } else {
+                  stack.push(SinglePart(combinations.head))
+                }
+              } else {
+                val combinations = TreePart.cartesian(parts.reverse).map(values =>
+                  reduceState(frame.state, Subtree(values), frame.userData, None)
+                ).toSeq
+                stack.push(MultiplePart(combinations))
+              }
+            } else {
+              val combinations = TreePart.cartesian(parts.reverse).map(values =>
+                reduceState(frame.state, Subtree(values), frame.userData, None)
+              ).toSeq
+              stack.push(SinglePart(combinations.head))
+            }   
           }
         } else {
           if (backPtrs.isEmpty) {
-            stack.push(None)
+            stack.push(TreePart.sentinel)
           }
         }
       } else {
@@ -659,14 +789,14 @@ class Navigator(
             )
           )
         } else if (backPtrs.tail.isEmpty) {
-          processBackPtr(frame, true, backPtrs.head, Seq.empty, false, stack)
+          processBackPtr(frame, true, backPtrs.head, Seq.empty, false, stack, Seq.empty)
         } else {
           processingQueue.prepend(ChoiceFrame(
             frame,
             true,
             backPtrs.head,
             backPtrs.tail,
-            stack.branch()
+            stack.branch() // not sure we have to branch
           ))
         }
       }
@@ -674,37 +804,55 @@ class Navigator(
 
     def processChoice(choice: ChoiceFrame): Unit = {
       if (choice.evaluated) {
+        // Collect the Parsing that processState just pushed for this alternative.
+        var newCollected = choice.collected
+        if (stack.nonEmpty && !stack.top.isSentinel) {
+          newCollected = newCollected :+ stack.pop()
+        }
         if (choice.backPtrs.nonEmpty) {
+          // More alternatives to explore, schedule the next one.
           val newFrame = StateFrame(
             choice.frame.state,
             choice.frame.userData,
             choice.frame.successState,
             false
           )
-          processingQueue.append(ChoiceFrame(
+          processingQueue.prepend(ChoiceFrame(
             newFrame,
             false,
             choice.backPtrs.head,
             choice.backPtrs.tail,
-            choice.stack
+            choice.stack,
+            newCollected
           ))
         } else {
-          // Try to filter ???
-          println(choice)
+          // All alternatives collected. Each TreePart in newCollected is already reduced
+          // by processState, so we must NOT call reduceState again.
+          val candidates = newCollected.flatMap(_.subtrees)
+          if (candidates.size > 1 && (choice.frame.successState || choice.frame.state.production.isDslElement)) {
+            // TODO the ambiguity must be shared when reducing, must be passed to processBackPtr ???
+            val ambiguity = Some(new Ambiguity(candidates.size))
+            val subtrees  = candidates.map(p => Subtree(Seq(p)))
+            val survivors = filterSubtrees(subtrees, ambiguity)
+            stack.push(MultiplePart(survivors.map(s => s.stack.head)))
+          } else if (candidates.size > 1) {
+            stack.push(MultiplePart(candidates))
+          } else {
+            stack.push(SinglePart(candidates.head))
+          }
         }
       } else {
         if (choice.first) {
-          processBackPtr(choice.frame, true, choice.backPtr, choice.backPtrs, true, choice.stack)
+          processBackPtr(choice.frame, true, choice.backPtr, choice.backPtrs, true, choice.stack, Seq.empty)
         } else {
-          stack.push(None)
-          stack = stack ++ choice.stack
           processBackPtr(
             choice.frame,
             false,
             choice.backPtr,
             choice.backPtrs,
             true,
-            choice.stack.branch()
+            choice.stack.branch(),
+            choice.collected
           )
         }
       }
@@ -725,7 +873,11 @@ class Navigator(
       }
     }
 
-    val allTrees = stack.reverseIterator.filter(p => p.nonEmpty).map(p => Subtree(Seq(p.get)))
+    // Expand every TreePart into its subtrees: SinglePart yields one Subtree,
+    // MultiplePart yields one Subtree per alternative.
+    val allTrees = stack.reverseIterator
+      .filter(p => !p.isSentinel)
+      .flatMap(p => p.subtrees.map(parsing => Subtree(Seq(parsing))))
     Subtrees(allTrees, userData)
   }
 
