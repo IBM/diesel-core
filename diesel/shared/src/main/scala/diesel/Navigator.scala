@@ -317,114 +317,6 @@ object Navigator {
   }
 }
 
-trait TreePart {
-
-  def isSentinel: Boolean
-
-  def isAmbiguous: Boolean
-
-  def subtrees: Seq[Parsing]
-}
-
-object TreePart {
-
-  def sentinel: TreePart = Sentinel()
-
-  def nonAmbiguous(parts: Seq[TreePart]): Boolean = 
-    parts.filter(p => p.isAmbiguous).isEmpty
-
-  def isAmbiguous(parts: Seq[TreePart]): Boolean = 
-    parts.filter(p => p.isAmbiguous).nonEmpty
-
-  def sizeOf(parts: Seq[TreePart]): Int =
-    parts.foldLeft(1) { (count, part) =>
-      part match {
-        case MultiplePart(values) => count * values.size
-        case SinglePart(_)        => count
-      }
-    }
-
-  /**
-   * Returns an iterator over all possible `Seq[Parsing]` combinations produced
-   * by the cartesian product of the given `TreePart` sequence.
-   *
-   * - `SinglePart`   contributes exactly one fixed `Parsing` slot (no branching).
-   * - `MultiplePart` contributes N slots — one per alternative — so all N are
-   *   enumerated across the product.
-   * - `Sentinel`     values must be excluded by the caller before passing in.
-   *
-   * The iteration order is "last part cycles fastest" (left-to-right odometer).
-   */
-  def cartesian(parts: Seq[TreePart]): Iterator[Seq[Parsing]] = {
-    if (parts.isEmpty) return Iterator.single(Seq.empty)
-
-    // Pre-materialise the choices per slot; SinglePart always has exactly 1 choice.
-    val slots: Array[Array[Parsing]] = parts.map(_.subtrees.toArray).toArray
-    val sizes: Array[Int]            = slots.map(_.length)
-    val total: Long                  = sizes.foldLeft(1L)(_ * _)
-
-    if (total == 0L) return Iterator.empty
-
-    // Odometer indices, one per slot.
-    val indices: Array[Int] = Array.fill(slots.length)(0)
-    var remaining: Long     = total
-
-    new Iterator[Seq[Parsing]] {
-      override def hasNext: Boolean = remaining > 0L
-
-      override def next(): Seq[Parsing] = {
-        if (!hasNext) throw new NoSuchElementException()
-
-        // Snapshot the current combination.
-        val result = Array.tabulate(slots.length)(i => slots(i)(indices(i)))
-
-        // Advance the odometer: increment rightmost slot, carry left.
-        var carry = true
-        var i     = slots.length - 1
-        while (carry && i >= 0) {
-          indices(i) += 1
-          if (indices(i) < sizes(i)) {
-            carry = false
-          } else {
-            indices(i) = 0
-            i -= 1
-          }
-        }
-
-        remaining -= 1
-        result.toSeq
-      }
-    }
-  }
-}
-
-case class Sentinel() extends TreePart {
-
-  override def isSentinel: Boolean = true
-
-  override def isAmbiguous: Boolean = false
-
-  override def subtrees: Seq[Parsing] = Seq.empty
-}
-
-case class SinglePart(val value: Parsing) extends TreePart {
-
-  override def isSentinel: Boolean = false
-
-  override def isAmbiguous: Boolean = false
-
-  override def subtrees: Seq[Parsing] = Seq(value)
-}
-
-case class MultiplePart(val values: Seq[Parsing]) extends TreePart {
-
-  override def isSentinel: Boolean = false
-
-  override def isAmbiguous: Boolean = true
-
-  override def subtrees: Seq[Parsing] = values
-}
-
 case class Subtree(stack: Seq[Parsing]) {
   def concat(other: Subtree): Subtree =
     Subtree(stack ++ other.stack)
@@ -622,6 +514,14 @@ class Navigator(
       other
     }
 
+    def take(n: Int): Seq[T] = {
+      var result: Seq[T] = Seq.empty
+      1 to n foreach { _ =>
+        result = pop() +: result
+      }
+      result
+    }
+
     def toSeq: Seq[T] = values
 
     def iterator: Iterator[T] = values.iterator
@@ -639,36 +539,42 @@ class Navigator(
 
   private trait Frame {
     def userData: ContextualUserData
-
-    def evaluated: Boolean
   }
 
   private case class ItemFrame(
+    val state: State,
     val item: TerminalItem,
     override val userData: ContextualUserData
-  ) extends Frame {
-
-    override def evaluated: Boolean = true
-  }
+  ) extends Frame { }
 
   private case class StateFrame(
     val state: State,
-    override val userData: ContextualUserData,
     val successState: Boolean,
-    override val evaluated: Boolean
+    override val userData: ContextualUserData
   ) extends Frame
 
-  private case class ChoiceFrame(
-    val frame: StateFrame,
-    val first: Boolean,
+  private case class BranchFrame(
+    val parent: StateFrame,
+    val size: Int,
     val backPtr: BackPtr,
     val backPtrs: Seq[BackPtr],
-    val stack: Stack[TreePart],
-    val collected: Seq[TreePart] = Seq.empty
-  ) extends Frame {
-    def userData: ContextualUserData = frame.userData
+    override val userData: ContextualUserData
+  ) extends Frame
 
-    override def evaluated: Boolean = frame.evaluated
+  private case class ConcatFrame(
+    val branch: BranchFrame
+  ) extends Frame {
+    def state: State = branch.parent.state
+
+    override def userData: ContextualUserData = branch.userData
+  }
+
+  private case class ReduceFrame(
+    val branch: BranchFrame
+  ) extends Frame {
+    def state: State = branch.parent.state
+
+    override def userData: ContextualUserData = branch.userData
   }
 
   private def nonTerminal2(
@@ -677,208 +583,94 @@ class Navigator(
     successState: Boolean = false
   ): Subtrees = {
     val processingQueue: Queue[Frame] = new Queue
-    var stack: Stack[TreePart] = new Stack[TreePart]
-
+    val stack: Stack[Subtrees] = new Stack[Subtrees]
+    
     def processItem(frame: ItemFrame): Unit = {
-      stack.push(SinglePart(applyToken(frame.item, frame.userData)))
-    }
-
-    def processBackPtr(
-      frame: StateFrame,
-      first: Boolean,
-      backPtr: BackPtr,
-      backPtrs: Seq[BackPtr],
-      ambiguous: Boolean,
-      stack: Stack[TreePart],
-      collected: Seq[TreePart]
-    ): Unit = {
-      val newFrame = StateFrame(
-        frame.state,
-        frame.userData,
-        frame.successState,
-        true
-      )
-      if (ambiguous) {
-        processingQueue.prepend(ChoiceFrame(newFrame, first, backPtr, backPtrs, stack, collected))
-      }
-      processingQueue.prepend(newFrame)
-
-      backPtr.causal match {
-        case item: TerminalItem =>
-          processingQueue.prepend(ItemFrame(item, frame.userData))
-        case state: State       =>
-          if (state.isCompleted) {
-            processingQueue.prepend(StateFrame(
-              state,
-              if (isContextual(state)) ContextualUserData(Some(userData)) else frame.userData,
-              false,
-              false
-            ))
-          } else {
-            processingQueue.prepend(StateFrame(
-              state,
-              frame.userData,
-              false,
-              false
-            ))
-          }
-      }
-      processingQueue.prepend(
-        StateFrame(
-          backPtr.predecessor,
-          frame.userData,
-          false,
-          false
-        )
-      )
+      stack.push(Subtrees(terminal(frame.item, frame.userData), frame.userData))
     }
 
     def processState(frame: StateFrame): Unit = {
       val backPtrs: Seq[BackPtr] = result.backPtrsOf(frame.state)
-      if (frame.evaluated) {
+      if (backPtrs.isEmpty) {
         if (frame.state.isCompleted) {
-          if (backPtrs.isEmpty) {
-            stack.push(SinglePart(reduceState(frame.state, Subtree(Seq.empty), frame.userData, None)))
-          } else {
-            var parts: Seq[TreePart] = Seq.empty
-            while (!stack.top.isSentinel) {
-              parts = stack.pop() +: parts
-            }
-            stack.pop() // consume the sentinel
-            val size = TreePart.sizeOf(parts)
-            // Generate all Seq[Parsing] combinations from the collected parts, taking
-            // the cartesian product across any MultiplePart slots.
-            if (size > 1) {
-              if (frame.successState || frame.state.production.isDslElement) {
-                val ambiguity = Some(new Ambiguity(size))
-                val combinations = TreePart.cartesian(parts.reverse).map(values =>
-                  reduceState(frame.state, Subtree(values), frame.userData, ambiguity)
-                ).toSeq
-                if (combinations.size > 1) {
-                  val survivors = filterSubtrees(combinations.map(p => Subtree(Seq(p))), ambiguity)
-                  stack.push(MultiplePart(survivors.map(s => s.stack.head)))
-                } else {
-                  stack.push(SinglePart(combinations.head))
-                }
-              } else {
-                val combinations = TreePart.cartesian(parts.reverse).map(values =>
-                  reduceState(frame.state, Subtree(values), frame.userData, None)
-                ).toSeq
-                stack.push(MultiplePart(combinations))
-              }
-            } else {
-              val combinations = TreePart.cartesian(parts.reverse).map(values =>
-                reduceState(frame.state, Subtree(values), frame.userData, None)
-              ).toSeq
-              stack.push(SinglePart(combinations.head))
-            }   
-          }
+          stack.push(Subtrees(
+            singleton(reduceState(frame.state, Subtree(Seq.empty), frame.userData, None)),
+            frame.userData
+          ))
         } else {
-          if (backPtrs.isEmpty) {
-            stack.push(TreePart.sentinel)
-          }
+          stack.push(Subtrees(sentinel(), frame.userData))
         }
       } else {
-        if (backPtrs.isEmpty) {
-          processingQueue.prepend(
-            StateFrame(
-              frame.state,
-              frame.userData,
-              frame.successState,
-              true
-            )
-          )
-        } else if (backPtrs.tail.isEmpty) {
-          processBackPtr(frame, true, backPtrs.head, Seq.empty, false, stack, Seq.empty)
-        } else {
-          processingQueue.prepend(ChoiceFrame(
-            frame,
-            true,
-            backPtrs.head,
-            backPtrs.tail,
-            stack.branch() // not sure we have to branch
-          ))
-        }
+        processingQueue.prepend(BranchFrame(frame, backPtrs.size, backPtrs.head, backPtrs.tail, 
+          if (isContextual(frame.state)) ContextualUserData(Some(frame.userData)) else frame.userData))
       }
     }
 
-    def processChoice(choice: ChoiceFrame): Unit = {
-      if (choice.evaluated) {
-        // Collect the Parsing that processState just pushed for this alternative.
-        var newCollected = choice.collected
-        if (stack.nonEmpty && !stack.top.isSentinel) {
-          newCollected = newCollected :+ stack.pop()
-        }
-        if (choice.backPtrs.nonEmpty) {
-          // More alternatives to explore, schedule the next one.
-          val newFrame = StateFrame(
-            choice.frame.state,
-            choice.frame.userData,
-            choice.frame.successState,
-            false
-          )
-          processingQueue.prepend(ChoiceFrame(
-            newFrame,
-            false,
-            choice.backPtrs.head,
-            choice.backPtrs.tail,
-            choice.stack,
-            newCollected
-          ))
-        } else {
-          // All alternatives collected. Each TreePart in newCollected is already reduced
-          // by processState, so we must NOT call reduceState again.
-          val candidates = newCollected.flatMap(_.subtrees)
-          if (candidates.size > 1 && (choice.frame.successState || choice.frame.state.production.isDslElement)) {
-            // TODO the ambiguity must be shared when reducing, must be passed to processBackPtr ???
-            val ambiguity = Some(new Ambiguity(candidates.size))
-            val subtrees  = candidates.map(p => Subtree(Seq(p)))
-            val survivors = filterSubtrees(subtrees, ambiguity)
-            stack.push(MultiplePart(survivors.map(s => s.stack.head)))
-          } else if (candidates.size > 1) {
-            stack.push(MultiplePart(candidates))
-          } else {
-            stack.push(SinglePart(candidates.head))
-          }
-        }
+    def processBranch(frame: BranchFrame): Unit = {
+      if (frame.backPtrs.isEmpty) {
+        processingQueue.prepend(ReduceFrame(frame))
       } else {
-        if (choice.first) {
-          processBackPtr(choice.frame, true, choice.backPtr, choice.backPtrs, true, choice.stack, Seq.empty)
-        } else {
-          processBackPtr(
-            choice.frame,
-            false,
-            choice.backPtr,
-            choice.backPtrs,
-            true,
-            choice.stack.branch(),
-            choice.collected
-          )
-        }
+        processingQueue.prepend(BranchFrame(frame.parent, frame.size, frame.backPtrs.head, frame.backPtrs.tail, frame.userData))
       }
+      processingQueue.prepend(ConcatFrame(frame))
+      frame.backPtr.causal match {
+        case item: TerminalItem => 
+          processingQueue.prepend(ItemFrame(frame.parent.state, item, frame.userData))
+        case state: State =>
+          processingQueue.prepend(StateFrame(state, false, frame.userData))
+      }
+      processingQueue.prepend(StateFrame(frame.backPtr.predecessor, false, frame.userData))
+    }
+
+    def processConcat(frame: ConcatFrame): Unit = {
+      val causal = stack.pop()
+      val predecessor = stack.pop()
+      var result: Seq[Subtree] = Seq.empty      
+      val pred = predecessor.choices.toSeq
+      val caus = causal.choices.toSeq
+      pred.reverse.foreach(p => {
+        caus.reverse.foreach(c => {
+          result = Subtree(c.stack ++ p.stack) +: result
+        })
+      })
+      stack.push(Subtrees(result.iterator, predecessor.userData))
+    }
+
+    def processReduce(frame: ReduceFrame): Unit = {
+      val subtrees = stack.take(frame.branch.size).reduce(_ ++ _)
+      if (frame.state.isCompleted) {
+        val candidates = subtrees.choices.toSeq
+        if (candidates.size > 1 && (frame.branch.parent.successState || frame.state.production.isDslElement)) {
+          val ambiguity = Some(new Ambiguity(candidates.size))
+          val subtrees  =
+            candidates.map(s => Subtree(Seq(reduceState(frame.state, s, frame.userData, ambiguity))))
+          stack.push(Subtrees(filterSubtrees(subtrees, ambiguity).iterator, frame.userData))
+        } else
+          stack.push(Subtrees(
+            candidates.map(s => Subtree(Seq(reduceState(frame.state, s, frame.userData, None)))).iterator,
+            frame.userData
+          ))
+      } else
+        stack.push(subtrees)
     }
 
     processingQueue.prepend(StateFrame(
       state,
-      userData,
       successState,
-      false
+      userData
     ))
     while (processingQueue.nonEmpty) {
       val frame = processingQueue.dequeue()
       frame match {
         case item: ItemFrame     => processItem(item)
         case state: StateFrame   => processState(state)
-        case choice: ChoiceFrame => processChoice(choice)
+        case branch: BranchFrame   => processBranch(branch)
+        case concat: ConcatFrame   => processConcat(concat)
+        case reduce: ReduceFrame   => processReduce(reduce)
       }
     }
 
-    // Expand every TreePart into its subtrees: SinglePart yields one Subtree,
-    // MultiplePart yields one Subtree per alternative.
-    val allTrees = stack.reverseIterator
-      .filter(p => !p.isSentinel)
-      .flatMap(p => p.subtrees.map(parsing => Subtree(Seq(parsing))))
-    Subtrees(allTrees, userData)
+    stack.pop()
   }
 
   private def nonTerminal(
