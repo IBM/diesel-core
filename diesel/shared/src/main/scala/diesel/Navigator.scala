@@ -545,7 +545,7 @@ class Navigator(
     val state: State,
     val item: TerminalItem,
     override val userData: ContextualUserData
-  ) extends Frame { }
+  ) extends Frame {}
 
   private case class StateFrame(
     val state: State,
@@ -583,8 +583,8 @@ class Navigator(
     successState: Boolean = false
   ): Subtrees = {
     val processingQueue: Queue[Frame] = new Queue
-    val stack: Stack[Subtrees] = new Stack[Subtrees]
-    
+    val stack: Stack[Subtrees]        = new Stack[Subtrees]
+
     def processItem(frame: ItemFrame): Unit = {
       stack.push(Subtrees(terminal(frame.item, frame.userData), frame.userData))
     }
@@ -601,8 +601,14 @@ class Navigator(
           stack.push(Subtrees(sentinel(), frame.userData))
         }
       } else {
-        processingQueue.prepend(BranchFrame(frame, backPtrs.size, backPtrs.head, backPtrs.tail, 
-          if (isContextual(frame.state)) ContextualUserData(Some(frame.userData)) else frame.userData))
+        processingQueue.prepend(BranchFrame(
+          frame,
+          backPtrs.size,
+          backPtrs.head,
+          backPtrs.tail,
+          if (isContextual(frame.state)) ContextualUserData(Some(frame.userData))
+          else frame.userData
+        ))
       }
     }
 
@@ -610,24 +616,30 @@ class Navigator(
       if (frame.backPtrs.isEmpty) {
         processingQueue.prepend(ReduceFrame(frame))
       } else {
-        processingQueue.prepend(BranchFrame(frame.parent, frame.size, frame.backPtrs.head, frame.backPtrs.tail, frame.userData))
+        processingQueue.prepend(BranchFrame(
+          frame.parent,
+          frame.size,
+          frame.backPtrs.head,
+          frame.backPtrs.tail,
+          frame.userData
+        ))
       }
       processingQueue.prepend(ConcatFrame(frame))
       frame.backPtr.causal match {
-        case item: TerminalItem => 
+        case item: TerminalItem =>
           processingQueue.prepend(ItemFrame(frame.parent.state, item, frame.userData))
-        case state: State =>
+        case state: State       =>
           processingQueue.prepend(StateFrame(state, false, frame.userData))
       }
       processingQueue.prepend(StateFrame(frame.backPtr.predecessor, false, frame.userData))
     }
 
     def processConcat(frame: ConcatFrame): Unit = {
-      val causal = stack.pop()
-      val predecessor = stack.pop()
-      var result: Seq[Subtree] = Seq.empty      
-      val pred = predecessor.choices.toSeq
-      val caus = causal.choices.toSeq
+      val causal               = stack.pop()
+      val predecessor          = stack.pop()
+      var result: Seq[Subtree] = Seq.empty
+      val pred                 = predecessor.choices.toSeq
+      val caus                 = causal.choices.toSeq
       pred.reverse.foreach(p => {
         caus.reverse.foreach(c => {
           result = Subtree(c.stack ++ p.stack) +: result
@@ -640,14 +652,20 @@ class Navigator(
       val subtrees = stack.take(frame.branch.size).reduce(_ ++ _)
       if (frame.state.isCompleted) {
         val candidates = subtrees.choices.toSeq
-        if (candidates.size > 1 && (frame.branch.parent.successState || frame.state.production.isDslElement)) {
+        if (
+          candidates.size > 1 && (frame.branch.parent.successState || frame.state.production.isDslElement)
+        ) {
           val ambiguity = Some(new Ambiguity(candidates.size))
           val subtrees  =
-            candidates.map(s => Subtree(Seq(reduceState(frame.state, s, frame.userData, ambiguity))))
+            candidates.map(s =>
+              Subtree(Seq(reduceState(frame.state, s, frame.userData, ambiguity)))
+            )
           stack.push(Subtrees(filterSubtrees(subtrees, ambiguity).iterator, frame.userData))
         } else
           stack.push(Subtrees(
-            candidates.map(s => Subtree(Seq(reduceState(frame.state, s, frame.userData, None)))).iterator,
+            candidates.map(s =>
+              Subtree(Seq(reduceState(frame.state, s, frame.userData, None)))
+            ).iterator,
             frame.userData
           ))
       } else
@@ -664,9 +682,9 @@ class Navigator(
       frame match {
         case item: ItemFrame     => processItem(item)
         case state: StateFrame   => processState(state)
-        case branch: BranchFrame   => processBranch(branch)
-        case concat: ConcatFrame   => processConcat(concat)
-        case reduce: ReduceFrame   => processReduce(reduce)
+        case branch: BranchFrame => processBranch(branch)
+        case concat: ConcatFrame => processConcat(concat)
+        case reduce: ReduceFrame => processReduce(reduce)
       }
     }
 
