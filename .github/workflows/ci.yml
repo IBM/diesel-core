@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout current branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: "true"
       - name: Set up JDK 21
@@ -53,7 +53,7 @@ jobs:
     if: github.event_name == 'release'
     steps:
       - name: Checkout current branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
