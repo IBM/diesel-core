@@ -3,8 +3,8 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 import scala.sys.process._
 
-val scalaVersion2 = "2.13.16"
 // val scalaVersion3 = "3.2.1"
+val scalaVersion2 = "2.13.18"
 
 inThisBuild(Seq(
   organization     := "com.ibm.cloud.diesel",
@@ -59,12 +59,7 @@ lazy val sharedSettings_scalac = Seq(
 
 lazy val sharedSettings_test = Seq(
   Test / fork        := false,
-  Test / logBuffered := false,
-  // see https://github.com/scalameta/munit/blob/main/junit-interface/src/main/java/munit/internal/junitinterface/JUnitRunner.java
-  // with logger:
-  // Test / testOptions += Tests.Argument("+l", "--summary=1")
-  // without logger:
-  Test / testOptions += Tests.Argument("--summary=1")
+  Test / logBuffered := false
 )
 
 lazy val sharedSettings_lint = Seq(
@@ -103,7 +98,7 @@ lazy val diesel = crossProject(JSPlatform, JVMPlatform)
     libraryDependencies ++= Seq(
       "com.ibm.cloud.diesel" %%% "diesel-i18n"   % Dependencies.dieselI18nVersion,
       scalaOrganization.value  % "scala-reflect" % scalaVersion.value,
-      "org.scalameta"        %%% "munit"         % "1.1.1" % Test
+      "org.scalameta"        %%% "munit"         % "1.3.6" % Test
     )
   )
   .settings(sharedSettings_test)
