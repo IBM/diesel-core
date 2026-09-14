@@ -1,16 +1,14 @@
 {
-  "include": [
-    "src"
-  ],
+  "include": ["src"],
   "compilerOptions": {
     "target": "es6",
     "module": "commonjs",
     "declaration": true,
     "outDir": "./dist",
+    "rootDir": "./src",
     "strict": true,
     "inlineSourceMap": true,
-    "inlineSources": true,
-    "esModuleInterop": false
+    "inlineSources": true
   },
   "compileOnSave": true,
   "exclude": ["node_modules", "dist"]

@@ -1,31 +1,31 @@
 {
-  "name": "@diesel-parser/ts-facade",
-  "version": "0.32.2",
-  "description": "Facade types for using diesel parsers in typescript",
-  "author": "Rémi Van Keisbelck <remi@rvkb.com>",
-  "license": "Apache-2.0",
-  "repository": {
-    "type": "git",
-    "url": "git@github.com:IBM/diesel-core"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "clean": "rimraf dist",
-    "tsc-v": "tsc -v",
-    "test": "mocha",
-    "prettify": "prettier --write ..",
-    "build": "tsc"
-  },
-  "dependencies": {},
-  "devDependencies": {
-    "eslint-config-prettier": "^10.0.0",
-    "eslint-plugin-prettier": "^5.0.0",
-    "prettier": "3.5.3",
-    "rimraf": "^6.0.0",
-    "typescript": "^5.0.0"
-  }
+    "name": "@diesel-parser/ts-facade",
+    "version": "0.32.2",
+    "description": "Facade types for using diesel parsers in typescript",
+    "author": "Rémi Van Keisbelck <remi@rvkb.com>",
+    "license": "Apache-2.0",
+    "repository": {
+        "type": "git",
+        "url": "git@github.com:IBM/diesel-core"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "clean": "rimraf dist",
+        "tsc-v": "tsc -v",
+        "test": "mocha",
+        "prettify": "prettier --write ..",
+        "build": "tsc"
+    },
+    "dependencies": {},
+    "devDependencies": {
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-prettier": "^5.5.6",
+        "prettier": "3.9.6",
+        "rimraf": "^6.1.3",
+        "typescript": "^7.0.2"
+    }
 }
