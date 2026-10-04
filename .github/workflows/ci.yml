@@ -41,7 +41,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install sbt
       - name: Set up node lts/jod
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: lts/jod
       - name: Build and tests
@@ -72,7 +72,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install sbt
       - name: Set up node lts/jod
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: lts/jod
       - name: Release
