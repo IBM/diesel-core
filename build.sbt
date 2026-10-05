@@ -4,7 +4,7 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 import scala.sys.process._
 
 // val scalaVersion3 = "3.2.1"
-val scalaVersion2 = "2.13.18"
+val scalaVersion2 = "3.10.0"
 
 inThisBuild(Seq(
   organization     := "com.ibm.cloud.diesel",
