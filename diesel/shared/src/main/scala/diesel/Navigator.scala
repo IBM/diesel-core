@@ -21,7 +21,8 @@ import diesel.Bnf.{DslElement, Production}
 import diesel.Errors.{Ambiguous, Incompatible}
 import diesel.Lexer.Token
 
-import scala.collection.mutable
+import scala.collection.mutable.Queue
+import scala.collection.mutable.StringBuilder
 
 private[diesel] class ParsingContext(
   val begin: Int,
@@ -89,7 +90,7 @@ object GenericTree {
     roots: Seq[GenericNode],
     descendants: Boolean
   ): Iterator[GenericNode] with Object {} = {
-    val processingQueue: mutable.Queue[GenericNode] = mutable.Queue()
+    val processingQueue: Queue[GenericNode] = Queue()
     roots.foreach(child => processingQueue.enqueue(child))
     new Iterator[GenericNode] {
       override def hasNext: Boolean = processingQueue.nonEmpty
@@ -150,7 +151,7 @@ case class GenericTree(
 }
 
 abstract class GenericNode(var parent: Option[GenericNode], val context: Context, val value: Any) {
-  private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder
+  private[diesel] def toString(buf: StringBuilder): StringBuilder
 
   def offset: Int = context.offset
 
@@ -167,7 +168,7 @@ abstract class GenericNode(var parent: Option[GenericNode], val context: Context
   def wasAmbiguous: Boolean = false
 
   override def toString: String = {
-    val buf = new mutable.StringBuilder
+    val buf = new StringBuilder
     toString(buf)
     buf.toString()
   }
@@ -265,7 +266,7 @@ class GenericNonTerminal(
       case _                 => false
     }
 
-  private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder = {
+  private[diesel] def toString(buf: StringBuilder): StringBuilder = {
     // TODO useful for debugging?
 //    buf.append("[").append(production.element.getOrElse("?")).append("]")
     buf.append(production.rule.get.name).append("(")
@@ -278,13 +279,12 @@ class GenericNonTerminal(
   }
 
   override def getElement: Option[DslElement] = production.element
-
 }
 
 class GenericTerminal(override val context: Context, val token: Token)
     extends GenericNode(None, context, token) {
 
-  private[diesel] def toString(buf: mutable.StringBuilder): mutable.StringBuilder = {
+  private[diesel] def toString(buf: StringBuilder): StringBuilder = {
     buf.append(token.id.name).append("(").append(token.text).append(")")
   }
 }
@@ -315,13 +315,20 @@ object Navigator {
     private[diesel] def ambiguous: Boolean =
       branchCount - abortedBranchCount > 1
   }
-
-  type Filter = Seq[GenericNode] => Seq[GenericNode]
 }
 
-case class Subtree(stack: Seq[Parsing])
+case class Subtree(stack: Seq[Parsing]) {
+  def concat(other: Subtree): Subtree =
+    Subtree(stack ++ other.stack)
 
-case class Subtrees(choices: Iterator[Subtree], userData: ContextualUserData)
+  @`inline` final def ++(other: Subtree): Subtree = concat(other)
+}
+
+case class Subtrees(choices: Seq[Subtree], userData: ContextualUserData) {
+  def concat(other: Subtrees): Subtrees = Subtrees(choices ++ other.choices, userData)
+
+  @`inline` final def ++(other: Subtrees): Subtrees = concat(other)
+}
 
 trait Reducer {
 
@@ -426,10 +433,12 @@ class Navigator(
       successState = true
     )
 
-  def hasNext: Boolean = root.choices.hasNext
+  private val treeIterator: Iterator[Subtree] = root.choices.iterator
+
+  def hasNext: Boolean = treeIterator.hasNext
 
   def next(): GenericTree = {
-    val current = root.choices.next().stack.head
+    val current = treeIterator.next().stack.head
     var tree    =
       GenericTree(
         current.node,
@@ -455,23 +464,14 @@ class Navigator(
     }
   }
 
-  private def sentinel(): Iterator[Subtree] =
-    Seq(Subtree(Seq.empty)).iterator
+  private def sentinel(): Seq[Subtree] =
+    Seq(Subtree(Seq.empty))
 
-  private def terminal(item: TerminalItem, userData: ContextualUserData): Iterator[Subtree] =
+  private def terminal(item: TerminalItem, userData: ContextualUserData): Seq[Subtree] =
     singleton(applyToken(item, userData))
 
-  private def singleton(value: Parsing): Iterator[Subtree] =
-    Seq(Subtree(Seq(value))).iterator
-
-  type AlternativeSupplier = ContextualUserData => Subtrees
-
-  private def alternative(
-    causal: AlternativeSupplier,
-    predecessor: State,
-    userData: ContextualUserData
-  ): Iterator[Subtree] =
-    new BackPtrIterator(causal, predecessor, userData)
+  private def singleton(value: Parsing): Seq[Subtree] =
+    Seq(Subtree(Seq(value)))
 
   private def isContextual(state: State): Boolean = state.production.element match {
     case Some(element) => element match {
@@ -481,49 +481,201 @@ class Navigator(
     case None          => false
   }
 
+  private class Stack[T] {
+
+    private var values: Seq[T] = Seq.empty
+
+    def isEmpty: Boolean = values.isEmpty
+
+    def nonEmpty: Boolean = values.nonEmpty
+
+    def top: T = values.head
+
+    def push(value: T): Unit = {
+      values = value +: values
+    }
+
+    def pop(): T = {
+      val top = values.head
+      values = values.tail
+      top
+    }
+
+    def branch(): Stack[T] = {
+      val other = new Stack[T]
+      other.values = values
+      other
+    }
+
+    def take(n: Int): Seq[T] = {
+      var result: Seq[T] = Seq.empty
+      1 to n foreach { _ =>
+        result = pop() +: result
+      }
+      result
+    }
+
+    def toSeq: Seq[T] = values
+
+    def iterator: Iterator[T] = values.iterator
+
+    def reverseIterator: Iterator[T] = values.reverseIterator
+
+    def concat(other: Stack[T]): Stack[T] = {
+      val result = new Stack[T]
+      result.values = values ++ other.values
+      result
+    }
+
+    @`inline` final def ++(other: Stack[T]): Stack[T] = concat(other)
+  }
+
+  private trait Frame {
+    def userData: ContextualUserData
+
+    def process(stack: Stack[Subtrees], processingQueue: Queue[Frame]): Unit
+  }
+
+  private case class ItemFrame(
+    val state: State,
+    val item: TerminalItem,
+    override val userData: ContextualUserData
+  ) extends Frame {
+
+    override def process(stack: Stack[Subtrees], processingQueue: Queue[Frame]): Unit = {
+      stack.push(Subtrees(terminal(item, userData), userData))
+    }
+  }
+
+  private case class StateFrame(
+    val state: State,
+    val successState: Boolean,
+    override val userData: ContextualUserData
+  ) extends Frame {
+    override def process(stack: Stack[Subtrees], processingQueue: Queue[Frame]): Unit = {
+      val backPtrs: Seq[BackPtr] = result.backPtrsOf(state)
+      if (backPtrs.isEmpty) {
+        if (state.isCompleted) {
+          stack.push(Subtrees(
+            singleton(reduceState(state, Subtree(Seq.empty), userData, None)),
+            userData
+          ))
+        } else {
+          stack.push(Subtrees(sentinel(), userData))
+        }
+      } else {
+        processingQueue.prepend(BranchFrame(
+          this,
+          backPtrs.size,
+          backPtrs.head,
+          backPtrs.tail,
+          if (isContextual(state)) ContextualUserData(Some(userData))
+          else userData
+        ))
+      }
+    }
+  }
+
+  private case class BranchFrame(
+    val parent: StateFrame,
+    val size: Int,
+    val backPtr: BackPtr,
+    val backPtrs: Seq[BackPtr],
+    override val userData: ContextualUserData
+  ) extends Frame {
+    override def process(stack: Stack[Subtrees], processingQueue: Queue[Frame]): Unit = {
+      if (backPtrs.isEmpty) {
+        processingQueue.prepend(ReduceFrame(this))
+      } else {
+        processingQueue.prepend(BranchFrame(
+          parent,
+          size,
+          backPtrs.head,
+          backPtrs.tail,
+          userData
+        ))
+      }
+      processingQueue.prepend(ConcatFrame(this))
+      backPtr.causal match {
+        case item: TerminalItem =>
+          processingQueue.prepend(ItemFrame(parent.state, item, userData))
+        case state: State       =>
+          processingQueue.prepend(StateFrame(state, false, userData))
+      }
+      processingQueue.prepend(StateFrame(backPtr.predecessor, false, userData))
+    }
+  }
+
+  private case class ConcatFrame(
+    val branch: BranchFrame
+  ) extends Frame {
+    def state: State = branch.parent.state
+
+    override def userData: ContextualUserData = branch.userData
+
+    override def process(stack: Stack[Subtrees], processingQueue: Queue[Frame]): Unit = {
+      val causal               = stack.pop()
+      val predecessor          = stack.pop()
+      var result: Seq[Subtree] = Seq.empty
+      predecessor.choices.reverse.foreach(p => {
+        causal.choices.reverse.foreach(c => {
+          result = Subtree(c.stack ++ p.stack) +: result
+        })
+      })
+      stack.push(Subtrees(result, predecessor.userData))
+    }
+  }
+
+  private case class ReduceFrame(
+    val branch: BranchFrame
+  ) extends Frame {
+    def state: State = branch.parent.state
+
+    override def userData: ContextualUserData = branch.userData
+
+    override def process(stack: Stack[Subtrees], processingQueue: Queue[Frame]): Unit = {
+      val subtrees = stack.take(branch.size).reduce(_ ++ _)
+      if (state.isCompleted) {
+        val candidates = subtrees.choices.toSeq
+        if (candidates.size > 1 && (branch.parent.successState || state.production.isDslElement)) {
+          val ambiguity = Some(new Ambiguity(candidates.size))
+          val subtrees  =
+            candidates.map(s =>
+              Subtree(Seq(reduceState(state, s, userData, ambiguity)))
+            )
+          stack.push(Subtrees(filterSubtrees(subtrees, ambiguity), userData))
+        } else
+          stack.push(Subtrees(
+            candidates.map(s =>
+              Subtree(Seq(reduceState(state, s, userData, None)))
+            ),
+            userData
+          ))
+      } else
+        stack.push(subtrees)
+    }
+  }
+
   private def nonTerminal(
     state: State,
     userData: ContextualUserData,
     successState: Boolean = false
   ): Subtrees = {
-    val backPtrs: Seq[BackPtr] = result.backPtrsOf(state)
-    if (backPtrs.isEmpty) {
-      if (state.isCompleted)
-        Subtrees(
-          singleton(reduceState(state, Subtree(Seq.empty), userData, None)),
-          userData
-        )
-      else {
-        if (isContextual(state)) {
-          Subtrees(sentinel(), ContextualUserData(Some(userData)))
-        } else Subtrees(sentinel(), userData)
-      }
-    } else {
-      val subtrees = backPtrs.map(backPtr =>
-        alternative(
-          backPtr.causal match {
-            case item: TerminalItem => userData => Subtrees(terminal(item, userData), userData)
-            case state: State       => userData => nonTerminal(state, userData)
-          },
-          backPtr.predecessor,
-          userData
-        )
-      ).reduce(_ ++ _)
-      if (state.isCompleted) {
-        val candidates = subtrees.toSeq
-        if (candidates.size > 1 && (successState || state.production.isDslElement)) {
-          val ambiguity = Some(new Ambiguity(candidates.size))
-          val subtrees  =
-            candidates.map(s => Subtree(Seq(reduceState(state, s, userData, ambiguity))))
-          Subtrees(filterSubtrees(subtrees, ambiguity).iterator, userData)
-        } else
-          Subtrees(
-            candidates.map(s => Subtree(Seq(reduceState(state, s, userData, None)))).iterator,
-            userData
-          )
-      } else
-        Subtrees(subtrees, userData)
+    val processingQueue: Queue[Frame] = new Queue
+    val stack: Stack[Subtrees]        = new Stack[Subtrees]
+    // Initial frame
+    processingQueue.prepend(StateFrame(
+      state,
+      successState,
+      userData
+    ))
+    // Process the queue
+    while (processingQueue.nonEmpty) {
+      val frame = processingQueue.dequeue()
+      frame.process(stack, processingQueue)
     }
+    // Result is on the top of the stack
+    stack.pop()
   }
 
   private def filterSubtrees(
@@ -685,36 +837,6 @@ class Navigator(
       styles,
       errors
     )
-  }
-
-  private class BackPtrIterator(
-    val causalSupplier: AlternativeSupplier,
-    val predecessor: State,
-    val userData: ContextualUserData
-  ) extends Iterator[Subtree] {
-
-    private var predIterator = nonTerminal(predecessor, userData)
-    private val causal       = causalSupplier.apply(predIterator.userData)
-    private var current      =
-      if (causal.choices.hasNext) causal.choices.next() else Subtree(Seq.empty)
-    private var finished     = false
-
-    override def next(): Subtree = {
-      if (finished) {
-        throw new NoSuchElementException()
-      }
-      val result: Subtree = Subtree(current.stack ++ predIterator.choices.next().stack)
-      if (!predIterator.choices.hasNext) {
-        if (causal.choices.hasNext) {
-          current = causal.choices.next()
-          predIterator = nonTerminal(predecessor, userData)
-        } else
-          finished = true
-      }
-      result
-    }
-
-    override def hasNext: Boolean = predIterator.choices.hasNext || causal.choices.hasNext
   }
 
   def expectOneTree(): Either[(String, Seq[GenericTree]), GenericTree] = {
