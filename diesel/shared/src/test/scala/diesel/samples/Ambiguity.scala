@@ -24,23 +24,23 @@ object Ambiguity {
 
   sealed trait Expr
   case class Constant(value: Double) extends Expr {
-    override def toString: String = s"${System.identityHashCode(this)}($value)"
+    override def toString: String = s"$value"
   }
 
   case class Variable(name: String) extends Expr {
-    override def toString: String = s"${System.identityHashCode(this)}($name)"
+    override def toString: String = s"$name)"
   }
 
   case class Add(left: Expr, right: Expr) extends Expr {
-    override def toString: String = s"${System.identityHashCode(this)}($left, $right)"
+    override def toString: String = s"ADD($left, $right)"
   }
 
   case class Mul(left: Expr, right: Expr) extends Expr {
-    override def toString: String = s"${System.identityHashCode(this)}($left, $right)"
+    override def toString: String = s"MUL($left, $right)"
   }
 
   case class SubExpr(e: Expr) extends Expr {
-    override def toString: String = s"${System.identityHashCode(this)}($e)"
+    override def toString: String = s"($e)"
   }
 
   object MyDsl extends Dsl with Identifiers {
