@@ -47,9 +47,8 @@ object AmbiguousSyntax {
     val value: Concept[Expr] = concept[Expr]
 
     val number: Concept[Expr] =
-      concept[Expr, Expr]("\\d+".r, Constant(0), parent = Some(value)) map (
-        (_: Context, s: Token) => Constant(s.text.toDouble)
-      )
+      concept[Expr, Expr]("\\d+".r, Constant(0), parent = Some(value)) map
+        ((_: Context, s: Token) => Constant(s.text.toDouble))
 
     val person: Concept[Person] = concept(value)
 
