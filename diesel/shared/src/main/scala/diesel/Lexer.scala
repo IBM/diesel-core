@@ -68,7 +68,9 @@ object Lexer {
     def name: String = c.name
   }
 
-  class Input(var s: String) {
+  type StyledTokenListener = (Token, Seq[Style]) => Unit
+
+  class Input(var s: String, styledTokenListener: Option[StyledTokenListener] = None) {
     private var pos: Int = 0
 
     def offset: Int = pos
@@ -83,6 +85,9 @@ object Lexer {
     }
 
     def eos: Boolean = s.isEmpty
+
+    def onStyledToken(t: Token, styles: Seq[Style]): Unit =
+      styledTokenListener.foreach(_.apply(t, styles))
   }
 
   trait Scanner {
@@ -291,7 +296,11 @@ object Lexer {
     dsl match {
       case comments: Comments =>
         comments.commentScanners.foreach { regex =>
-          rules = rules ++ Seq(SimpleRule(regex, Skip))
+          rules = rules ++ Seq(SimpleRule(
+            regex,
+            Skip,
+            styles = comments.commentStyle.toSeq
+          ))
         }
       case _                  => ()
     }
@@ -311,7 +320,10 @@ object Lexer {
   }
 }
 
-case class Lexer(lexerRules: Seq[Rule], tokenRules: Map[TokenId, Rule]) {
+case class Lexer(
+  lexerRules: Seq[Rule],
+  tokenRules: Map[TokenId, Rule]
+) {
 
   import diesel.Lexer._
 
@@ -385,12 +397,14 @@ case class Lexer(lexerRules: Seq[Rule], tokenRules: Map[TokenId, Rule]) {
         case None =>
           (Token(input.offset, if (eatOnError) input.eat(1) else "", Error), Seq())
 
-        case Some(((Token(_, text, Skip), _), _)) =>
+        case Some(((t @ Token(_, text, Skip), styles), _)) =>
           input.eat(text.length)
+          input.onStyledToken(t, styles)
           next(input, lexerRules, eatOnError)
 
-        case Some((res @ (Token(_, text, _), _), _)) =>
+        case Some((res @ (t @ Token(_, text, _), styles), _)) =>
           input.eat(text.length)
+          input.onStyledToken(t, styles)
           res
       }
     }

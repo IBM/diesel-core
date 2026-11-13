@@ -1,0 +1,66 @@
+name: CI
+
+env:
+  JDK_JAVA_OPTIONS: -XX:+PrintCommandLineFlags
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current branch
+        uses: actions/checkout@v7
+        with:
+          submodules: "true"
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          java-version: "25"
+          distribution: "temurin"
+          check-latest: true
+          cache: "sbt"
+      - uses: sbt/setup-sbt@v1
+      - name: Set up node lts/jod
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/jod
+      - name: Build and tests
+        run: ./build.sh
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [ci]
+    if: github.event_name == 'release'
+    steps:
+      - name: Checkout current branch
+        uses: actions/checkout@v7
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          java-version: "25"
+          distribution: "temurin"
+          check-latest: true
+          cache: "sbt"
+      - uses: sbt/setup-sbt@v1
+      - name: Set up node lts/jod
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/jod
+      - name: Release
+        run: ./release.sh
+        env:
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+          PGP_SECRET: ${{ secrets.PGP_SECRET }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

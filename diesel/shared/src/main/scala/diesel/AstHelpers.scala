@@ -17,18 +17,25 @@
 package diesel
 
 import diesel.Dsl.Axiom
+import diesel.Dsl.Comments
+import diesel.Lexer.Token
 
 object AstHelpers {
 
   def parse(
     dsl: Dsl,
     text: String,
-    axiom: Option[Axiom[_]] = None
+    axiom: Option[Axiom[_]] = None,
+    onCommentToken: Option[Token => Unit] = None
   ): Result = {
-    val bnf: Bnf       = Bnf(dsl)
-    val parser: Earley = Earley(bnf, dsl.dynamicLexer)
-    val a              = getBnfAxiomOrThrow(bnf, axiom)
-    parser.parse(new Lexer.Input(text), a)
+    val bnf: Bnf            = Bnf(dsl)
+    val parser: Earley      = Earley(bnf, dsl.dynamicLexer)
+    val a                   = getBnfAxiomOrThrow(bnf, axiom)
+    val styledTokenListener = dsl match {
+      case c: Comments => onCommentToken.map(c.commentTokenListener)
+      case _           => None
+    }
+    parser.parse(new Lexer.Input(text, styledTokenListener), a)
   }
 
   def getBnfAxiomOrThrow(bnf: Bnf, axiom: Option[Axiom[_]]): Bnf.Axiom = {
@@ -68,9 +75,10 @@ object AstHelpers {
   def assertAsts(
     dsl: Dsl,
     axiom: Option[Axiom[_]] = None,
-    navigatorFactory: Result => Navigator = Navigator(_)
+    navigatorFactory: Result => Navigator = Navigator(_),
+    onCommentToken: Option[Token => Unit] = None
   )(s: String)(f: Navigator => Unit): Unit = {
-    val result    = parse(dsl, s, axiom)
+    val result    = parse(dsl, s, axiom, onCommentToken)
     assert(result.success)
     val navigator = navigatorFactory(result)
     f(navigator)

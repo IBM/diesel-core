@@ -41,9 +41,10 @@ object SFeel extends Dsl with Identifiers {
   val numeric_literal: Concept[NumericLiteral]                     =
     concept("[0-9]+".r, NumericLiteral(0)) map ((_, t) => NumericLiteral(t.text.toInt))
   val string_literal: Concept[StringLiteral]                       =
-    concept("\"[a-z]*\"".r, StringLiteral("")) map ((_, t) =>
-      StringLiteral(t.text.drop(1).dropRight(1))
-    )
+    concept("\"[a-z]*\"".r, StringLiteral("")) map
+      ((_, t) =>
+        StringLiteral(t.text.drop(1).dropRight(1))
+      )
   val boolean_literal: Concept[BooleanLiteral]                     = concept
 
   val s_expression: Syntax[Expression] = syntax(expression)(

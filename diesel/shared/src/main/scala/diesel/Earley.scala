@@ -269,7 +269,8 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
     candidates.foreach(candidate => {
       val feature = candidate.feature.merge(candidate.dot, state.feature)
       if (
-        feature != Constraints.Incompatible || (errorRecovery && state.syntacticErrors( // apply only when no syntactic errors
+        feature != Constraints.Incompatible ||
+        (errorRecovery && state.syntacticErrors( // apply only when no syntactic errors
           context
         ) == 0)
       ) {

@@ -22,6 +22,7 @@ import diesel.i18n.DeclaringSourceName
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
 import scala.util.matching.Regex
+import diesel.Lexer.StyledTokenListener
 
 /** Type definitions of the Dsl API
   */
@@ -719,8 +720,14 @@ object Dsl {
    */
 
   trait Comments {
-
     def commentScanners: Seq[Scanner]
+    def commentStyle: Option[Style]                                 = Option.empty
+    def commentTokenListener(f: Token => Unit): StyledTokenListener = { case (t, styles) =>
+      val hasCommentStyle = commentStyle.exists(styles.contains)
+      if (hasCommentStyle) {
+        f(t)
+      }
+    }
   }
 
   /*

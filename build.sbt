@@ -3,8 +3,8 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
 import scala.sys.process._
 
-val scalaVersion2 = "2.13.16"
 // val scalaVersion3 = "3.2.1"
+val scalaVersion2 = "2.13.18"
 
 inThisBuild(Seq(
   organization     := "com.ibm.cloud.diesel",
@@ -13,7 +13,14 @@ inThisBuild(Seq(
   description      := "Diesel is a library for creating and using languages easily.",
   startYear        := Some(2018),
   organizationName := "The Diesel Authors",
-  licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt"))
+  licenses += ("Apache-2.0", uri("https://www.apache.org/licenses/LICENSE-2.0.txt")),
+  homepage         := Some(uri("https://github.com/IBM/diesel-core")),
+  developers       := List(Developer(
+    "decisions-sonatype",
+    "The Diesel Authors",
+    "decisions-sonatype@ibm.com",
+    uri("https://github.com/IBM/diesel-core")
+  ))
 ))
 
 // CI convenience
@@ -52,12 +59,7 @@ lazy val sharedSettings_scalac = Seq(
 
 lazy val sharedSettings_test = Seq(
   Test / fork        := false,
-  Test / logBuffered := false,
-  // see https://github.com/scalameta/munit/blob/main/junit-interface/src/main/java/munit/internal/junitinterface/JUnitRunner.java
-  // with logger:
-  // Test / testOptions += Tests.Argument("+l", "--summary=1")
-  // without logger:
-  Test / testOptions += Tests.Argument("--summary=1")
+  Test / logBuffered := false
 )
 
 lazy val sharedSettings_lint = Seq(
@@ -69,12 +71,12 @@ lazy val sharedJsSettings = Seq(
   scalacOptions += {
     val branch        =
       if (version.value.endsWith("SNAPSHOT")) {
-        "develop"
+        "main"
       } else {
         version.value
       }
     val local: String = baseDirectory.value.getParentFile.getParentFile.toURI.toString
-    val remote        = s"https://raw.github.ibm.com/IBM/diesel-core/$branch/"
+    val remote        = s"https://raw.githubusercontent.com/IBM/diesel-core/refs/heads/$branch/"
     println(s"sourceURIs : \nLOCAL:$local\nREMOTE:$remote")
     s"-P:scalajs:mapSourceURI:$local->$remote"
   },
@@ -94,9 +96,9 @@ lazy val diesel = crossProject(JSPlatform, JVMPlatform)
   .settings(sharedSettings_scalac)
   .settings(
     libraryDependencies ++= Seq(
-      "com.ibm.cloud.diesel" %%% "diesel-i18n"   % Dependencies.dieselI18nVersion,
-      scalaOrganization.value  % "scala-reflect" % scalaVersion.value,
-      "org.scalameta"        %%% "munit"         % "1.1.1" % Test
+      "com.ibm.cloud.diesel" %% "diesel-i18n"   % Dependencies.dieselI18nVersion,
+      scalaOrganization.value % "scala-reflect" % scalaVersion.value,
+      "org.scalameta"        %% "munit"         % "1.3.6" % Test
     )
   )
   .settings(sharedSettings_test)
