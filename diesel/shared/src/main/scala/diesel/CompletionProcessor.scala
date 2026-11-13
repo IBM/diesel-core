@@ -443,11 +443,12 @@ class CompletionProcessor(
               }
           })
           .getOrElse(Seq.empty)
-        acc ++ config
-          .flatMap(c => c.getFilter)
-          .map(f => f.filterProposals(tree, offset, node, treeProposals))
-          .getOrElse(treeProposals)
-          .map(proposal => proposal.copy(replace = proposal.replace.orElse(defaultReplace)))
+        acc ++
+          config
+            .flatMap(c => c.getFilter)
+            .map(f => f.filterProposals(tree, offset, node, treeProposals))
+            .getOrElse(treeProposals)
+            .map(proposal => proposal.copy(replace = proposal.replace.orElse(defaultReplace)))
       }
       .distinct
   }

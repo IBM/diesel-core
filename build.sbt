@@ -13,13 +13,13 @@ inThisBuild(Seq(
   description      := "Diesel is a library for creating and using languages easily.",
   startYear        := Some(2018),
   organizationName := "The Diesel Authors",
-  licenses += ("Apache-2.0", url("https://www.apache.org/licenses/LICENSE-2.0.txt")),
-  homepage         := Some(url("https://github.com/IBM/diesel-core")),
+  licenses += ("Apache-2.0", uri("https://www.apache.org/licenses/LICENSE-2.0.txt")),
+  homepage         := Some(uri("https://github.com/IBM/diesel-core")),
   developers       := List(Developer(
     "decisions-sonatype",
     "The Diesel Authors",
     "decisions-sonatype@ibm.com",
-    url("https://github.com/IBM/diesel-core")
+    uri("https://github.com/IBM/diesel-core")
   ))
 ))
 
@@ -96,9 +96,9 @@ lazy val diesel = crossProject(JSPlatform, JVMPlatform)
   .settings(sharedSettings_scalac)
   .settings(
     libraryDependencies ++= Seq(
-      "com.ibm.cloud.diesel" %%% "diesel-i18n"   % Dependencies.dieselI18nVersion,
-      scalaOrganization.value  % "scala-reflect" % scalaVersion.value,
-      "org.scalameta"        %%% "munit"         % "1.3.6" % Test
+      "com.ibm.cloud.diesel" %% "diesel-i18n"   % Dependencies.dieselI18nVersion,
+      scalaOrganization.value % "scala-reflect" % scalaVersion.value,
+      "org.scalameta"        %% "munit"         % "1.3.6" % Test
     )
   )
   .settings(sharedSettings_test)

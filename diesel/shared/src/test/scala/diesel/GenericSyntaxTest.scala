@@ -27,12 +27,14 @@ class GenericSyntaxTest extends DslTestFunSuite {
   object MyDsl extends Dsl {
 
     val word: Concept[Result]   =
-      concept[Result]("'\\S+'".r, Right[Int, String]("")) map ((_, t) =>
-        Right[Int, String](t.text)
+      concept[Result]("'\\S+'".r, Right[Int, String]("")) map
+        ((_, t) =>
+          Right[Int, String](t.text)
+        )
+    val number: Concept[Result] = concept[Result]("\\d+".r, Left[Int, String](0)) map
+      ((_, t) =>
+        Left[Int, String](t.text.toIntOption.getOrElse(0))
       )
-    val number: Concept[Result] = concept[Result]("\\d+".r, Left[Int, String](0)) map ((_, t) =>
-      Left[Int, String](t.text.toIntOption.getOrElse(0))
-    )
 
     val sGenericList: SyntaxGenericMulti[Result, MyList[Result]] = {
       syntaxGeneric[Result]

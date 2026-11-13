@@ -414,10 +414,11 @@ class Feel extends Dsl with Identifiers with DynamicLexer {
   // TODO proper handling of names : s25 -> s30
   // for now we do with IDs
   val s25: Syntax[Name] = syntax(name)(
-    id map {
-      case (_, i) =>
-        Name(i.text)
-    }
+    id map
+      {
+        case (_, i) =>
+          Name(i.text)
+      }
 //    id ~ ("+" | id).rep(true) map {
 //      case (_,(i,is)) =>
 //        val s = is.map {
@@ -716,21 +717,22 @@ class Feel extends Dsl with Identifiers with DynamicLexer {
   )
 
   val s55: Syntax[FunctionDefinition] = syntax(function_definition)(
-    "function" ~ "(" ~ (formalParameter ~ ("," ~ formalParameter).rep(
-      true
-    )).? ~ ")" ~ "external".? ~ expression map {
-      case (_, (_, _, params, _, ext, e)) =>
-        FunctionDefinition(
-          params match {
-            case Some((p, rest)) =>
-              Seq(p) ++ rest.map(_._2)
-            case None            =>
-              Seq()
-          },
-          e,
-          ext.isDefined
-        )
-    }
+    "function" ~ "(" ~
+      (formalParameter ~ ("," ~ formalParameter).rep(
+        true
+      )).? ~ ")" ~ "external".? ~ expression map {
+        case (_, (_, _, params, _, ext, e)) =>
+          FunctionDefinition(
+            params match {
+              case Some((p, rest)) =>
+                Seq(p) ++ rest.map(_._2)
+              case None            =>
+                Seq()
+            },
+            e,
+            ext.isDefined
+          )
+      }
   )
 
 //  var foo: List[String] = List.empty
