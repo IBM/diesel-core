@@ -1,7 +1,11 @@
 {
-	"require": "ts-node/register",
-	"extensions": ["ts"],
-	"spec": [
-	  "src/**/*.test.ts"
-	]
+    "node-option": [
+        "import=tsx"
+    ],
+    "extensions": [
+        "ts"
+    ],
+    "spec": [
+        "src/**/*.test.ts"
+    ]
 }
