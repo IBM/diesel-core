@@ -1,8 +1,10 @@
 {
   "include": ["src"],
   "compilerOptions": {
-    "target": "es6",
-    "module": "commonjs",
+    "target": "esnext",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node", "mocha"],
     "declaration": true,
     "outDir": "./dist",
     "rootDir": "./src",
