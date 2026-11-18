@@ -34,7 +34,7 @@ class PredictTest extends FunSuite {
 
   implicit val element: DslValue[String] = DslValue(MyPredictDsl.foo)
 
-  val nodeWithStringValue: GenericNode => Boolean = { n: GenericNode =>
+  val nodeWithStringValue: GenericNode => Boolean = { (n: GenericNode) =>
     n.value.isInstanceOf[String]
   }
 

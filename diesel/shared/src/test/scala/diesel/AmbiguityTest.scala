@@ -37,7 +37,7 @@ class AmbiguityTest extends DslTestFunSuite {
   }
 
   test("variable") {
-    withAsts("pi", navWithFewerErrors) { nav: Navigator =>
+    withAsts("pi", navWithFewerErrors) { (nav: Navigator) =>
       val first = nav.next();
       assert(first.value == Constant(3.14))
       assert(first.toSeq.forall(n => !n.hasAmbiguity))
@@ -56,7 +56,7 @@ class AmbiguityTest extends DslTestFunSuite {
   }
 
   test("left assoc") {
-    withAsts("1 + 2 + 3", emptyNav) { nav: Navigator =>
+    withAsts("1 + 2 + 3", emptyNav) { (nav: Navigator) =>
       val first  = nav.next()
       assert(first.value == Add(Add(Constant(1), Constant(2)), Constant(3)))
       assert(first.toSeq.exists(n => n.hasAmbiguity))
@@ -76,7 +76,7 @@ class AmbiguityTest extends DslTestFunSuite {
   }
 
   test("precedence") {
-    withAsts("1 + 2 * 3 + 4", emptyNav) { nav: Navigator =>
+    withAsts("1 + 2 * 3 + 4", emptyNav) { (nav: Navigator) =>
       val first  = nav.next()
       assert(first.value == Add(
         Mul(Add(Constant(1.0), Constant(2.0)), Constant(3.0)),

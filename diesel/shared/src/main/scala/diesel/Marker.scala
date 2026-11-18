@@ -86,12 +86,12 @@ case class UnknownTokenMsg(token: String)                               extends 
 }
 case object AmbiguousMsg                                                extends InternalMsg {
   override def format(locale: String): String = {
-    DieselI18n.ambiguous()(resolver(locale))
+    DieselI18n.ambiguous()(using resolver(locale))
   }
 }
 case object IncompatibleMsg                                             extends InternalMsg {
   override def format(locale: String): String = {
-    DieselI18n.incompatible()(resolver(locale))
+    DieselI18n.incompatible()(using resolver(locale))
   }
 }
 

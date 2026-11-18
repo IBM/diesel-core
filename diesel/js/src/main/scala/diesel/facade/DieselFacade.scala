@@ -155,7 +155,7 @@ class DieselParseResult(
   val styles: js.Array[DieselStyle] = res.toOption
     .map(new Styles(_).styledRanges)
     .getOrElse(Seq.empty)
-    .map(DieselStyle)
+    .map(DieselStyle.apply)
     .toJSArray
 }
 

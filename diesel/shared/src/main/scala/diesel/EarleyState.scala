@@ -329,7 +329,7 @@ class Result(val bnf: Bnf, val axiom: Bnf.Axiom) {
   ): Option[(Chart, Option[String])] = {
 
     def tokenEndsAt(offset: Int) = {
-      t: Token => t.offset + t.length == offset
+      (t: Token) => t.offset + t.length == offset
     }
 
     def useNextChart = charts

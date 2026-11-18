@@ -4,7 +4,7 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 import scala.sys.process._
 
 // val scalaVersion3 = "3.2.1"
-val scalaVersion2 = "2.13.18"
+val scalaVersion2 = "3.9.0"
 
 inThisBuild(Seq(
   organization     := "com.ibm.cloud.diesel",
@@ -53,7 +53,8 @@ lazy val sharedSettings_scalac = Seq(
     "-Wconf:cat=deprecation:i",
     "-language:existentials",
     "-Wunused:imports",
-    "-Ytasty-reader"
+    "-rewrite",
+    "-source:3.0-migration"
   )
 )
 
@@ -67,24 +68,6 @@ lazy val sharedSettings_lint = Seq(
   ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 )
 
-lazy val sharedJsSettings = Seq(
-  scalacOptions += {
-    val branch        =
-      if (version.value.endsWith("SNAPSHOT")) {
-        "main"
-      } else {
-        version.value
-      }
-    val local: String = baseDirectory.value.getParentFile.getParentFile.toURI.toString
-    val remote        = s"https://raw.githubusercontent.com/IBM/diesel-core/refs/heads/$branch/"
-    println(s"sourceURIs : \nLOCAL:$local\nREMOTE:$remote")
-    s"-P:scalajs:mapSourceURI:$local->$remote"
-  },
-  // for dependency: pine
-  libraryDependencies := libraryDependencies.value.filterNot(_.name == "scalajs-compiler"),
-  addCompilerPlugin("org.scala-js" % "scalajs-compiler" % scalaJSVersion cross CrossVersion.patch)
-)
-
 lazy val diesel = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .enablePlugins(I18nPlugin)
@@ -96,14 +79,13 @@ lazy val diesel = crossProject(JSPlatform, JVMPlatform)
   .settings(sharedSettings_scalac)
   .settings(
     libraryDependencies ++= Seq(
-      "com.ibm.cloud.diesel" %% "diesel-i18n"   % Dependencies.dieselI18nVersion,
-      scalaOrganization.value % "scala-reflect" % scalaVersion.value,
-      "org.scalameta"        %% "munit"         % "1.3.6" % Test
+      "com.ibm.cloud.diesel" %% "diesel-i18n" % Dependencies.dieselI18nVersion,
+//      scalaOrganization.value % "scala-reflect" % scalaVersion.value,
+      "org.scalameta"        %% "munit"       % "1.3.6" % Test
     )
   )
   .settings(sharedSettings_test)
   .settings(sharedSettings_lint)
-  .jsSettings(sharedJsSettings)
 
 lazy val samples = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
@@ -115,7 +97,6 @@ lazy val samples = crossProject(JSPlatform, JVMPlatform)
   .settings(sharedSettings_scalac)
   .settings(sharedSettings_test)
   .settings(sharedSettings_lint)
-  .jsSettings(sharedJsSettings)
 
 lazy val samplesBundle = project
   .in(file("./facade/samples-bundle"))

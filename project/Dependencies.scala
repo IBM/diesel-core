@@ -1,3 +1,3 @@
 object Dependencies {
-  lazy val dieselI18nVersion = "0.8.2"
+  lazy val dieselI18nVersion = "1.0.0"
 }

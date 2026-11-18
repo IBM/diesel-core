@@ -17,3 +17,4 @@ diesel-samples/jvm/profile*
 
 *gpcreds.json
 sbt-launch.jar
+build.sbt.semanticdb

@@ -51,18 +51,21 @@ private[diesel] case class BnfEmptyRules(bnf: Bnf) {
   val emptyRules: Set[Bnf.NonTerminal] = {
     var emptyRules: Set[Bnf.NonTerminal] = Set()
     var cont                             = false
-    do {
-      cont = false
-      var i = bnf.rules
-      while (i.nonEmpty) {
-        val newEmptyRules = computeEmptyRules(i.head, emptyRules)
-        if (newEmptyRules.size > emptyRules.size) {
-          cont = true
-          emptyRules = newEmptyRules
+    while ({
+      {
+        cont = false
+        var i = bnf.rules
+        while (i.nonEmpty) {
+          val newEmptyRules = computeEmptyRules(i.head, emptyRules)
+          if (newEmptyRules.size > emptyRules.size) {
+            cont = true
+            emptyRules = newEmptyRules
+          }
+          i = i.tail
         }
-        i = i.tail
-      }
-    } while (cont)
+      };
+      cont
+    }) ()
     emptyRules
   }
 }
