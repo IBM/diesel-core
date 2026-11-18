@@ -9,4 +9,3 @@ addSbtPlugin("com.github.sbt"     % "sbt-ci-release"           % "1.12.1")
 addSbtPlugin(
   ("com.ibm.cloud.diesel" % "diesel-i18n-plugin" % "1.0.0")
 )
-

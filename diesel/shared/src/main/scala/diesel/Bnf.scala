@@ -1520,41 +1520,44 @@ object Bnf {
     def cleanGrammar(): Unit = {
       var rulesToRemove: Set[String] = Set()
       var cont                       = false
-      while ({ {
-        rules.values.foreach {
-          case rule: Rule   =>
-            if (rule.productions.isEmpty)
-              rulesToRemove = rulesToRemove ++ Seq(rule.name)
-          case axiom: Axiom =>
-            if (axiom.rule.productions.isEmpty)
-              rulesToRemove = rulesToRemove ++ Seq(axiom.name)
-        }
-        cont = false;
-        if (rulesToRemove.nonEmpty) {
+      while ({
+        {
           rules.values.foreach {
-            case rule: Rule =>
-              var productionsToRemove: Seq[Production] = Seq()
-              rule.productions.foreach(p => {
-                if (
-                  p.symbols.exists {
-                    case r: Rule => rulesToRemove.contains(r.name)
-                    case _       => false
-                  }
-                ) {
-                  productionsToRemove = productionsToRemove ++ Seq(p)
-                }
-              })
-              if (productionsToRemove.nonEmpty) {
-                rule.productions = rule.productions.filter(p => !productionsToRemove.contains(p))
-                cont = true
-              }
-            case _ =>
-                // noop
+            case rule: Rule   =>
+              if (rule.productions.isEmpty)
+                rulesToRemove = rulesToRemove ++ Seq(rule.name)
+            case axiom: Axiom =>
+              if (axiom.rule.productions.isEmpty)
+                rulesToRemove = rulesToRemove ++ Seq(axiom.name)
           }
-          rulesToRemove.foreach(ruleName => rules = rules - ruleName)
-          rulesToRemove = Set()
-        }
-      } ; cont}) ()
+          cont = false;
+          if (rulesToRemove.nonEmpty) {
+            rules.values.foreach {
+              case rule: Rule =>
+                var productionsToRemove: Seq[Production] = Seq()
+                rule.productions.foreach(p => {
+                  if (
+                    p.symbols.exists {
+                      case r: Rule => rulesToRemove.contains(r.name)
+                      case _       => false
+                    }
+                  ) {
+                    productionsToRemove = productionsToRemove ++ Seq(p)
+                  }
+                })
+                if (productionsToRemove.nonEmpty) {
+                  rule.productions = rule.productions.filter(p => !productionsToRemove.contains(p))
+                  cont = true
+                }
+              case _          =>
+              // noop
+            }
+            rulesToRemove.foreach(ruleName => rules = rules - ruleName)
+            rulesToRemove = Set()
+          }
+        };
+        cont
+      }) ()
     }
 
     def dumpGrammar(): Unit = {
