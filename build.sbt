@@ -53,7 +53,8 @@ lazy val sharedSettings_scalac = Seq(
     "-Wconf:cat=deprecation:i",
     "-language:existentials",
     "-Wunused:imports",
-    "-Ytasty-reader"
+    "-Ytasty-reader",
+    "-Xsource:3"
   )
 )
 
