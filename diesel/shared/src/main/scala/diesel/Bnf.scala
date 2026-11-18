@@ -1520,7 +1520,7 @@ object Bnf {
     def cleanGrammar(): Unit = {
       var rulesToRemove: Set[String] = Set()
       var cont                       = false
-      do {
+      while ({ {
         rules.values.foreach {
           case rule: Rule   =>
             if (rule.productions.isEmpty)
@@ -1528,7 +1528,6 @@ object Bnf {
           case axiom: Axiom =>
             if (axiom.rule.productions.isEmpty)
               rulesToRemove = rulesToRemove ++ Seq(axiom.name)
-          case _            =>
         }
         cont = false;
         if (rulesToRemove.nonEmpty) {
@@ -1549,13 +1548,13 @@ object Bnf {
                 rule.productions = rule.productions.filter(p => !productionsToRemove.contains(p))
                 cont = true
               }
-
             case _ =>
+                // noop
           }
           rulesToRemove.foreach(ruleName => rules = rules - ruleName)
           rulesToRemove = Set()
         }
-      } while (cont)
+      } ; cont}) ()
     }
 
     def dumpGrammar(): Unit = {
@@ -1566,7 +1565,6 @@ object Bnf {
         case a: Axiom =>
           a.dump(Console.out)
           println()
-        case _        =>
       }
     }
 

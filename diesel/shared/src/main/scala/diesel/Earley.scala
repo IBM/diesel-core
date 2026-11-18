@@ -35,7 +35,7 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
     var token = if (tokens.isEmpty) lexer.next(input) else lexer.next(input, tokens)
     if (token.id == Lexer.Error) {
       var errorToken = Lexer.Token(token.offset, "", Lexer.Error)
-      do {
+      while ({ {
         if (errorToken.offset + errorToken.length == token.offset) {
           errorToken = Lexer.Token(errorToken.offset, errorToken.text ++ token.text, Lexer.Error)
         } else {
@@ -43,7 +43,7 @@ case class Earley(bnf: Bnf, dynamicLexer: Boolean = false) {
           errorToken = token
         }
         token = if (tokens.isEmpty) lexer.next(input) else lexer.next(input, tokens)
-      } while (token.id == Lexer.Error)
+      } ; token.id == Lexer.Error}) ()
       context.addLexicalError(token = errorToken)
     }
     token

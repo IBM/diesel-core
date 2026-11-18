@@ -51,7 +51,7 @@ private[diesel] case class BnfEmptyRules(bnf: Bnf) {
   val emptyRules: Set[Bnf.NonTerminal] = {
     var emptyRules: Set[Bnf.NonTerminal] = Set()
     var cont                             = false
-    do {
+    while ({ {
       cont = false
       var i = bnf.rules
       while (i.nonEmpty) {
@@ -62,7 +62,7 @@ private[diesel] case class BnfEmptyRules(bnf: Bnf) {
         }
         i = i.tail
       }
-    } while (cont)
+    } ; cont}) ()
     emptyRules
   }
 }
