@@ -7,5 +7,6 @@ addSbtPlugin("com.github.sbt"     % "sbt-ci-release"           % "1.12.1")
 
 // Dependencies.dieselI18nVersion
 addSbtPlugin(
-  ("com.ibm.cloud.diesel" % "diesel-i18n-plugin" % "0.8.2")
+  ("com.ibm.cloud.diesel" % "diesel-i18n-plugin" % "1.0.0")
 )
+

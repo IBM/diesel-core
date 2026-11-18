@@ -4,7 +4,7 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 import scala.sys.process._
 
 // val scalaVersion3 = "3.2.1"
-val scalaVersion2 = "2.13.18"
+val scalaVersion2 = "3.9.0"
 
 inThisBuild(Seq(
   organization     := "com.ibm.cloud.diesel",
@@ -53,8 +53,8 @@ lazy val sharedSettings_scalac = Seq(
     "-Wconf:cat=deprecation:i",
     "-language:existentials",
     "-Wunused:imports",
-    "-Ytasty-reader",
-    "-Xsource:3"
+    "-rewrite",
+    "-source:3.0-migration",
   )
 )
 
@@ -83,7 +83,7 @@ lazy val sharedJsSettings = Seq(
   },
   // for dependency: pine
   libraryDependencies := libraryDependencies.value.filterNot(_.name == "scalajs-compiler"),
-  addCompilerPlugin("org.scala-js" % "scalajs-compiler" % scalaJSVersion cross CrossVersion.patch)
+  addCompilerPlugin("org.scala-js" % "scalajs-compiler" % scalaJSVersion `cross` CrossVersion.patch)
 )
 
 lazy val diesel = crossProject(JSPlatform, JVMPlatform)
@@ -98,7 +98,7 @@ lazy val diesel = crossProject(JSPlatform, JVMPlatform)
   .settings(
     libraryDependencies ++= Seq(
       "com.ibm.cloud.diesel" %% "diesel-i18n"   % Dependencies.dieselI18nVersion,
-      scalaOrganization.value % "scala-reflect" % scalaVersion.value,
+//      scalaOrganization.value % "scala-reflect" % scalaVersion.value,
       "org.scalameta"        %% "munit"         % "1.3.6" % Test
     )
   )
