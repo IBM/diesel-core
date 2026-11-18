@@ -68,24 +68,6 @@ lazy val sharedSettings_lint = Seq(
   ThisBuild / semanticdbVersion := scalafixSemanticdb.revision
 )
 
-lazy val sharedJsSettings = Seq(
-  scalacOptions += {
-    val branch        =
-      if (version.value.endsWith("SNAPSHOT")) {
-        "main"
-      } else {
-        version.value
-      }
-    val local: String = baseDirectory.value.getParentFile.getParentFile.toURI.toString
-    val remote        = s"https://raw.githubusercontent.com/IBM/diesel-core/refs/heads/$branch/"
-    println(s"sourceURIs : \nLOCAL:$local\nREMOTE:$remote")
-    s"-P:scalajs:mapSourceURI:$local->$remote"
-  },
-  // for dependency: pine
-  libraryDependencies := libraryDependencies.value.filterNot(_.name == "scalajs-compiler"),
-  addCompilerPlugin("org.scala-js" % "scalajs-compiler" % scalaJSVersion `cross` CrossVersion.patch)
-)
-
 lazy val diesel = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
   .enablePlugins(I18nPlugin)
@@ -104,7 +86,6 @@ lazy val diesel = crossProject(JSPlatform, JVMPlatform)
   )
   .settings(sharedSettings_test)
   .settings(sharedSettings_lint)
-  .jsSettings(sharedJsSettings)
 
 lazy val samples = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
@@ -116,7 +97,6 @@ lazy val samples = crossProject(JSPlatform, JVMPlatform)
   .settings(sharedSettings_scalac)
   .settings(sharedSettings_test)
   .settings(sharedSettings_lint)
-  .jsSettings(sharedJsSettings)
 
 lazy val samplesBundle = project
   .in(file("./facade/samples-bundle"))
