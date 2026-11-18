@@ -45,4 +45,19 @@ class ExprTest extends DslTestFunSuite {
       )))
     }
   }
+
+  test("big".ignore) {
+    var i = 1;
+    while (true) {
+      println(s"i=${i}")
+      val s     = (0 until i).map(_ => i).mkString("+")
+      // println(s)
+      val start = System.currentTimeMillis()
+      val r     = withAst(s)(ast =>
+        println(s"took ${System.currentTimeMillis() - start} ms")
+      )
+      // val r = AstHelpers.parse(dsl, s)
+      i = i * 10
+    }
+  }
 }
