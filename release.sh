@@ -10,6 +10,7 @@ export VERSION=$(sbt --batch --server -Dsbt.supershell=false -error "print diese
 sbt ci-release
 sbt samplesBundle/fastOptJS
 
+cd facade
 echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
 yarn
 cd samples-bundle
