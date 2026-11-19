@@ -1,9 +1,9 @@
 #!/bin/bash
 
-set -x
+set -e
 
 # make sure facades / JS has same version as scala jars
-export VERSION=$(sbt --batch --server -Dsbt.supershell=false -error "print diesel/version" | tail -1)
+export VERSION=$(sbt --batch --server -Dsbt.supershell=false -error --no-colors "print diesel/version" | tail -1)
 # use facace/bump-version.js, and commit to the release tag 
 ( cd facade; ./check-version.js )
 
