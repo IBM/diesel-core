@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -x
 
 # make sure facades / JS has same version as scala jars
 export VERSION=$(sbt --batch --server -Dsbt.supershell=false -error "print diesel/version" | tail -1)
