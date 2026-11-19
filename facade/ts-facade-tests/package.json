@@ -1,29 +1,29 @@
 {
-    "name": "@diesel-parser/ts-facade-facade-tests",
-    "version": "1.0.0",
-    "private": true,
-    "scripts": {
-        "clean": "rimraf dist",
-        "tsc-v": "tsc -v",
-        "test": "mocha",
-        "prettify": "prettier --write ..",
-        "build": "tsc"
-    },
-    "dependencies": {
-        "@diesel-parser/samples": "^0.32.2"
-    },
-    "devDependencies": {
-        "@diesel-parser/ts-facade": "^0.32.2",
-        "@types/chai": "^5.2.3",
-        "@types/mocha": "^10.0.10",
-        "@types/node": "^26.6.6",
-        "chai": "^6.2.2",
-        "eslint-config-prettier": "^10.1.8",
-        "eslint-plugin-prettier": "^5.5.6",
-        "mocha": "^12.0.3",
-        "prettier": "3.10.1",
-        "rimraf": "^6.1.3",
-        "tsx": "^4.23.15",
-        "typescript": "^7.0.0"
-    }
+  "name": "@diesel-parser/ts-facade-facade-tests",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "clean": "rimraf dist",
+    "tsc-v": "tsc -v",
+    "test": "mocha",
+    "prettify": "prettier --write ..",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@diesel-parser/samples": "^1.0.0"
+  },
+  "devDependencies": {
+    "@diesel-parser/ts-facade": "^1.0.0",
+    "@types/chai": "^5.2.3",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^26.6.6",
+    "chai": "^6.2.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.6",
+    "mocha": "^12.0.3",
+    "prettier": "3.10.1",
+    "rimraf": "^6.1.3",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.0"
+  }
 }
